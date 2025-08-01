@@ -1,4 +1,5 @@
 use super::translate_ctx::*;
+use anstream::panic;
 use charon_lib::ast::*;
 use charon_lib::common::hash_by_addr::HashByAddr;
 use charon_lib::ids::Vector;
@@ -379,7 +380,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 |ty| tcx.try_normalize_erasing_regions(ty_env, ty).unwrap_or(ty),
                 || {},
             );
-        let hax_ty = raw_ty.sinto(self.hax_state());
+        let hax_ty = self.catch_sinto(raw_ty);
 
         // call the key method
         match raw_ty.kind()
@@ -388,7 +389,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             ty::Str => PtrMetadata::StrByteLen,
             ty::Slice(..) => PtrMetadata::SliceLen,
             ty::Dynamic(..) => match hax_ty.kind() {
-                hax::TyKind::Dynamic(self_ty, preds, region) => {
+                hax::TyKind::Dynamic(_, preds, _) => {
                     let hax::ClauseKind::Trait(trait_predicate) =
                     preds.predicates[0].0.kind.hax_skip_binder_ref() else {
                         unreachable!()
@@ -398,12 +399,12 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 }
                 _ => unreachable!("Unexpected hax type {hax_ty:?} for dynamic type: {ty:?}"),
             }
-            // This is NOT accurate -- if there is no generic clause that states `?Sized`
-            // Then it will be safe to return `Some(PtrMetadata::None)`.
-            // TODO: inquire the generic clause to get the accurate info.
-            ty::Placeholder(..) | ty::Infer(..) | ty::Param(..) | ty::Bound(..) => {
+            ty::Param(..) => {
                 PtrMetadata::InheritFrom(self.translate_ty(span, hax_ty)?)
             },
+            ty::Placeholder(..) | ty::Infer(..) | ty::Bound(..) => {
+                panic!("We should never encounter a placeholder, infer, or bound type from ptr_metadata translation. Got: {raw_ty:?}")
+            }
             _ => PtrMetadata::None,
         }
     }
