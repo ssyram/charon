@@ -1,4 +1,6 @@
 //! Desugar array/slice index operations to function calls.
+use std::ptr;
+
 use crate::llbc_ast::*;
 use crate::transform::TransformCtx;
 use derive_generic_visitor::*;
@@ -32,8 +34,11 @@ impl<'a> IndexVisitor<'a> {
         var
     }
 
+    /// transform `place: subplace[i]` into indexing function calls for `subplace` and `i`
     fn transform_place(&mut self, mut_access: bool, place: &mut Place) {
         use ProjectionElem::*;
+        // This function is naturally called recusively, so `subplace` cannot be another `Index` or `Subslice`.
+        // Hence, `subplace`, if still projecting, must be either a `Deref` or a `Field`.
         let Some((subplace, pe @ (Index { .. } | Subslice { .. }))) = place.as_projection() else {
             return;
         };
@@ -82,6 +87,10 @@ impl<'a> IndexVisitor<'a> {
             .into_ty()
         };
 
+        // TODO: find the metadata operand here
+        // do something similar to the `input_var` below, but for the metadata.
+        let ptr_metadata = todo!();
+
         // Push the statements:
         // `storage_live(tmp0)`
         // `tmp0 = &{mut}p`
@@ -89,7 +98,11 @@ impl<'a> IndexVisitor<'a> {
             let input_var = self.fresh_var(None, input_ty);
             let kind = RawStatement::Assign(
                 input_var.clone(),
-                Rvalue::Ref(subplace.clone(), BorrowKind::mutable(mut_access)),
+                Rvalue::Ref {
+                    place: subplace.clone(),
+                    kind: BorrowKind::mutable(mut_access),
+                    ptr_metadata,
+                },
             );
             self.statements.push(Statement::new(self.span, kind));
             input_var
@@ -183,7 +196,7 @@ impl<'a> IndexVisitor<'a> {
 
 /// The visitor methods.
 impl VisitBodyMut for IndexVisitor<'_> {
-    /// We explore places from the inside-out.
+    /// We explore places from the inside-out --- recursion naturally happens here.
     fn exit_place(&mut self, place: &mut Place) {
         // We have intercepted every traversal that would reach a place and pushed the correct
         // mutability on the stack.
@@ -215,12 +228,21 @@ impl VisitBodyMut for IndexVisitor<'_> {
         match x {
             // `UniqueImmutable` de facto gives mutable access and only shows up if there is nested
             // mutable access.
-            RawPtr(_, RefKind::Mut)
-            | Ref(_, BorrowKind::Mut | BorrowKind::TwoPhaseMut | BorrowKind::UniqueImmutable) => {
-                self.visit_inner_with_mutability(x, true)
+            RawPtr {
+                kind: RefKind::Mut, ..
             }
-            RawPtr(_, RefKind::Shared)
-            | Ref(_, BorrowKind::Shared | BorrowKind::Shallow)
+            | Ref {
+                kind: BorrowKind::Mut | BorrowKind::TwoPhaseMut | BorrowKind::UniqueImmutable,
+                ..
+            } => self.visit_inner_with_mutability(x, true),
+            RawPtr {
+                kind: RefKind::Shared,
+                ..
+            }
+            | Ref {
+                kind: BorrowKind::Shared | BorrowKind::Shallow,
+                ..
+            }
             | Discriminant(..)
             | Len(..) => self.visit_inner_with_mutability(x, false),
 

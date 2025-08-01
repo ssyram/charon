@@ -1189,7 +1189,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Rvalue::Use(x) => write!(f, "{}", x.with_ctx(ctx)),
-            Rvalue::Ref(place, borrow_kind) => {
+            Rvalue::Ref { place, kind:borrow_kind, ptr_metadata } => {
                 let borrow_kind = match borrow_kind {
                     BorrowKind::Shared => "&",
                     BorrowKind::Mut => "&mut ",
@@ -1197,14 +1197,20 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
                     BorrowKind::UniqueImmutable => "&uniq ",
                     BorrowKind::Shallow => "&shallow ",
                 };
-                write!(f, "{borrow_kind}{}", place.with_ctx(ctx))
+                match ptr_metadata {
+                    Some(metadata) => write!(f, "{borrow_kind}({}, {})", place.with_ctx(ctx), metadata.with_ctx(ctx)),
+                    None => write!(f, "{borrow_kind}{}", place.with_ctx(ctx)),
+                }
             }
-            Rvalue::RawPtr(place, mutability) => {
+            Rvalue::RawPtr { place, kind:mutability, ptr_metadata } => {
                 let ptr_kind = match mutability {
                     RefKind::Shared => "&raw const ",
                     RefKind::Mut => "&raw mut ",
                 };
-                write!(f, "{ptr_kind}{}", place.with_ctx(ctx))
+                match ptr_metadata {
+                    Some(metadata) => write!(f, "{ptr_kind}({}, {})", place.with_ctx(ctx), metadata.with_ctx(ctx)),
+                    None => write!(f, "{ptr_kind}{}", place.with_ctx(ctx)),
+                }
             }
 
             Rvalue::BinaryOp(binop, x, y) => {
