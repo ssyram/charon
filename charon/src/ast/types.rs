@@ -820,6 +820,9 @@ pub enum TyKind {
     /// variables (those that could appear in a function pointer type like `for<'a> fn(&'a u32)`),
     /// we need to bind them here.
     FnDef(RegionBinder<FnPtr>),
+    /// As a marker of taking out metadata from a given type
+    /// The internal type is assumed to be a type variable
+    PtrMetadata(Ty),
     /// A type that could not be computed or was incorrect.
     #[drive(skip)]
     Error(String),

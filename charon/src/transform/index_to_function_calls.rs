@@ -1,5 +1,4 @@
 //! Desugar array/slice index operations to function calls.
-use std::ptr;
 
 use crate::llbc_ast::*;
 use crate::transform::TransformCtx;
@@ -13,7 +12,7 @@ use super::ctx::LlbcPass;
 /// We accumulate the new assignments as statements in the visitor, and at the end we insert these
 /// statements before the one that was just explored.
 #[derive(Visitor)]
-struct IndexVisitor<'a> {
+struct IndexVisitor<'a, 'b> {
     locals: &'a mut Locals,
     /// Statements to prepend to the statement currently being explored.
     statements: Vec<Statement>,
@@ -24,14 +23,53 @@ struct IndexVisitor<'a> {
     place_mutability_stack: Vec<bool>,
     // Span of the statement.
     span: Span,
+    ty_ptr_metadata: &'b dyn Fn(&Ty) -> PtrMetadata,
 }
 
-impl<'a> IndexVisitor<'a> {
+/// Get the outmost deref of a place, if it exists. Returns the place that the deref happens on.
+fn outmost_deref(place: &Place) -> Option<&Place> {
+    let (subplace, proj) = place.as_projection()?;
+    match proj {
+        ProjectionElem::Deref => Some(subplace),
+        _ => outmost_deref(subplace),
+    }
+}
+
+impl<'a, 'b> IndexVisitor<'a, 'b> {
     fn fresh_var(&mut self, name: Option<String>, ty: Ty) -> Place {
         let var = self.locals.new_var(name, ty);
         let live_kind = RawStatement::StorageLive(var.local_id());
         self.statements.push(Statement::new(self.span, live_kind));
         var
+    }
+
+    fn get_ptr_metadata_aux(&mut self, place: &Place) -> Option<Operand> {
+        let place = outmost_deref(place)?;
+        let ty = match (self.ty_ptr_metadata)(place.ty()) {
+            PtrMetadata::None => None,
+            PtrMetadata::Length => Some(Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)))),
+            PtrMetadata::VTable(type_decl_ref) => Some(Ty::new(TyKind::Ref(
+                Region::Static,
+                Ty::new(TyKind::Adt(type_decl_ref)),
+                RefKind::Shared,
+            ))),
+            PtrMetadata::InheritFrom(ty) => Some(Ty::new(TyKind::PtrMetadata(ty))),
+        }?;
+        let new_place = self.fresh_var(None, ty);
+        // it is `Copy` because `place` is a deref, which means it is a pointer / ref
+        let statement = RawStatement::Assign(
+            new_place.clone(),
+            Rvalue::UnaryOp(UnOp::PtrMetadata, Operand::Copy(place.clone())),
+        );
+        self.statements.push(Statement::new(self.span, statement));
+        Some(Operand::Move(new_place))
+    }
+
+    fn get_ptr_metadata(&mut self, place: &Place) -> Operand {
+        match self.get_ptr_metadata_aux(place) {
+            Some(metadata) => metadata,
+            None => Operand::mk_const_unit(), // No metadata, use unit
+        }
     }
 
     /// transform `place: subplace[i]` into indexing function calls for `subplace` and `i`
@@ -87,9 +125,8 @@ impl<'a> IndexVisitor<'a> {
             .into_ty()
         };
 
-        // TODO: find the metadata operand here
         // do something similar to the `input_var` below, but for the metadata.
-        let ptr_metadata = todo!();
+        let ptr_metadata = self.get_ptr_metadata(subplace);
 
         // Push the statements:
         // `storage_live(tmp0)`
@@ -195,7 +232,7 @@ impl<'a> IndexVisitor<'a> {
 }
 
 /// The visitor methods.
-impl VisitBodyMut for IndexVisitor<'_> {
+impl VisitBodyMut for IndexVisitor<'_, '_> {
     /// We explore places from the inside-out --- recursion naturally happens here.
     fn exit_place(&mut self, place: &mut Place) {
         // We have intercepted every traversal that would reach a place and pushed the correct
@@ -317,13 +354,14 @@ pub struct Transform;
 ///   *tmp1 = x
 /// ```
 impl LlbcPass for Transform {
-    fn transform_body(&self, _ctx: &mut TransformCtx, b: &mut ExprBody) {
+    fn transform_body(&self, ctx: &mut TransformCtx, b: &mut ExprBody) {
         b.body.transform(|st: &mut Statement| {
             let mut visitor = IndexVisitor {
                 locals: &mut b.locals,
                 statements: Vec::new(),
                 place_mutability_stack: Vec::new(),
                 span: st.span,
+                ty_ptr_metadata: &|ty| ty.get_ptr_metadata(&ctx.translated),
             };
             use RawStatement::*;
             match &mut st.content {

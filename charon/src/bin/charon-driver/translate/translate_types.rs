@@ -375,35 +375,41 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             .instantiate(tcx, item.rustc_args(hax_state));
 
         // call the key method
-        let raw_ty = tcx
-            .struct_tail_raw(
-                ty,
-                |ty| tcx.try_normalize_erasing_regions(ty_env, ty).unwrap_or(ty),
-                || {},
-            );
+        let raw_ty = tcx.struct_tail_raw(
+            ty,
+            |ty| tcx.try_normalize_erasing_regions(ty_env, ty).unwrap_or(ty),
+            || {},
+        );
         let hax_ty = self.catch_sinto(raw_ty);
 
-        match raw_ty.kind()
-        {
+        match raw_ty.kind() {
             ty::Foreign(..) => PtrMetadata::None,
             ty::Str | ty::Slice(..) => PtrMetadata::Length,
             ty::Dynamic(..) => match hax_ty.kind() {
                 hax::TyKind::Dynamic(_, preds, _) => {
-                    let vtable = self.translate_region_binder(span, preds.predicates[0].0.kind, |ctx, trait_clause| {
-                        let hax::ClauseKind::Trait(trait_predicate) = trait_clause.kind else {
-                            unreachable!()
-                        };
-                        self.translate_vtable_struct_ref(span, &trait_predicate.trait_ref)?.unwrap()
-                    })?.erase();
+                    let vtable = self
+                        .translate_region_binder(
+                            span,
+                            preds.predicates[0].0.kind,
+                            |ctx, trait_clause| {
+                                let hax::ClauseKind::Trait(trait_predicate) = trait_clause.kind
+                                else {
+                                    unreachable!()
+                                };
+                                self.translate_vtable_struct_ref(span, &trait_predicate.trait_ref)?
+                                    .unwrap()
+                            },
+                        )?
+                        .erase();
                     PtrMetadata::VTable(vtable)
                 }
                 _ => unreachable!("Unexpected hax type {hax_ty:?} for dynamic type: {ty:?}"),
-            }
-            ty::Param(..) => {
-                PtrMetadata::InheritFrom(self.translate_ty(span, hax_ty)?)
             },
+            ty::Param(..) => PtrMetadata::InheritFrom(self.translate_ty(span, hax_ty)?),
             ty::Placeholder(..) | ty::Infer(..) | ty::Bound(..) => {
-                panic!("We should never encounter a placeholder, infer, or bound type from ptr_metadata translation. Got: {raw_ty:?}")
+                panic!(
+                    "We should never encounter a placeholder, infer, or bound type from ptr_metadata translation. Got: {raw_ty:?}"
+                )
             }
             _ => PtrMetadata::None,
         }
