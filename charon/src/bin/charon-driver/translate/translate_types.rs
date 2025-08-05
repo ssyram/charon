@@ -363,7 +363,11 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     /// Translate a Dynamically Sized Type metadata kind.
     ///
     /// Returns `None` if the type is generic, or if it is not a DST.
-    pub fn translate_ptr_metadata(&self, item: &hax::ItemRef) -> PtrMetadata {
+    pub fn translate_ptr_metadata(
+        &self,
+        span: Span,
+        item: &hax::ItemRef,
+    ) -> Result<PtrMetadata, Error> {
         // prepare the call to the method
         use rustc_middle::ty;
         let tcx = self.t_ctx.tcx;
@@ -380,9 +384,11 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             |ty| tcx.try_normalize_erasing_regions(ty_env, ty).unwrap_or(ty),
             || {},
         );
-        let hax_ty = self.catch_sinto(raw_ty);
+        let hax_ty: &hax::Ty =
+            // self.t_ctx.catch_sinto(hax_state, span, &raw_ty)?;
+            todo!();
 
-        match raw_ty.kind() {
+        let ret = match raw_ty.kind() {
             ty::Foreign(..) => PtrMetadata::None,
             ty::Str | ty::Slice(..) => PtrMetadata::Length,
             ty::Dynamic(..) => match hax_ty.kind() {
@@ -390,14 +396,14 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                     let vtable = self
                         .translate_region_binder(
                             span,
-                            preds.predicates[0].0.kind,
-                            |ctx, trait_clause| {
-                                let hax::ClauseKind::Trait(trait_predicate) = trait_clause.kind
-                                else {
+                            &preds.predicates[0].0.kind,
+                            |ctx, kind: &hax::ClauseKind| {
+                                let hax::ClauseKind::Trait(trait_predicate) = kind else {
                                     unreachable!()
                                 };
-                                self.translate_vtable_struct_ref(span, &trait_predicate.trait_ref)?
-                                    .unwrap()
+                                Ok(self
+                                    .translate_vtable_struct_ref(span, &trait_predicate.trait_ref)?
+                                    .unwrap())
                             },
                         )?
                         .erase();
@@ -412,7 +418,9 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 )
             }
             _ => PtrMetadata::None,
-        }
+        };
+
+        Ok(ret)
     }
 
     /// Translate a type layout.
