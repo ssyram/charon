@@ -79,7 +79,15 @@ fn transform_constant_expr(
                     let bvar = new_var(Rvalue::Use(bval), bval_ty);
 
                     // Borrow the value
-                    let ref_var = new_var(Rvalue::Ref(bvar, BorrowKind::Shared), val.ty);
+                    // As the value is originally an argument, it must be Sized
+                    let ref_var = new_var(
+                        Rvalue::Ref {
+                            place: bvar,
+                            kind: BorrowKind::Shared,
+                            ptr_metadata: Operand::mk_const_unit(),
+                        },
+                        val.ty,
+                    );
 
                     Operand::Move(ref_var)
                 }
@@ -99,7 +107,15 @@ fn transform_constant_expr(
                     let bvar = new_var(Rvalue::Use(bval), bval_ty);
 
                     // Borrow the value
-                    let ref_var = new_var(Rvalue::RawPtr(bvar, rk), val.ty);
+                    // The same as the above
+                    let ref_var = new_var(
+                        Rvalue::RawPtr {
+                            place: bvar,
+                            kind: rk,
+                            ptr_metadata: Operand::mk_const_unit(),
+                        },
+                        val.ty,
+                    );
 
                     Operand::Move(ref_var)
                 }

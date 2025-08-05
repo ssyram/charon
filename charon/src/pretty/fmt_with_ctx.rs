@@ -1202,15 +1202,12 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
                     BorrowKind::UniqueImmutable => "&uniq ",
                     BorrowKind::Shallow => "&shallow ",
                 };
-                match ptr_metadata {
-                    Some(metadata) => write!(
-                        f,
-                        "{borrow_kind}({}, {})",
-                        place.with_ctx(ctx),
-                        metadata.with_ctx(ctx)
-                    ),
-                    None => write!(f, "{borrow_kind}{}", place.with_ctx(ctx)),
-                }
+                write!(
+                    f,
+                    "{borrow_kind}({}, {})",
+                    place.with_ctx(ctx),
+                    ptr_metadata.with_ctx(ctx)
+                )
             }
             Rvalue::RawPtr {
                 place,
@@ -1221,15 +1218,12 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
                     RefKind::Shared => "&raw const ",
                     RefKind::Mut => "&raw mut ",
                 };
-                match ptr_metadata {
-                    Some(metadata) => write!(
-                        f,
-                        "{ptr_kind}({}, {})",
-                        place.with_ctx(ctx),
-                        metadata.with_ctx(ctx)
-                    ),
-                    None => write!(f, "{ptr_kind}{}", place.with_ctx(ctx)),
-                }
+                write!(
+                    f,
+                    "{ptr_kind}({}, {})",
+                    place.with_ctx(ctx),
+                    ptr_metadata.with_ctx(ctx)
+                )
             }
 
             Rvalue::BinaryOp(binop, x, y) => {
@@ -1839,6 +1833,9 @@ impl<C: AstFormatter> FmtWithCtx<C> for Ty {
                     write!(f, "for<{regions}> ",)?
                 };
                 write!(f, "{value}",)
+            }
+            TyKind::PtrMetadata(ty) => {
+                write!(f, "PtrMetadata<{}>", ty.with_ctx(ctx))
             }
             TyKind::Error(msg) => write!(f, "type_error(\"{msg}\")"),
         }
