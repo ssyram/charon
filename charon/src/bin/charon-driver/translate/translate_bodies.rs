@@ -417,7 +417,9 @@ impl BodyTransCtx<'_, '_, '_> {
                 Ok(Rvalue::Ref {
                     place,
                     kind: borrow_kind,
-                    ptr_metadata: todo!(),
+                    // Use `()` as a placeholder now.
+                    // Will be fixed by the cleanup pass `insert_ptr_metadata`.
+                    ptr_metadata: Operand::mk_const_unit(),
                 })
             }
             hax::Rvalue::RawPtr(mtbl, place) => {
@@ -430,7 +432,9 @@ impl BodyTransCtx<'_, '_, '_> {
                 Ok(Rvalue::RawPtr {
                     place,
                     kind: mtbl,
-                    ptr_metadata: todo!(),
+                    // Use `()` as a placeholder now.
+                    // Will be fixed by the cleanup pass `insert_ptr_metadata`.
+                    ptr_metadata: Operand::mk_const_unit(),
                 })
             }
             hax::Rvalue::Len(place) => {

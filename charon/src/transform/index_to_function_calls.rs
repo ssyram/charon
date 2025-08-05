@@ -5,6 +5,7 @@ use crate::transform::TransformCtx;
 use derive_generic_visitor::*;
 
 use super::ctx::LlbcPass;
+use crate::transform::insert_ptr_metadata::*;
 
 /// We replace some place constructors with function calls. To do that, we explore all the places
 /// in a body and deconstruct a given place access into intermediate assignments.
@@ -23,55 +24,33 @@ struct IndexVisitor<'a, 'b> {
     place_mutability_stack: Vec<bool>,
     // Span of the statement.
     span: Span,
-    ty_ptr_metadata: &'b dyn Fn(&Ty) -> PtrMetadata,
+    translated: &'b TranslatedCrate,
 }
 
-/// Get the outmost deref of a place, if it exists. Returns the place that the deref happens on.
-fn outmost_deref(place: &Place) -> Option<&Place> {
-    let (subplace, proj) = place.as_projection()?;
-    match proj {
-        ProjectionElem::Deref => Some(subplace),
-        _ => outmost_deref(subplace),
+impl PtrMetadataComputable for IndexVisitor<'_, '_> {
+    fn get_translated(&self) -> &TranslatedCrate {
+        self.translated
+    }
+    
+    fn get_locals_mut(&mut self) -> &mut Locals {
+        self.locals
+    }
+    
+    fn insert_storage_live_stmt(&mut self, local: LocalId) {
+        let statement = RawStatement::StorageLive(local);
+        self.statements.push(Statement::new(self.span, statement));
+    }
+    
+    fn insert_assn_stmt(&mut self, place: Place, rvalue: Rvalue) {
+        let statement = RawStatement::Assign(
+            place,
+            rvalue,
+        );
+        self.statements.push(Statement::new(self.span, statement));
     }
 }
 
 impl<'a, 'b> IndexVisitor<'a, 'b> {
-    fn fresh_var(&mut self, name: Option<String>, ty: Ty) -> Place {
-        let var = self.locals.new_var(name, ty);
-        let live_kind = RawStatement::StorageLive(var.local_id());
-        self.statements.push(Statement::new(self.span, live_kind));
-        var
-    }
-
-    fn get_ptr_metadata_aux(&mut self, place: &Place) -> Option<Operand> {
-        let place = outmost_deref(place)?;
-        let ty = match (self.ty_ptr_metadata)(place.ty()) {
-            PtrMetadata::None => None,
-            PtrMetadata::Length => Some(Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)))),
-            PtrMetadata::VTable(type_decl_ref) => Some(Ty::new(TyKind::Ref(
-                Region::Static,
-                Ty::new(TyKind::Adt(type_decl_ref)),
-                RefKind::Shared,
-            ))),
-            PtrMetadata::InheritFrom(ty) => Some(Ty::new(TyKind::PtrMetadata(ty))),
-        }?;
-        let new_place = self.fresh_var(None, ty);
-        // it is `Copy` because `place` is a deref, which means it is a pointer / ref
-        let statement = RawStatement::Assign(
-            new_place.clone(),
-            Rvalue::UnaryOp(UnOp::PtrMetadata, Operand::Copy(place.clone())),
-        );
-        self.statements.push(Statement::new(self.span, statement));
-        Some(Operand::Move(new_place))
-    }
-
-    fn get_ptr_metadata(&mut self, place: &Place) -> Operand {
-        match self.get_ptr_metadata_aux(place) {
-            Some(metadata) => metadata,
-            None => Operand::mk_const_unit(), // No metadata, use unit
-        }
-    }
-
     /// transform `place: subplace[i]` into indexing function calls for `subplace` and `i`
     fn transform_place(&mut self, mut_access: bool, place: &mut Place) {
         use ProjectionElem::*;
@@ -126,7 +105,7 @@ impl<'a, 'b> IndexVisitor<'a, 'b> {
         };
 
         // do something similar to the `input_var` below, but for the metadata.
-        let ptr_metadata = self.get_ptr_metadata(subplace);
+        let ptr_metadata = place_ptr_metadata_operand(self,subplace);
 
         // Push the statements:
         // `storage_live(tmp0)`
@@ -361,7 +340,7 @@ impl LlbcPass for Transform {
                 statements: Vec::new(),
                 place_mutability_stack: Vec::new(),
                 span: st.span,
-                ty_ptr_metadata: &|ty| ty.get_ptr_metadata(&ctx.translated),
+                translated: &ctx.translated,
             };
             use RawStatement::*;
             match &mut st.content {
