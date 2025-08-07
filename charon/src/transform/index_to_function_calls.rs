@@ -165,7 +165,7 @@ impl<'a, 'b> IndexVisitor<'a, 'b> {
                 ),
             );
             self.statements.push(Statement::new(self.span, kind));
-            let dead_kind = RawStatement::StorageDead(len_var.local_id());
+            let dead_kind = RawStatement::StorageDead(len_var.local_id().unwrap());
             self.statements.push(Statement::new(self.span, dead_kind));
             args.push(Operand::Copy(index_var));
         } else {
@@ -259,8 +259,8 @@ impl VisitBodyMut for IndexVisitor<'_, '_> {
             | Discriminant(..)
             | Len(..) => self.visit_inner_with_mutability(x, false),
 
-            Use(_) | NullaryOp(..) | UnaryOp(..) | BinaryOp(..) | Aggregate(..) | Global(..)
-            | GlobalRef(..) | Repeat(..) | ShallowInitBox(..) => self.visit_inner(x),
+            Use(_) | NullaryOp(..) | UnaryOp(..) | BinaryOp(..) | Aggregate(..) | Repeat(..)
+            | ShallowInitBox(..) => self.visit_inner(x),
         }
     }
 
