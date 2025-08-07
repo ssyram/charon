@@ -14,6 +14,7 @@ pub mod index_to_function_calls;
 pub mod inline_local_panic_functions;
 pub mod inline_promoted_consts;
 pub mod insert_assign_return_unit;
+pub mod insert_ptr_metadata;
 pub mod insert_storage_lives;
 pub mod lift_associated_item_clauses;
 pub mod merge_goto_chains;
@@ -37,7 +38,6 @@ pub mod skip_trait_refs_when_known;
 pub mod ullbc_to_llbc;
 pub mod unbind_item_vars;
 pub mod update_block_indices;
-pub mod insert_ptr_metadata;
 pub mod utils;
 
 use Pass::*;

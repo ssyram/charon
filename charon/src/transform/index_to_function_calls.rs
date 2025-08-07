@@ -31,21 +31,18 @@ impl PtrMetadataComputable for IndexVisitor<'_, '_> {
     fn get_translated(&self) -> &TranslatedCrate {
         self.translated
     }
-    
+
     fn get_locals_mut(&mut self) -> &mut Locals {
         self.locals
     }
-    
+
     fn insert_storage_live_stmt(&mut self, local: LocalId) {
         let statement = RawStatement::StorageLive(local);
         self.statements.push(Statement::new(self.span, statement));
     }
-    
+
     fn insert_assn_stmt(&mut self, place: Place, rvalue: Rvalue) {
-        let statement = RawStatement::Assign(
-            place,
-            rvalue,
-        );
+        let statement = RawStatement::Assign(place, rvalue);
         self.statements.push(Statement::new(self.span, statement));
     }
 }
@@ -105,7 +102,7 @@ impl<'a, 'b> IndexVisitor<'a, 'b> {
         };
 
         // do something similar to the `input_var` below, but for the metadata.
-        let ptr_metadata = place_ptr_metadata_operand(self,subplace);
+        let ptr_metadata = place_ptr_metadata_operand(self, subplace);
 
         // Push the statements:
         // `storage_live(tmp0)`

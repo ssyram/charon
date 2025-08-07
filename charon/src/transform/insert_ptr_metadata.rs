@@ -1,5 +1,5 @@
-use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
 use crate::transform::TransformCtx;
+use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
 use derive_generic_visitor::*;
 
 #[derive(Visitor)]
@@ -31,10 +31,8 @@ impl PtrMetadataComputable for BodyVisitor<'_, '_> {
     }
 
     fn insert_storage_live_stmt(&mut self, local: LocalId) {
-        self.statements.push(Statement::new(
-            self.span,
-            RawStatement::StorageLive(local),
-        ));
+        self.statements
+            .push(Statement::new(self.span, RawStatement::StorageLive(local)));
     }
 
     fn insert_assn_stmt(&mut self, place: Place, rvalue: Rvalue) {
@@ -58,7 +56,7 @@ fn outmost_deref(place: &Place) -> Option<&Place> {
     }
 }
 
-fn get_ptr_metadata_aux<T : PtrMetadataComputable>(ctx : &mut T, place: &Place) -> Option<Operand> {
+fn get_ptr_metadata_aux<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) -> Option<Operand> {
     let place = outmost_deref(place)?;
     let ty = match place.ty().get_ptr_metadata(ctx.get_translated()) {
         PtrMetadata::None => None,
@@ -82,7 +80,7 @@ fn get_ptr_metadata_aux<T : PtrMetadataComputable>(ctx : &mut T, place: &Place) 
 /// When a place is to be referred to as a reference or a raw pointer, we compute the metadata required
 /// for this operation and return it as an operand.
 /// New locals & statements are to be inserted before the target place to keep the metadata.
-pub fn place_ptr_metadata_operand<T : PtrMetadataComputable>(ctx : &mut T, place: &Place) -> Operand {
+pub fn place_ptr_metadata_operand<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) -> Operand {
     match get_ptr_metadata_aux(ctx, place) {
         Some(metadata) => metadata,
         None => Operand::mk_const_unit(), // No metadata, use unit
@@ -90,25 +88,25 @@ pub fn place_ptr_metadata_operand<T : PtrMetadataComputable>(ctx : &mut T, place
 }
 
 impl VisitBodyMut for BodyVisitor<'_, '_> {
-    fn visit_rvalue(&mut self,x: &mut Rvalue) -> ::std::ops::ControlFlow<Self::Break> {
+    fn visit_rvalue(&mut self, x: &mut Rvalue) -> ::std::ops::ControlFlow<Self::Break> {
         match x {
             Rvalue::Ref { place, kind, .. } => {
                 let metadata = place_ptr_metadata_operand(self, &place);
                 *x = Rvalue::Ref {
-                    place:place.clone(),
-                    kind:*kind,
-                    ptr_metadata: metadata,
-                };
-            },
-            Rvalue::RawPtr { place, kind, .. } => {
-                let metadata = place_ptr_metadata_operand(self, &place);
-                *x = Rvalue::RawPtr {
-                    place:place.clone(),
-                    kind:*kind,
+                    place: place.clone(),
+                    kind: *kind,
                     ptr_metadata: metadata,
                 };
             }
-            _ => { }
+            Rvalue::RawPtr { place, kind, .. } => {
+                let metadata = place_ptr_metadata_operand(self, &place);
+                *x = Rvalue::RawPtr {
+                    place: place.clone(),
+                    kind: *kind,
+                    ptr_metadata: metadata,
+                };
+            }
+            _ => {}
         }
         Continue(())
     }
@@ -118,12 +116,12 @@ pub struct Transform;
 
 /// This pass computes the metadata for Rvalue, which is used to create references and raw pointers.
 /// E.g., in cases like:
-/// ```no_run
+/// ```ignore
 /// let x = &[mut] (*some_v).field;
 /// ```
 /// If the `(*some_v).field` is a DST, like `[i32]`, we will need to fetch the metadata, i.e., the length of the slice,
 /// and store it in a local variable, then we have:
-/// ```no_run
+/// ```ignore
 /// let x = Rvalue::Ref { place:(*some_v).field, kind: [mut], ptr_metadata: PtrMetadata(some_v) };
 /// ```
 /// There should be a new local variable introduced to store `PtrMetadata(some_v)`.

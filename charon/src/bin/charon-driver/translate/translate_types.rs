@@ -364,7 +364,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     ///
     /// Returns `None` if the type is generic, or if it is not a DST.
     pub fn translate_ptr_metadata(
-        &self,
+        &mut self,
         span: Span,
         item: &hax::ItemRef,
     ) -> Result<PtrMetadata, Error> {
@@ -384,9 +384,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
             |ty| tcx.try_normalize_erasing_regions(ty_env, ty).unwrap_or(ty),
             || {},
         );
-        let hax_ty: &hax::Ty =
-            // self.t_ctx.catch_sinto(hax_state, span, &raw_ty)?;
-            todo!();
+        let hax_ty: &hax::Ty = &self.t_ctx.catch_sinto(hax_state, span, &raw_ty)?;
 
         let ret = match raw_ty.kind() {
             ty::Foreign(..) => PtrMetadata::None,
@@ -401,7 +399,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                                 let hax::ClauseKind::Trait(trait_predicate) = kind else {
                                     unreachable!()
                                 };
-                                Ok(self
+                                Ok(ctx
                                     .translate_vtable_struct_ref(span, &trait_predicate.trait_ref)?
                                     .unwrap())
                             },
