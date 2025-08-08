@@ -291,12 +291,15 @@ and ty_to_string (env : 'a fmt_env) (ty : ty) : string =
       let fn = fn_ptr_to_string env f.binder_value in
       fn
   | TDynTrait pred ->
-    let (regions, clauses) = generic_params_to_strings env pred.binder.binder_params in
-    let reg_str = match regions with
-      | [] -> ""
-      | r :: _ -> " + " ^ r
-    in
-    "dyn (" ^ String.concat " + " clauses ^ reg_str ^ ")"
+      let regions, clauses =
+        generic_params_to_strings env pred.binder.binder_params
+      in
+      let reg_str =
+        match regions with
+        | [] -> ""
+        | r :: _ -> " + " ^ r
+      in
+      "dyn (" ^ String.concat " + " clauses ^ reg_str ^ ")"
   | TPtrMetadata ty -> "PtrMetadata(" ^ ty_to_string env ty ^ ")"
   | TError msg -> "type_error (\"" ^ msg ^ "\")"
 
