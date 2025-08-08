@@ -20,7 +20,7 @@ pub trait PtrMetadataComputable {
     fn get_translated(&self) -> &TranslatedCrate;
     fn fresh_var(&mut self, name: Option<String>, ty: Ty) -> Place {
         let var = self.get_locals_mut().new_var(name, ty);
-        self.insert_storage_live_stmt(var.local_id());
+        self.insert_storage_live_stmt(var.local_id().unwrap());
         var
     }
 }

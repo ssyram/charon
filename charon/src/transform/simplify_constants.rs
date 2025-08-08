@@ -70,7 +70,12 @@ fn transform_constant_expr(
         RawConstantExpr::Ref(bval) => {
             match bval.value {
                 RawConstantExpr::Global(global_ref) => Operand::Move(new_var(
-                    Rvalue::Ref(Place::new_global(global_ref, bval.ty), BorrowKind::Shared),
+                    // This is a reference to a global constant, which must be Sized, so no metadata
+                    Rvalue::Ref {
+                        place: Place::new_global(global_ref, bval.ty),
+                        kind: BorrowKind::Shared,
+                        ptr_metadata: Operand::mk_const_unit(),
+                    },
                     val.ty,
                 )),
                 _ => {
@@ -99,7 +104,12 @@ fn transform_constant_expr(
         RawConstantExpr::Ptr(rk, bval) => {
             match bval.value {
                 RawConstantExpr::Global(global_ref) => Operand::Move(new_var(
-                    Rvalue::RawPtr(Place::new_global(global_ref, bval.ty), rk),
+                    // This is a raw pointer to a global constant, which must be Sized, so no metadata
+                    Rvalue::RawPtr {
+                        place: Place::new_global(global_ref, bval.ty),
+                        kind: rk,
+                        ptr_metadata: Operand::mk_const_unit(),
+                    },
                     val.ty,
                 )),
                 _ => {
