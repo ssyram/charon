@@ -69,15 +69,18 @@ fn transform_constant_expr(
         }
         RawConstantExpr::Ref(bval) => {
             match bval.value {
-                RawConstantExpr::Global(global_ref) => Operand::Move(new_var(
-                    // This is a reference to a global constant, which must be Sized, so no metadata
-                    Rvalue::Ref {
-                        place: Place::new_global(global_ref, bval.ty),
-                        kind: BorrowKind::Shared,
-                        ptr_metadata: Operand::mk_const_unit(),
-                    },
-                    val.ty,
-                )),
+                RawConstantExpr::Global(global_ref) => {
+                    let unit_metadata = new_var(Rvalue::unit_value(), Ty::mk_unit());
+                    Operand::Move(new_var(
+                        // This is a reference to a global constant, which must be Sized, so no metadata
+                        Rvalue::Ref {
+                            place: Place::new_global(global_ref, bval.ty),
+                            kind: BorrowKind::Shared,
+                            ptr_metadata: Operand::Move(unit_metadata),
+                        },
+                        val.ty,
+                    ))
+                }
                 _ => {
                     // Recurse on the borrowed value
                     let bval_ty = bval.ty.clone();
@@ -86,13 +89,15 @@ fn transform_constant_expr(
                     // Evaluate the referenced value
                     let bvar = new_var(Rvalue::Use(bval), bval_ty);
 
+                    let unit_metadata = new_var(Rvalue::unit_value(), Ty::mk_unit());
+
                     // Borrow the value
                     // As the value is originally an argument, it must be Sized
                     let ref_var = new_var(
                         Rvalue::Ref {
                             place: bvar,
                             kind: BorrowKind::Shared,
-                            ptr_metadata: Operand::mk_const_unit(),
+                            ptr_metadata: Operand::Move(unit_metadata),
                         },
                         val.ty,
                     );
@@ -103,15 +108,18 @@ fn transform_constant_expr(
         }
         RawConstantExpr::Ptr(rk, bval) => {
             match bval.value {
-                RawConstantExpr::Global(global_ref) => Operand::Move(new_var(
-                    // This is a raw pointer to a global constant, which must be Sized, so no metadata
-                    Rvalue::RawPtr {
-                        place: Place::new_global(global_ref, bval.ty),
-                        kind: rk,
-                        ptr_metadata: Operand::mk_const_unit(),
-                    },
-                    val.ty,
-                )),
+                RawConstantExpr::Global(global_ref) => {
+                    let unit_metadata = new_var(Rvalue::unit_value(), Ty::mk_unit());
+                    Operand::Move(new_var(
+                        // This is a raw pointer to a global constant, which must be Sized, so no metadata
+                        Rvalue::RawPtr {
+                            place: Place::new_global(global_ref, bval.ty),
+                            kind: rk,
+                            ptr_metadata: Operand::Move(unit_metadata),
+                        },
+                        val.ty,
+                    ))
+                }
                 _ => {
                     // Recurse on the borrowed value
                     let bval_ty = bval.ty.clone();
@@ -120,13 +128,15 @@ fn transform_constant_expr(
                     // Evaluate the referenced value
                     let bvar = new_var(Rvalue::Use(bval), bval_ty);
 
+                    let unit_metadata = new_var(Rvalue::unit_value(), Ty::mk_unit());
+
                     // Borrow the value
-                    // The same as the above
+                    // As the value is originally an argument, it must be Sized, hence no metadata
                     let ref_var = new_var(
                         Rvalue::RawPtr {
                             place: bvar,
                             kind: rk,
-                            ptr_metadata: Operand::mk_const_unit(),
+                            ptr_metadata: Operand::Move(unit_metadata),
                         },
                         val.ty,
                     );

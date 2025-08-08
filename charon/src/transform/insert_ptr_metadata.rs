@@ -83,7 +83,13 @@ fn get_ptr_metadata_aux<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) ->
 pub fn place_ptr_metadata_operand<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) -> Operand {
     match get_ptr_metadata_aux(ctx, place) {
         Some(metadata) => metadata,
-        None => Operand::mk_const_unit(), // No metadata, use unit
+        // No metadata, use unit, but as const ADT (for `()`) is not allowed
+        // Introduce a new local to hold this
+        None => {
+            let new_place = ctx.fresh_var(None, Ty::mk_unit());
+            ctx.insert_assn_stmt(new_place.clone(), Rvalue::unit_value());
+            Operand::Move(new_place)
+        }
     }
 }
 
