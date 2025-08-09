@@ -1,3 +1,5 @@
+use crate::formatter::IntoFormatter;
+use crate::pretty::FmtWithCtx;
 use crate::transform::TransformCtx;
 use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
 use derive_generic_visitor::*;
@@ -8,7 +10,7 @@ struct BodyVisitor<'a, 'b> {
     /// Statements to prepend to the statement currently being explored.
     statements: Vec<Statement>,
     span: Span,
-    translated: &'b TranslatedCrate,
+    ctx: &'b TransformCtx,
 }
 
 /// A helper trait to compute the metadata for a given place we are to make ref / raw-ptr from.
@@ -17,7 +19,7 @@ pub trait PtrMetadataComputable {
     fn get_locals_mut(&mut self) -> &mut Locals;
     fn insert_storage_live_stmt(&mut self, local: LocalId);
     fn insert_assn_stmt(&mut self, place: Place, rvalue: Rvalue);
-    fn get_translated(&self) -> &TranslatedCrate;
+    fn get_ctx(&self) -> &TransformCtx;
     fn fresh_var(&mut self, name: Option<String>, ty: Ty) -> Place {
         let var = self.get_locals_mut().new_var(name, ty);
         self.insert_storage_live_stmt(var.local_id().unwrap());
@@ -42,23 +44,34 @@ impl PtrMetadataComputable for BodyVisitor<'_, '_> {
         ));
     }
 
-    fn get_translated(&self) -> &TranslatedCrate {
-        self.translated
+    fn get_ctx(&self) -> &TransformCtx {
+        self.ctx
     }
 }
 
-/// Get the outmost deref of a place, if it exists. Returns the place that the deref happens on.
-fn outmost_deref(place: &Place) -> Option<&Place> {
+/// Get the outmost deref of a place, if it exists. Returns the place that the deref happens upon and the derefed type.
+fn outmost_deref(place: &Place) -> Option<(&Place, &Ty)> {
     let (subplace, proj) = place.as_projection()?;
     match proj {
-        ProjectionElem::Deref => Some(subplace),
+        // *subplace
+        // So that `subplace` is a pointer / reference type
+        // We will need to keep the derefed type to get the metadata type
+        ProjectionElem::Deref => Some((subplace, place.ty())),
         _ => outmost_deref(subplace),
     }
 }
 
 fn get_ptr_metadata_aux<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) -> Option<Operand> {
-    let place = outmost_deref(place)?;
-    let ty = match place.ty().get_ptr_metadata(ctx.get_translated()) {
+    trace!(
+        "getting ptr metadata for place: {}",
+        place.with_ctx(&ctx.get_ctx().into_fmt())
+    );
+    let (place, deref_ty) = outmost_deref(place)?;
+    trace!(
+        "outmost deref place: {}",
+        place.with_ctx(&ctx.get_ctx().into_fmt())
+    );
+    let ty = match deref_ty.get_ptr_metadata(&ctx.get_ctx().translated) {
         PtrMetadata::None => None,
         PtrMetadata::Length => Some(Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)))),
         PtrMetadata::VTable(type_decl_ref) => Some(Ty::new(TyKind::Ref(
@@ -68,6 +81,10 @@ fn get_ptr_metadata_aux<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) ->
         ))),
         PtrMetadata::InheritFrom(ty) => Some(Ty::new(TyKind::PtrMetadata(ty))),
     }?;
+    trace!(
+        "computed metadata type: {}",
+        ty.with_ctx(&ctx.get_ctx().into_fmt())
+    );
     let new_place = ctx.fresh_var(None, ty);
     // it is `Copy` because `place` is a deref, which means it is a pointer / ref
     ctx.insert_assn_stmt(
@@ -139,7 +156,7 @@ impl UllbcPass for Transform {
                     locals: &mut b.locals,
                     statements: Vec::new(),
                     span: st.span,
-                    translated: &ctx.translated,
+                    ctx: &ctx,
                 };
                 let _ = st.drive_body_mut(&mut visitor);
                 visitor.statements

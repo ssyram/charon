@@ -418,7 +418,7 @@ fn main()
     let @6: &'_ mut (Iter<'_, i32>[Sized<i32>]); // anonymous local
     let @7: Iter<'_, i32>[Sized<i32>]; // anonymous local
     let @8: &'_ (Slice<i32>); // anonymous local
-    let @9: (); // anonymous local
+    let @9: usize; // anonymous local
     let @10: (); // anonymous local
     let @11: (); // anonymous local
     let @12: (); // anonymous local
@@ -442,7 +442,7 @@ fn main()
     storage_live(@7)
     storage_live(@8)
     storage_live(@9)
-    @9 := ()
+    @9 := ptr_metadata(copy (slice@1))
     @8 := &(*(slice@1), move (@9))
     @7 := iter<'_, i32>[Sized<i32>](move (@8))
     storage_live(@12)

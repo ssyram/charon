@@ -260,8 +260,8 @@ where
     let @13: usize; // anonymous local
     let @14: *const T; // anonymous local
     let @15: *const T; // anonymous local
-    let @16: (); // anonymous local
-    let @17: (); // anonymous local
+    let @16: usize; // anonymous local
+    let @17: usize; // anonymous local
     let @18: Option<&'_ (Slice<T>)>[Sized<&'_ (Slice<T>)>]; // anonymous local
 
     storage_live(self@4)
@@ -304,7 +304,7 @@ where
             storage_live(@10)
             storage_live(@11)
             storage_live(@17)
-            @17 := ()
+            @17 := ptr_metadata(copy (slice@2))
             @11 := &raw const (*(slice@2), move (@17))
             storage_live(@14)
             storage_live(@15)
@@ -315,7 +315,7 @@ where
             storage_dead(@14)
             storage_dead(@11)
             storage_live(@16)
-            @16 := ()
+            @16 := ptr_metadata(copy (@10))
             @9 := &(*(@10), move (@16))
             @0 := Option::Some { 0: copy (@9) }
             storage_dead(@10)
@@ -353,8 +353,8 @@ where
     let @13: usize; // anonymous local
     let @14: *mut T; // anonymous local
     let @15: *mut T; // anonymous local
-    let @16: (); // anonymous local
-    let @17: (); // anonymous local
+    let @16: usize; // anonymous local
+    let @17: usize; // anonymous local
     let @18: Option<&'_ mut (Slice<T>)>[Sized<&'_ mut (Slice<T>)>]; // anonymous local
 
     storage_live(self@4)
@@ -397,7 +397,7 @@ where
             storage_live(@10)
             storage_live(ptr@11)
             storage_live(@17)
-            @17 := ()
+            @17 := ptr_metadata(copy (slice@2))
             ptr@11 := &raw mut (*(slice@2), move (@17))
             storage_live(@14)
             storage_live(@15)
@@ -408,7 +408,7 @@ where
             storage_dead(@14)
             storage_dead(ptr@11)
             storage_live(@16)
-            @16 := ()
+            @16 := ptr_metadata(copy (@10))
             @9 := &mut (*(@10), move (@16))
             @0 := Option::Some { 0: copy (@9) }
             storage_dead(@10)
@@ -671,8 +671,8 @@ where
     let @14: usize; // anonymous local
     let @15: *const T; // anonymous local
     let @16: *const T; // anonymous local
-    let @17: (); // anonymous local
-    let @18: (); // anonymous local
+    let @17: usize; // anonymous local
+    let @18: usize; // anonymous local
 
     storage_live(@3)
     storage_live(new_len@4)
@@ -713,7 +713,7 @@ where
             storage_live(@11)
             storage_live(@12)
             storage_live(@18)
-            @18 := ()
+            @18 := ptr_metadata(copy (slice@2))
             @12 := &raw const (*(slice@2), move (@18))
             storage_live(@15)
             storage_live(@16)
@@ -724,7 +724,7 @@ where
             storage_dead(@15)
             storage_dead(@12)
             storage_live(@17)
-            @17 := ()
+            @17 := ptr_metadata(copy (@11))
             @0 := &(*(@11), move (@17))
             storage_dead(@11)
             return
@@ -758,8 +758,8 @@ where
     let @14: usize; // anonymous local
     let @15: *mut T; // anonymous local
     let @16: *mut T; // anonymous local
-    let @17: (); // anonymous local
-    let @18: (); // anonymous local
+    let @17: usize; // anonymous local
+    let @18: usize; // anonymous local
 
     storage_live(@3)
     storage_live(new_len@4)
@@ -800,7 +800,7 @@ where
             storage_live(@11)
             storage_live(ptr@12)
             storage_live(@18)
-            @18 := ()
+            @18 := ptr_metadata(copy (slice@2))
             ptr@12 := &raw mut (*(slice@2), move (@18))
             storage_live(@15)
             storage_live(@16)
@@ -811,7 +811,7 @@ where
             storage_dead(@15)
             storage_dead(ptr@12)
             storage_live(@17)
-            @17 := ()
+            @17 := ptr_metadata(copy (@11))
             @0 := &mut (*(@11), move (@17))
             storage_dead(@11)
             return
@@ -856,8 +856,8 @@ fn main()
     let @8: i32; // anonymous local
     let @9: usize; // anonymous local
     let @10: (); // anonymous local
-    let @11: (); // anonymous local
-    let @12: (); // anonymous local
+    let @11: usize; // anonymous local
+    let @12: usize; // anonymous local
     let @13: &'_ (Slice<i32>); // anonymous local
     let @14: &'_ (i32); // anonymous local
 
@@ -875,7 +875,7 @@ fn main()
     storage_dead(@5)
     storage_dead(@4)
     storage_live(@11)
-    @11 := ()
+    @11 := ptr_metadata(copy (@3))
     slice@2 := &(*(@3), move (@11))
     storage_live(@6)
     storage_live(@7)
@@ -883,7 +883,7 @@ fn main()
     storage_live(@9)
     @9 := const (0 : usize)
     storage_live(@12)
-    @12 := ()
+    @12 := ptr_metadata(copy (slice@2))
     storage_live(@13)
     @13 := &(*(slice@2), move (@12))
     storage_live(@14)

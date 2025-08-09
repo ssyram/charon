@@ -951,11 +951,11 @@ where
     let @0: String; // return
     let x@1: &'_ (T); // arg #1
     let @2: &'_ (T); // anonymous local
-    let @3: (); // anonymous local
+    let @3: PtrMetadata<T>; // anonymous local
 
     storage_live(@2)
     storage_live(@3)
-    @3 := ()
+    @3 := ptr_metadata(copy (x@1))
     @2 := &(*(x@1), move (@3))
     @0 := @TraitClause1::parent_clause1::get_name<'_>(move (@2))
     storage_dead(@2)
@@ -971,11 +971,11 @@ where
     let @0: @TraitClause1::parent_clause1::W; // return
     let x@1: &'_ (T); // arg #1
     let @2: &'_ (T); // anonymous local
-    let @3: (); // anonymous local
+    let @3: PtrMetadata<T>; // anonymous local
 
     storage_live(@2)
     storage_live(@3)
-    @3 := ()
+    @3 := ptr_metadata(copy (x@1))
     @2 := &(*(x@1), move (@3))
     @0 := @TraitClause1::parent_clause1::get_w<'_>(move (@2))
     storage_dead(@2)
@@ -1199,11 +1199,11 @@ where
     let @0: @TraitClause1::W; // return
     let x@1: &'_ (T); // arg #1
     let @2: &'_ (T); // anonymous local
-    let @3: (); // anonymous local
+    let @3: PtrMetadata<T>; // anonymous local
 
     storage_live(@2)
     storage_live(@3)
-    @3 := ()
+    @3 := ptr_metadata(copy (x@1))
     @2 := &(*(x@1), move (@3))
     @0 := @TraitClause1::get_w<'_>(move (@2))
     storage_dead(@2)

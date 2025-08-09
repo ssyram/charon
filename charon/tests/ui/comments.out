@@ -120,8 +120,8 @@ pub fn sum<'_0>(@1: &'_0 (Slice<u32>)) -> u32
     let @24: u32; // anonymous local
     let @25: u32; // anonymous local
     let @26: u32; // anonymous local
-    let @27: (); // anonymous local
-    let @28: (); // anonymous local
+    let @27: usize; // anonymous local
+    let @28: usize; // anonymous local
     let @29: &'_ (Slice<u32>); // anonymous local
     let @30: &'_ (u32); // anonymous local
 
@@ -166,7 +166,7 @@ pub fn sum<'_0>(@1: &'_0 (Slice<u32>)) -> u32
         storage_live(@11)
         storage_live(@12)
         storage_live(@27)
-        @27 := ()
+        @27 := ptr_metadata(copy (s@1))
         @12 := &(*(s@1), move (@27))
         @11 := len<'_, u32>[Sized<u32>](move (@12))
         storage_dead(@12)
@@ -183,7 +183,7 @@ pub fn sum<'_0>(@1: &'_0 (Slice<u32>)) -> u32
         // Add to running sum
         @14 := copy (i@3)
         storage_live(@28)
-        @28 := ()
+        @28 := ptr_metadata(copy (s@1))
         storage_live(@29)
         @29 := &(*(s@1), move (@28))
         storage_live(@30)

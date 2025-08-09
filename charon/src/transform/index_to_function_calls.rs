@@ -24,14 +24,10 @@ struct IndexVisitor<'a, 'b> {
     place_mutability_stack: Vec<bool>,
     // Span of the statement.
     span: Span,
-    translated: &'b TranslatedCrate,
+    ctx: &'b TransformCtx,
 }
 
 impl PtrMetadataComputable for IndexVisitor<'_, '_> {
-    fn get_translated(&self) -> &TranslatedCrate {
-        self.translated
-    }
-
     fn get_locals_mut(&mut self) -> &mut Locals {
         self.locals
     }
@@ -44,6 +40,10 @@ impl PtrMetadataComputable for IndexVisitor<'_, '_> {
     fn insert_assn_stmt(&mut self, place: Place, rvalue: Rvalue) {
         let statement = RawStatement::Assign(place, rvalue);
         self.statements.push(Statement::new(self.span, statement));
+    }
+
+    fn get_ctx(&self) -> &TransformCtx {
+        self.ctx
     }
 }
 
@@ -337,7 +337,7 @@ impl LlbcPass for Transform {
                 statements: Vec::new(),
                 place_mutability_stack: Vec::new(),
                 span: st.span,
-                translated: &ctx.translated,
+                ctx: &ctx,
             };
             use RawStatement::*;
             match &mut st.content {

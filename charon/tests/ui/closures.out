@@ -232,7 +232,7 @@ where
     let @4: T; // anonymous local
     let @5: fn<'_0>(&'_0_0 (T)) -> T; // anonymous local
     let @6: &'_ (T); // anonymous local
-    let @7: (); // anonymous local
+    let @7: PtrMetadata<T>; // anonymous local
     let @8: (); // anonymous local
 
     storage_live(x@3)
@@ -254,7 +254,7 @@ where
             @5 := copy (f@2)
             storage_live(@6)
             storage_live(@7)
-            @7 := ()
+            @7 := ptr_metadata(copy (x@3))
             @6 := &(*(x@3), move (@7))
             @4 := (move @5)(move (@6))
             storage_dead(@6)
@@ -768,8 +768,8 @@ where
     let @4: &'_ (T); // anonymous local
     let @5: fn<'_0>(&'_0_0 (T)) -> &'_0_0 (T); // anonymous local
     let @6: &'_ (T); // anonymous local
-    let @7: (); // anonymous local
-    let @8: (); // anonymous local
+    let @7: PtrMetadata<T>; // anonymous local
+    let @8: PtrMetadata<T>; // anonymous local
 
     storage_live(f@2)
     storage_live(@3)
@@ -781,11 +781,11 @@ where
     @5 := copy (f@2)
     storage_live(@6)
     storage_live(@7)
-    @7 := ()
+    @7 := ptr_metadata(copy (x@1))
     @6 := &(*(x@1), move (@7))
     @4 := (move @5)(move (@6))
     storage_live(@8)
-    @8 := ()
+    @8 := ptr_metadata(copy (@4))
     @0 := &(*(@4), move (@8))
     storage_dead(@6)
     storage_dead(@5)
@@ -935,8 +935,8 @@ where
     let @4: &'_ (T); // anonymous local
     let @5: fn<'_0>(&'_0_0 (T)) -> &'_0_0 (T); // anonymous local
     let @6: &'_ (T); // anonymous local
-    let @7: (); // anonymous local
-    let @8: (); // anonymous local
+    let @7: PtrMetadata<T>; // anonymous local
+    let @8: PtrMetadata<T>; // anonymous local
 
     storage_live(f@2)
     storage_live(@3)
@@ -948,11 +948,11 @@ where
     @5 := copy (f@2)
     storage_live(@6)
     storage_live(@7)
-    @7 := ()
+    @7 := ptr_metadata(copy (x@1))
     @6 := &(*(x@1), move (@7))
     @4 := (move @5)(move (@6))
     storage_live(@8)
-    @8 := ()
+    @8 := ptr_metadata(copy (@4))
     @0 := &(*(@4), move (@8))
     storage_dead(@6)
     storage_dead(@5)

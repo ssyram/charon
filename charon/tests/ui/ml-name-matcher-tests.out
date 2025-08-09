@@ -272,10 +272,10 @@ fn foo()
     let @10: &'_ (Slice<bool>); // anonymous local
     let @11: RangeFrom<usize>[Sized<usize>]; // anonymous local
     let @12: (); // anonymous local
-    let @13: (); // anonymous local
+    let @13: usize; // anonymous local
     let @14: (); // anonymous local
     let @15: (); // anonymous local
-    let @16: (); // anonymous local
+    let @16: usize; // anonymous local
 
     storage_live(@1)
     storage_live(@2)
@@ -306,7 +306,7 @@ fn foo()
     storage_live(@9)
     storage_live(@10)
     storage_live(@13)
-    @13 := ()
+    @13 := ptr_metadata(copy (slice@4))
     @10 := &(*(slice@4), move (@13))
     storage_live(@11)
     @11 := RangeFrom { start: const (1 : usize) }
@@ -314,7 +314,7 @@ fn foo()
     storage_dead(@11)
     storage_dead(@10)
     storage_live(@16)
-    @16 := ()
+    @16 := ptr_metadata(copy (@9))
     @8 := &(*(@9), move (@16))
     storage_dead(@8)
     @0 := ()

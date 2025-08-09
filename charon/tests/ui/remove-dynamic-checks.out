@@ -799,8 +799,8 @@ fn div_unsigned_to_slice<'_0>(@1: &'_0 mut (Slice<u32>), @2: u32)
     let x@2: u32; // arg #2
     let @3: u32; // anonymous local
     let @4: usize; // anonymous local
-    let @5: (); // anonymous local
-    let @6: (); // anonymous local
+    let @5: usize; // anonymous local
+    let @6: usize; // anonymous local
     let @7: &'_ mut (Slice<u32>); // anonymous local
     let @8: &'_ mut (u32); // anonymous local
 
@@ -809,8 +809,9 @@ fn div_unsigned_to_slice<'_0>(@1: &'_0 mut (Slice<u32>), @2: u32)
     storage_live(@4)
     @4 := const (0 : usize)
     storage_live(@5)
+    @5 := ptr_metadata(copy (result@1))
     storage_live(@6)
-    @6 := ()
+    @6 := ptr_metadata(copy (result@1))
     storage_live(@7)
     @7 := &mut (*(result@1), move (@6))
     storage_live(@8)
@@ -831,8 +832,8 @@ fn div_signed_to_slice<'_0>(@1: &'_0 mut (Slice<i32>), @2: i32)
     let x@2: i32; // arg #2
     let @3: i32; // anonymous local
     let @4: usize; // anonymous local
-    let @5: (); // anonymous local
-    let @6: (); // anonymous local
+    let @5: usize; // anonymous local
+    let @6: usize; // anonymous local
     let @7: &'_ mut (Slice<i32>); // anonymous local
     let @8: &'_ mut (i32); // anonymous local
 
@@ -841,8 +842,9 @@ fn div_signed_to_slice<'_0>(@1: &'_0 mut (Slice<i32>), @2: i32)
     storage_live(@4)
     @4 := const (0 : usize)
     storage_live(@5)
+    @5 := ptr_metadata(copy (result@1))
     storage_live(@6)
-    @6 := ()
+    @6 := ptr_metadata(copy (result@1))
     storage_live(@7)
     @7 := &mut (*(result@1), move (@6))
     storage_live(@8)
@@ -864,8 +866,8 @@ fn add_to_slice<'_0>(@1: &'_0 mut (Slice<u32>), @2: u32)
     let @3: u32; // anonymous local
     let @4: u32; // anonymous local
     let @5: usize; // anonymous local
-    let @6: (); // anonymous local
-    let @7: (); // anonymous local
+    let @6: usize; // anonymous local
+    let @7: usize; // anonymous local
     let @8: &'_ mut (Slice<u32>); // anonymous local
     let @9: &'_ mut (u32); // anonymous local
 
@@ -876,8 +878,9 @@ fn add_to_slice<'_0>(@1: &'_0 mut (Slice<u32>), @2: u32)
     storage_live(@5)
     @5 := const (0 : usize)
     storage_live(@6)
+    @6 := ptr_metadata(copy (result@1))
     storage_live(@7)
-    @7 := ()
+    @7 := ptr_metadata(copy (result@1))
     storage_live(@8)
     @8 := &mut (*(result@1), move (@7))
     storage_live(@9)
@@ -902,8 +905,8 @@ fn add_to_slice2<'_0>(@1: &'_0 mut (Slice<u8>), @2: usize, @3: u8)
     let @6: usize; // anonymous local
     let @7: usize; // anonymous local
     let @8: usize; // anonymous local
-    let @9: (); // anonymous local
-    let @10: (); // anonymous local
+    let @9: usize; // anonymous local
+    let @10: usize; // anonymous local
     let @11: &'_ mut (Slice<u8>); // anonymous local
     let @12: &'_ mut (u8); // anonymous local
 
@@ -919,8 +922,9 @@ fn add_to_slice2<'_0>(@1: &'_0 mut (Slice<u8>), @2: usize, @3: u8)
     @6 := move (@8)
     storage_dead(@7)
     storage_live(@9)
+    @9 := ptr_metadata(copy (result@1))
     storage_live(@10)
-    @10 := ()
+    @10 := ptr_metadata(copy (result@1))
     storage_live(@11)
     @11 := &mut (*(result@1), move (@10))
     storage_live(@12)
