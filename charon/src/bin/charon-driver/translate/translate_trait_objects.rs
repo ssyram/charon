@@ -1,3 +1,5 @@
+use crate::translate::translate_crate::RustcItem;
+
 use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
     translate_predicates::PredicateLocation,
@@ -530,6 +532,8 @@ impl ItemTransCtx<'_, '_> {
         &mut self,
         span: Span,
         impl_def: &hax::FullDef,
+        self_ty: &Ty,
+        dyn_self: &Ty,
         item: &hax::ImplAssocItem,
         mut mk_field: impl FnMut(RawConstantExpr),
     ) -> Result<(), Error> {
@@ -549,12 +553,15 @@ impl ItemTransCtx<'_, '_> {
                 // The method is vtable safe so it has no generics, hence we can reuse the impl
                 // generics.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
-                let shim_ref =
-                    self.translate_item(span, &item_ref, TransItemSourceKind::VTableMethod)?;
+                let shim_ref = self.translate_item(
+                    span,
+                    &item_ref,
+                    TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
+                )?;
                 RawConstantExpr::FnPtr(shim_ref)
             }
             hax::ImplAssocItemValue::DefaultedFn { .. } => RawConstantExpr::Opaque(
-                "shim for provided methods \
+                "shim for default methods \
                     aren't yet supported"
                     .to_string(),
             ),
@@ -645,12 +652,25 @@ impl ItemTransCtx<'_, '_> {
         let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
 
         let hax::FullDefKind::TraitImpl {
-            trait_pred, items, ..
+            trait_pred,
+            items,
+            dyn_self,
+            ..
         } = impl_def.kind()
         else {
             unreachable!()
         };
         let trait_def = self.hax_def(&trait_pred.trait_ref)?;
+        let Some(dyn_self) = dyn_self else {
+            raise_error!(
+                self,
+                span,
+                "Trying to generate a vtable for a non-dyn-compatible trait"
+            );
+        };
+        let trait_ref = self.translate_trait_ref(span, &trait_pred.trait_ref)?;
+        let self_ty = trait_ref.generics.types[0].clone();
+        let dyn_self = self.translate_ty(span, dyn_self)?;
 
         // Retreive the expected field types from the struct definition. This avoids complicated
         // substitutions.
@@ -687,7 +707,7 @@ impl ItemTransCtx<'_, '_> {
         mk_field(RawConstantExpr::Opaque("unknown drop".to_string()));
 
         for item in items {
-            self.add_method_to_vtable_value(span, impl_def, item, &mut mk_field)?;
+            self.add_method_to_vtable_value(span, impl_def, &self_ty, &dyn_self, item, &mut mk_field)?;
         }
 
         self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut mk_field)?;
@@ -775,13 +795,55 @@ impl ItemTransCtx<'_, '_> {
         })
     }
 
-    // pub(crate) fn translate_vtable_shim(
-    //     self,
-    //     _fun_id: FunDeclId,
-    //     item_meta: ItemMeta,
-    //     _impl_func_def: &hax::FullDef,
-    // ) -> Result<FunDecl, Error> {
-    //     let span = item_meta.span;
-    //     raise_error!(self, span, "unimplemented")
-    // }
+    /// The target vtable shim body looks like:
+    /// ```ignore
+    /// local ret@0 : ReturnTy;
+    /// // the shim receiver of this shim function
+    /// local shim_self@1 : ShimReceiverTy;
+    /// // the arguments of the impl function
+    /// local arg1@2 : Arg1Ty;
+    /// ...
+    /// local argN@N : ArgNTy;
+    /// // the target receiver of the impl function
+    /// local target_self@(N+1) : TargetReceiverTy;
+    /// // perform some conversion to cast / re-box the shim receiver to the target receiver
+    /// ...
+    /// target_self@(N+1) := concretize_cast<ShimReceiverTy, TargetReceiverTy>(shim_self@1);
+    /// // call the impl function and assign the result to ret@0
+    /// ret@0 := impl_func(target_self@(N+1), arg1@2, ..., argN@N);
+    /// ```
+    fn translate_vtable_shim_body(
+        &mut self,
+        span: Span,
+        target_receiver: &Ty,
+        shim_signature: &FunSig,
+        impl_func_def: &hax::FullDef,
+    ) -> Result<Body, Error> {
+        ullbc_ast::Call
+        raise_error!(
+            self,
+            span,
+            "To implement"
+        );
+    }
+
+    pub(crate) fn translate_vtable_shim(
+        mut self,
+        fun_id: FunDeclId,
+        item_meta: ItemMeta,
+        self_ty: &Ty,
+        dyn_self: &Ty,
+        impl_func_def: &hax::FullDef,
+    ) -> Result<FunDecl, Error> {
+        let span = item_meta.span;
+        // compute the correct signature for the shim
+        let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
+        let target_receiver = signature.inputs[0].clone();
+        // dynify the receiver type
+        Ty::substitute_ty(&mut signature.inputs[0], self_ty, dyn_self);
+
+        let body = self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
+
+        Ok(FunDecl { def_id: fun_id, item_meta, signature, kind: ItemKind::VTableMethodShim, is_global_initializer: None, body: Ok(body) })
+    }
 }
