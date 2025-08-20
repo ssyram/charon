@@ -21,10 +21,11 @@ enum SpecialReceiverKind {
     Rc,
     /// std::sync::Arc<T> - Atomically reference-counted pointer  
     Arc,
-    /// std::boxed::Box<T> - Heap-allocated pointer
-    Box,
     /// std::pin::Pin<T> - Pinned pointer that prevents moving
     Pin,
+    // Note: Box is not included here because Box<dyn Trait> has issues with
+    // unsize coercions in the current Charon implementation. See tests/ui/dyn-trait.rs
+    // where Box<dyn Display> constructions are marked as #[charon::opaque].
 }
 
 fn dummy_public_attr_info() -> AttrInfo {
@@ -982,14 +983,6 @@ impl ItemTransCtx<'_, '_> {
                 self.generate_single_field_concretization(
                     span, locals, statements, shim_self, target_self, 
                     type_id, "__pointer"
-                )
-            }
-            SpecialReceiverKind::Box => {
-                // Box<T> in its raw form is handled similarly to Pin
-                // It typically has a single field containing the pointer
-                self.generate_single_field_concretization(
-                    span, locals, statements, shim_self, target_self,
-                    type_id, "0" // Box typically uses field index 0
                 )
             }
             SpecialReceiverKind::Rc | SpecialReceiverKind::Arc => {
