@@ -924,7 +924,14 @@ impl ItemTransCtx<'_, '_> {
         mk_field(RawConstantExpr::Opaque("unknown drop".to_string()));
 
         for item in items {
-            self.add_method_to_vtable_value(span, impl_def, &self_ty, &dyn_self, item, &mut mk_field)?;
+            self.add_method_to_vtable_value(
+                span,
+                impl_def,
+                &self_ty,
+                &dyn_self,
+                item,
+                &mut mk_field,
+            )?;
         }
 
         self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut mk_field)?;
@@ -1127,7 +1134,7 @@ impl ItemTransCtx<'_, '_> {
         mut self,
         fun_id: FunDeclId,
         item_meta: ItemMeta,
-        _self_ty: &Ty,
+        self_ty: &Ty,
         dyn_self: &Ty,
         impl_func_def: &hax::FullDef,
     ) -> Result<FunDecl, Error> {
@@ -1135,11 +1142,20 @@ impl ItemTransCtx<'_, '_> {
         // compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
         let target_receiver = signature.inputs[0].clone();
-        // dynify the receiver type - replace self_ty with dyn_self
-        signature.inputs[0] = dyn_self.clone();
+        // dynify the receiver type, e.g., &T -> &dyn Trait when `impl ... for T`
+        // Pin<Box<i32>> -> Pin<Box<dyn Trait>> when `impl ... for i32`
+        signature.inputs[0].substitute_ty(self_ty, dyn_self);
 
-        let body = self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
+        let body =
+            self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
 
-        Ok(FunDecl { def_id: fun_id, item_meta, signature, kind: ItemKind::VTableMethodShim, is_global_initializer: None, body: Ok(body) })
+        Ok(FunDecl {
+            def_id: fun_id,
+            item_meta,
+            signature,
+            kind: ItemKind::VTableMethodShim,
+            is_global_initializer: None,
+            body: Ok(body),
+        })
     }
 }
