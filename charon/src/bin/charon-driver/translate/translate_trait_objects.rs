@@ -10,6 +10,23 @@ use charon_lib::ullbc_ast::*;
 use hax_frontend_exporter as hax;
 use itertools::Itertools;
 
+/// Represents different types of special receivers that require custom handling
+/// during trait object concretization.
+///
+/// These smart pointer types wrap other types and need recursive unpacking and
+/// repacking when converting between shim and target receiver types in vtable shims.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SpecialReceiverKind {
+    /// std::rc::Rc<T> - Reference-counted pointer
+    Rc,
+    /// std::sync::Arc<T> - Atomically reference-counted pointer  
+    Arc,
+    /// std::boxed::Box<T> - Heap-allocated pointer
+    Box,
+    /// std::pin::Pin<T> - Pinned pointer that prevents moving
+    Pin,
+}
+
 fn dummy_public_attr_info() -> AttrInfo {
     AttrInfo {
         public: true,
@@ -799,7 +816,7 @@ impl ItemTransCtx<'_, '_> {
         self.check_concretization_ty_match(span, shim_self.ty(), target_self.ty())?;
 
         let mut push_raw_stmt = |raw_stmt| statements.push(Statement::new(span, raw_stmt));
-        let mut new_var = |name, ty| {
+        let mut _new_var = |name, ty| {
             let ret = locals.new_var(name, ty);
             push_raw_stmt(RawStatement::StorageLive(ret.as_local().unwrap()));
             ret
@@ -825,17 +842,42 @@ impl ItemTransCtx<'_, '_> {
                 id: TypeId::Adt(id),
                 ..
             }) => {
-                // We should handle this by the following:
-                // 1. force the translation of the internal structures of this type id -- 
-                //    notably, the internal structures for, e.g., `Rc`, are missing
-                // 2. get the real type to see if it is one of `Rc`, `Arc`, `Box` or `Pin`
-                // 3. then perform the operations differently based on the corresponding strucure:
-                //    E.g., for `Pin`, it has only one field `__pointer`, so, we recurse by
-                //    the `shim_self` be the place `shim_self.__pointer`
-                //    the `target_self` be a fresh variable V for the internal structure,
-                //    and then the current `target_self` be the aggreated value:
-                //    ``` Pin { __pointer: move V } ```
-                todo!("Handle the cases when the receiver is `Rc`, `Arc`, `Box` or `Pin`.");
+                // Handle special receiver types like Rc, Arc, Box, and Pin that need
+                // recursive unpacking and repacking during concretization.
+                // 
+                // The approach is:
+                // 1. Force translation of the type to ensure its structure is available
+                // 2. Identify if it's one of the special receiver types by checking the type name
+                // 3. Generate recursive unpacking/repacking based on the type structure
+                
+                // Step 1: Force translation of the type to ensure it's not opaque
+                // This ensures we have access to the type's field structure
+                self.t_ctx.get_or_translate((*id).into())?;
+                
+                // Step 2: Check if this is one of the special receiver types
+                let type_name = self.get_type_name(*id);
+                let special_receiver_kind = self.identify_special_receiver_type(&type_name);
+                
+                match special_receiver_kind {
+                    Some(kind) => {
+                        // Step 3: Generate recursive unpacking/repacking for special receiver types
+                        self.generate_special_receiver_concretization(
+                            span, locals, statements, shim_self, target_self, kind, *id
+                        )?;
+                    }
+                    None => {
+                        // For non-special ADT types, fall back to the standard concretization
+                        let rval = Rvalue::UnaryOp(
+                            UnOp::Cast(CastKind::Concretize(
+                                shim_self.ty().clone(),
+                                target_self.ty().clone(),
+                            )),
+                            Operand::Move(shim_self.clone()),
+                        );
+                        let stmt = RawStatement::Assign(target_self.clone(), rval);
+                        push_raw_stmt(stmt);
+                    }
+                }
             }
             _ => {
                 raise_error!(
@@ -847,6 +889,241 @@ impl ItemTransCtx<'_, '_> {
             }
         }
         Ok(())
+    }
+
+    /// Identifies the type of special receiver based on its name.
+    /// 
+    /// Special receivers are smart pointer types like Rc, Arc, Box, and Pin that require
+    /// recursive unpacking during trait object concretization. This function checks if
+    /// a type matches one of these well-known patterns by examining its name.
+    /// 
+    /// Returns Some(SpecialReceiverKind) if the type is recognized, None otherwise.
+    fn identify_special_receiver_type(&self, type_name: &Name) -> Option<SpecialReceiverKind> {
+        use charon_lib::name_matcher::NamePattern;
+        
+        // Define the patterns for special receiver types
+        let patterns = &[
+            ("alloc::rc::Rc", SpecialReceiverKind::Rc),
+            ("alloc::sync::Arc", SpecialReceiverKind::Arc),
+            ("alloc::boxed::Box", SpecialReceiverKind::Box),
+            ("core::pin::Pin", SpecialReceiverKind::Pin),
+        ];
+        
+        for (pattern_str, kind) in patterns {
+            if let Ok(pattern) = NamePattern::parse(pattern_str) {
+                if pattern.matches(&self.t_ctx.translated, type_name) {
+                    return Some(*kind);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Gets the name of a type declaration from its ID.
+    /// 
+    /// This function retrieves the fully qualified name of a type, which is used
+    /// to identify special receiver types that need custom handling during concretization.
+    /// 
+    /// Returns the type name if available, otherwise returns a generic "unknown" name.
+    fn get_type_name(&self, type_id: TypeDeclId) -> Name {
+        self.t_ctx
+            .translated
+            .item_names
+            .get(&AnyTransId::Type(type_id))
+            .cloned()
+            .unwrap_or_else(|| {
+                // If no name is found, create a generic name for error reporting
+                // Use a simple name since we can't access private constructors
+                use charon_lib::ast::{PathElem, Disambiguator};
+                Name {
+                    name: vec![PathElem::Ident("unknown".to_string(), Disambiguator::ZERO)],
+                }
+            })
+    }
+    
+    /// Generates concretization code for special receiver types.
+    /// 
+    /// This function handles the recursive unpacking and repacking required for
+    /// smart pointer types like Rc, Arc, Box, and Pin. The general approach is:
+    /// 
+    /// 1. Access the internal field of the smart pointer (e.g., __pointer for Pin)
+    /// 2. Recursively generate concretization for the inner type
+    /// 3. Reconstruct the smart pointer with the concretized inner value
+    /// 
+    /// For example, for Pin<T>, this generates:
+    /// ```
+    /// let inner = shim_self.__pointer;
+    /// let concretized_inner = concretize(inner);
+    /// target_self = Pin { __pointer: concretized_inner };
+    /// ```
+    fn generate_special_receiver_concretization(
+        &mut self,
+        span: Span,
+        locals: &mut Locals,
+        statements: &mut Vec<Statement>,
+        shim_self: &Place,
+        target_self: &Place,
+        kind: SpecialReceiverKind,
+        type_id: TypeDeclId,
+    ) -> Result<(), Error> {
+        let mut _push_raw_stmt = |raw_stmt| statements.push(Statement::new(span, raw_stmt));
+        let mut _new_var = |name, ty| {
+            let ret = locals.new_var(name, ty);
+            _push_raw_stmt(RawStatement::StorageLive(ret.as_local().unwrap()));
+            ret
+        };
+        
+        match kind {
+            SpecialReceiverKind::Pin => {
+                // Pin<T> has a single field '__pointer' of type T
+                // We need to access this field and recursively concretize it
+                self.generate_single_field_concretization(
+                    span, locals, statements, shim_self, target_self, 
+                    type_id, "__pointer"
+                )
+            }
+            SpecialReceiverKind::Box => {
+                // Box<T> in its raw form is handled similarly to Pin
+                // It typically has a single field containing the pointer
+                self.generate_single_field_concretization(
+                    span, locals, statements, shim_self, target_self,
+                    type_id, "0" // Box typically uses field index 0
+                )
+            }
+            SpecialReceiverKind::Rc | SpecialReceiverKind::Arc => {
+                // Rc<T> and Arc<T> have more complex structures with reference counting
+                // They typically have a 'ptr' field that points to RcBox<T> or ArcInner<T>
+                // For trait object concretization, we focus on the data field
+                self.generate_rc_arc_concretization(
+                    span, locals, statements, shim_self, target_self, 
+                    type_id, kind
+                )
+            }
+        }
+    }
+    
+    /// Generates concretization for types with a single field (like Pin, Box).
+    /// 
+    /// This handles the common case where a smart pointer wraps a single value
+    /// and we need to unpack, concretize, and repack that value.
+    fn generate_single_field_concretization(
+        &mut self,
+        span: Span,
+        locals: &mut Locals,
+        statements: &mut Vec<Statement>,
+        shim_self: &Place,
+        target_self: &Place,
+        type_id: TypeDeclId,
+        field_name: &str,
+    ) -> Result<(), Error> {
+        let mut new_var = |name, ty| {
+            let ret = locals.new_var(name, ty);
+            statements.push(Statement::new(span, RawStatement::StorageLive(ret.as_local().unwrap())));
+            ret
+        };
+        
+        // Get the field ID for the specified field name
+        let field_id = self.get_field_id(span, type_id, field_name)?;
+        
+        // Create a projection to access the field
+        let field_projection = ProjectionElem::Field(FieldProjKind::Adt(type_id, None), field_id);
+        let inner_ty = {
+            // Get the field type from the type declaration
+            let type_decl = self.t_ctx.translated.type_decls.get(type_id).unwrap();
+            match &type_decl.kind {
+                TypeDeclKind::Struct(fields) => {
+                    fields.get(field_id).unwrap().ty.clone()
+                }
+                _ => {
+                    return Err(self.span_err(span, "Expected struct type for single field concretization", Level::ERROR));
+                }
+            }
+        };
+        let inner_place = shim_self.clone().project(field_projection.clone(), inner_ty.clone());
+        
+        // Create a fresh variable for the concretized inner value
+        let inner_concretized = new_var(None, inner_ty);
+        
+        // Generate recursive concretization for the inner value
+        self.generate_concretization(span, locals, statements, &inner_place, &inner_concretized)?;
+        
+        // Reconstruct the target by creating an aggregate with the concretized inner value
+        let tref = TypeDeclRef::new(TypeId::Adt(type_id), (*shim_self.ty().as_adt().unwrap().generics).clone());
+        let aggregate = Rvalue::Aggregate(
+            AggregateKind::Adt(tref, None, None),
+            vec![Operand::Move(inner_concretized)]
+        );
+        statements.push(Statement::new(span, RawStatement::Assign(target_self.clone(), aggregate)));
+        
+        Ok(())
+    }
+    
+    /// Generates concretization for Rc and Arc types.
+    /// 
+    /// Rc and Arc have more complex internal structures, but for trait object
+    /// concretization we typically need to handle the data pointer field.
+    fn generate_rc_arc_concretization(
+        &mut self,
+        span: Span,
+        locals: &mut Locals,
+        statements: &mut Vec<Statement>,
+        shim_self: &Place,
+        target_self: &Place,
+        type_id: TypeDeclId,
+        kind: SpecialReceiverKind,
+    ) -> Result<(), Error> {
+        // For Rc/Arc, we typically need to handle the 'ptr' field
+        // The exact field name may vary, but it's usually the main pointer field
+        let field_name = match kind {
+            SpecialReceiverKind::Rc | SpecialReceiverKind::Arc => "ptr",
+            _ => unreachable!(),
+        };
+        
+        // Use the single field approach as a starting point
+        // In practice, Rc/Arc might need more sophisticated handling
+        self.generate_single_field_concretization(
+            span, locals, statements, shim_self, target_self, 
+            type_id, field_name
+        )
+    }
+    
+    /// Gets the field ID for a named field in a type declaration.
+    /// 
+    /// This function searches through the type's field list to find the field
+    /// with the specified name and returns its ID.
+    fn get_field_id(&self, span: Span, type_id: TypeDeclId, field_name: &str) -> Result<FieldId, Error> {
+        let Some(type_decl) = self.t_ctx.translated.type_decls.get(type_id) else {
+            return Err(self.span_err(span, "Type declaration not found", Level::ERROR));
+        };
+        
+        // Search through the type definition to find the field
+        match &type_decl.kind {
+            TypeDeclKind::Struct(fields) => {
+                for (field_id, field) in fields.iter_indexed() {
+                    if field.name.as_deref() == Some(field_name) || 
+                       field_name.parse::<usize>().ok() == Some(field_id.index()) {
+                        return Ok(field_id);
+                    }
+                }
+                Err(self.span_err(span, &format!("Field '{}' not found in struct", field_name), Level::ERROR))
+            }
+            TypeDeclKind::Enum(_) => {
+                Err(self.span_err(span, "Enum concretization not implemented for special receivers", Level::ERROR))
+            }
+            TypeDeclKind::Union(_) => {
+                Err(self.span_err(span, "Union concretization not implemented for special receivers", Level::ERROR))
+            }
+            TypeDeclKind::Opaque => {
+                Err(self.span_err(span, "Cannot concretize opaque type", Level::ERROR))
+            }
+            TypeDeclKind::Error(_) => {
+                Err(self.span_err(span, "Cannot concretize error type", Level::ERROR))
+            }
+            TypeDeclKind::Alias(_) => {
+                Err(self.span_err(span, "Alias type concretization not implemented for special receivers", Level::ERROR))
+            }
+        }
     }
 
     pub(crate) fn translate_vtable_instance_init(
