@@ -8,6 +8,25 @@ use charon_lib::ullbc_ast::*;
 use hax_frontend_exporter as hax;
 use itertools::Itertools;
 
+/// Checks if a type is valid for `CastKind::Concretize` operations.
+/// According to the documentation of `CastKind::Concretize`, valid conversions are:
+/// - `&[mut] dyn Trait<...>` -> `&[mut] T` (references)
+/// - `*[mut] dyn Trait<...>` -> `*[mut] T` (raw pointers) 
+/// - `Box<dyn Trait<...>>` -> `Box<T>` when no `--raw-boxes` (builtin Box only)
+/// Other receiver types like `Rc<dyn Trait>` should be unpacked, cast, then re-boxed.
+fn is_valid_concretize_cast(ty: &Ty) -> bool {
+    match ty.kind() {
+        // References: &[mut] dyn Trait
+        TyKind::Ref(_, _, _) => true,
+        // Raw pointers: *[const|mut] dyn Trait  
+        TyKind::RawPtr(_, _) => true,
+        // Builtin Box: Box<dyn Trait>
+        TyKind::Adt(type_ref) => matches!(type_ref.id, TypeId::Builtin(BuiltinTy::Box)),
+        // All other types (like Rc, Arc, custom smart pointers) are not supported
+        _ => false,
+    }
+}
+
 fn dummy_public_attr_info() -> AttrInfo {
     AttrInfo {
         public: true,
@@ -840,17 +859,31 @@ impl ItemTransCtx<'_, '_> {
 
         // Cast from shim receiver to target receiver
         // target_self := concretize_cast<ShimReceiverTy, TargetReceiverTy>(shim_self);
+        // Check if CastKind::Concretize is valid for this receiver type
+        let shim_receiver_ty = &shim_signature.inputs[0];
+        let cast_rvalue = if is_valid_concretize_cast(shim_receiver_ty) {
+            // Direct concretize cast for references, raw pointers, and builtin Box
+            Rvalue::UnaryOp(
+                UnOp::Cast(CastKind::Concretize(
+                    shim_receiver_ty.clone(),
+                    target_receiver.clone(),
+                )),
+                Operand::Move(shim_self_place),
+            )
+        } else {
+            // For other types (like Rc, Arc), we need to implement unpack/cast/re-box pattern
+            // For now, return an error as this case needs more complex handling
+            return Err(Error {
+                span,
+                msg: format!("Unsupported receiver type for vtable shim: {:?}. Only references (&/&mut), raw pointers (*const/*mut), and builtin Box are currently supported for CastKind::Concretize", shim_receiver_ty.kind()),
+            });
+        };
+
         let statements = vec![Statement::new(
             span,
             RawStatement::Assign(
                 target_self_place.clone(),
-                Rvalue::UnaryOp(
-                    UnOp::Cast(CastKind::Concretize(
-                        shim_signature.inputs[0].clone(),
-                        target_receiver.clone(),
-                    )),
-                    Operand::Move(shim_self_place),
-                ),
+                cast_rvalue,
             ),
         )];
 
