@@ -1,5 +1,3 @@
-use crate::translate::translate_crate::RustcItem;
-
 use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
     translate_predicates::PredicateLocation,
@@ -819,19 +817,102 @@ impl ItemTransCtx<'_, '_> {
         shim_signature: &FunSig,
         impl_func_def: &hax::FullDef,
     ) -> Result<Body, Error> {
-        ullbc_ast::Call
-        raise_error!(
-            self,
+        let arg_count = shim_signature.inputs.len();
+        let mut locals = Locals {
+            arg_count,
+            locals: Vector::new(),
+        };
+
+        // Add the return local
+        let ret_place = locals.new_var(Some("ret".into()), shim_signature.output.clone());
+        
+        // Add argument locals based on signature
+        let shim_self_place = locals.new_var(Some("shim_self".into()), shim_signature.inputs[0].clone());
+        let mut other_arg_places = Vec::new();
+        for (i, input_ty) in shim_signature.inputs.iter().enumerate().skip(1) {
+            let name = Some(format!("arg{}", i));
+            let arg_place = locals.new_var(name, input_ty.clone());
+            other_arg_places.push(arg_place);
+        }
+
+        // Add a local for the target receiver
+        let target_self_place = locals.new_var(Some("target_self".into()), target_receiver.clone());
+
+        let mut statements = Vec::new();
+
+        // Cast from shim receiver to target receiver
+        // target_self := concretize_cast<ShimReceiverTy, TargetReceiverTy>(shim_self);
+        statements.push(Statement::new(
             span,
-            "To implement"
-        );
+            RawStatement::Assign(
+                target_self_place.clone(),
+                Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(
+                        shim_signature.inputs[0].clone(),
+                        target_receiver.clone(),
+                    )),
+                    Operand::Move(shim_self_place),
+                ),
+            ),
+        ));
+
+        // Prepare arguments for the impl function call  
+        let mut call_args = vec![Operand::Move(target_self_place)];
+        for arg_place in other_arg_places {
+            call_args.push(Operand::Move(arg_place));
+        }
+
+        // Get the function pointer for the impl function
+        let impl_fn_ref = self.translate_fn_ptr(span, impl_func_def.this())?;
+        
+        let call = Call {
+            func: FnOperand::Regular(impl_fn_ref.skip_binder),
+            args: call_args,
+            dest: ret_place,
+        };
+
+        // Create blocks
+        let mut blocks = Vector::new();
+        
+        let ret_block = BlockData {
+            statements: vec![],
+            terminator: Terminator::new(span, RawTerminator::Return),
+        };
+
+        let unwind_block = BlockData {
+            statements: vec![],
+            terminator: Terminator::new(span, RawTerminator::UnwindResume),
+        };
+
+        let call_block = BlockData {
+            statements,
+            terminator: Terminator::new(
+                span,
+                RawTerminator::Call {
+                    call,
+                    target: BlockId::new(1), // ret_block
+                    on_unwind: BlockId::new(2), // unwind_block
+                },
+            ),
+        };
+
+        blocks.push(call_block); // BlockId(0) - START_BLOCK_ID
+        blocks.push(ret_block);  // BlockId(1)
+        blocks.push(unwind_block); // BlockId(2)
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: Vec::new(),
+            body: blocks,
+        }))
     }
 
     pub(crate) fn translate_vtable_shim(
         mut self,
         fun_id: FunDeclId,
         item_meta: ItemMeta,
-        self_ty: &Ty,
+        _self_ty: &Ty,
         dyn_self: &Ty,
         impl_func_def: &hax::FullDef,
     ) -> Result<FunDecl, Error> {
@@ -839,8 +920,8 @@ impl ItemTransCtx<'_, '_> {
         // compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
         let target_receiver = signature.inputs[0].clone();
-        // dynify the receiver type
-        Ty::substitute_ty(&mut signature.inputs[0], self_ty, dyn_self);
+        // dynify the receiver type - replace self_ty with dyn_self
+        signature.inputs[0] = dyn_self.clone();
 
         let body = self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
 
