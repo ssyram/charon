@@ -905,7 +905,8 @@ impl ItemTransCtx<'_, '_> {
         let patterns = &[
             ("alloc::rc::Rc", SpecialReceiverKind::Rc),
             ("alloc::sync::Arc", SpecialReceiverKind::Arc),
-            ("alloc::boxed::Box", SpecialReceiverKind::Box),
+            // TODO: Temporarily disable Box handling as it's causing issues
+            // ("alloc::boxed::Box", SpecialReceiverKind::Box),
             ("core::pin::Pin", SpecialReceiverKind::Pin),
         ];
         
