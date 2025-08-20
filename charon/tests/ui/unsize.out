@@ -159,6 +159,20 @@ impl Clone for String {
 // Full name: alloc::string::{impl Display for String}::fmt
 pub fn {impl Display for String}::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
 
+// Full name: alloc::string::{impl Display for String}::fmt
+fn {impl Display for String}::fmt<'_0, '_1, '_2>(@1: (dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
+{
+    let ret@0: Result<(), Error>[Sized<()>, Sized<Error>]; // return
+    let shim_self@1: (dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_); // arg #1
+    let arg1@2: &'_1 mut (Formatter<'_2>); // arg #2
+    let target_self@3: &'_0 (String); // local
+
+    storage_live(target_self@3)
+    target_self@3 := concretize<(dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_), &'_0 (String)>(move (shim_self@1))
+    ret@0 := {impl Display for String}::fmt<'_0, '_1, '_2>(move (target_self@3), move (arg1@2))
+    return
+}
+
 // Full name: alloc::string::{impl Display for String}::{vtable}
 fn {impl Display for String}::{vtable}() -> core::fmt::Display::{vtable}
 {

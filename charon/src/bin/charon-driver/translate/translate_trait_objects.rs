@@ -437,7 +437,7 @@ impl ItemTransCtx<'_, '_> {
     }
 }
 
-//// Generate a vtable value.
+/// Generate a vtable value.
 impl ItemTransCtx<'_, '_> {
     pub fn translate_vtable_instance_ref(
         &mut self,
@@ -461,10 +461,10 @@ impl ItemTransCtx<'_, '_> {
     }
 
     /// Local helper function to get the vtable struct reference and trait declaration reference
-    fn get_vtable_instance_info<'a>(
+    fn get_vtable_instance_info(
         &mut self,
         span: Span,
-        impl_def: &'a hax::FullDef,
+        impl_def: &hax::FullDef,
         impl_kind: &TraitImplSource,
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
         let implemented_trait = match impl_def.kind() {
@@ -673,7 +673,7 @@ impl ItemTransCtx<'_, '_> {
         // Retreive the expected field types from the struct definition. This avoids complicated
         // substitutions.
         let field_tys = {
-            let vtable_decl_id = vtable_struct_ref.id.as_adt().unwrap().clone();
+            let vtable_decl_id = *vtable_struct_ref.id.as_adt().unwrap();
             let AnyTransItem::Type(vtable_def) =
                 self.t_ctx.get_or_translate(vtable_decl_id.into())?
             else {
@@ -830,7 +830,7 @@ impl ItemTransCtx<'_, '_> {
         let shim_self_place = locals.new_var(Some("shim_self".into()), shim_signature.inputs[0].clone());
         let mut other_arg_places = Vec::new();
         for (i, input_ty) in shim_signature.inputs.iter().enumerate().skip(1) {
-            let name = Some(format!("arg{}", i));
+            let name = Some(format!("arg{i}"));
             let arg_place = locals.new_var(name, input_ty.clone());
             other_arg_places.push(arg_place);
         }
@@ -838,11 +838,9 @@ impl ItemTransCtx<'_, '_> {
         // Add a local for the target receiver
         let target_self_place = locals.new_var(Some("target_self".into()), target_receiver.clone());
 
-        let mut statements = Vec::new();
-
         // Cast from shim receiver to target receiver
         // target_self := concretize_cast<ShimReceiverTy, TargetReceiverTy>(shim_self);
-        statements.push(Statement::new(
+        let statements = vec![Statement::new(
             span,
             RawStatement::Assign(
                 target_self_place.clone(),
@@ -854,7 +852,7 @@ impl ItemTransCtx<'_, '_> {
                     Operand::Move(shim_self_place),
                 ),
             ),
-        ));
+        )];
 
         // Prepare arguments for the impl function call  
         let mut call_args = vec![Operand::Move(target_self_place)];
