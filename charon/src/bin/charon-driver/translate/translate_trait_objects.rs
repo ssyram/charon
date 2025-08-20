@@ -27,6 +27,206 @@ fn is_valid_concretize_cast(ty: &Ty) -> bool {
     }
 }
 
+/// Generate the statements needed to concretize a value from src_place to tar_place.
+/// This handles recursive unpacking and repacking for complex types like Box, Rc, Arc, Pin.
+fn generate_concretization(
+    locals: &mut Locals,
+    statements: &mut Vec<Statement>,
+    src_place: &Place,
+    tar_place: &Place,
+    src_ty: &Ty,
+    tar_ty: &Ty,
+    span: Span,
+) -> Result<(), Error> {
+    // First check if we can use direct CastKind::Concretize
+    if is_valid_concretize_cast(src_ty) {
+        let cast_rvalue = Rvalue::UnaryOp(
+            UnOp::Cast(CastKind::Concretize(
+                src_ty.clone(),
+                tar_ty.clone(),
+            )),
+            Operand::Move(src_place.clone()),
+        );
+        statements.push(Statement::new(
+            span,
+            RawStatement::Assign(tar_place.clone(), cast_rvalue),
+        ));
+        return Ok(());
+    }
+
+    // Handle complex types that need unpacking/repacking  
+    match (src_ty.kind(), tar_ty.kind()) {
+        // Both are references - should have been handled above, but double-check
+        (TyKind::Ref(_src_region, _src_inner, src_kind), TyKind::Ref(_tar_region, _tar_inner, tar_kind)) => {
+            if src_kind != tar_kind {
+                return Err(Error {
+                    span,
+                    msg: format!("Reference kind mismatch: {:?} vs {:?}", src_kind, tar_kind),
+                });
+            }
+            // References should use direct concretize_cast
+            let cast_rvalue = Rvalue::UnaryOp(
+                UnOp::Cast(CastKind::Concretize(
+                    src_ty.clone(),
+                    tar_ty.clone(),
+                )),
+                Operand::Move(src_place.clone()),
+            );
+            statements.push(Statement::new(
+                span,
+                RawStatement::Assign(tar_place.clone(), cast_rvalue),
+            ));
+        }
+        
+        // Both are raw pointers - should have been handled above, but double-check
+        (TyKind::RawPtr(_src_inner, src_kind), TyKind::RawPtr(_tar_inner, tar_kind)) => {
+            if src_kind != tar_kind {
+                return Err(Error {
+                    span,
+                    msg: format!("Raw pointer kind mismatch: {:?} vs {:?}", src_kind, tar_kind),
+                });
+            }
+            // Raw pointers should use direct concretize_cast
+            let cast_rvalue = Rvalue::UnaryOp(
+                UnOp::Cast(CastKind::Concretize(
+                    src_ty.clone(),
+                    tar_ty.clone(),
+                )),
+                Operand::Move(src_place.clone()),
+            );
+            statements.push(Statement::new(
+                span,
+                RawStatement::Assign(tar_place.clone(), cast_rvalue),
+            ));
+        }
+
+        // Both are ADTs - handle recursively for complex wrapper types
+        (TyKind::Adt(src_type_ref), TyKind::Adt(tar_type_ref)) => {
+            if src_type_ref.id != tar_type_ref.id {
+                return Err(Error {
+                    span,
+                    msg: format!(
+                        "Cannot concretize between different ADT types: {:?} -> {:?}",
+                        src_type_ref.id, tar_type_ref.id
+                    ),
+                });
+            }
+
+            match &src_type_ref.id {
+                TypeId::Builtin(BuiltinTy::Box) => {
+                    // Builtin Box should use direct concretize_cast
+                    let cast_rvalue = Rvalue::UnaryOp(
+                        UnOp::Cast(CastKind::Concretize(
+                            src_ty.clone(),
+                            tar_ty.clone(),
+                        )),
+                        Operand::Move(src_place.clone()),
+                    );
+                    statements.push(Statement::new(
+                        span,
+                        RawStatement::Assign(tar_place.clone(), cast_rvalue),
+                    ));
+                }
+                
+                TypeId::Adt(_) => {
+                    // Handle complex ADT types like Rc, Arc, Pin recursively
+                    // Extract inner types from generics
+                    if src_type_ref.generics.types.elem_count() != 1 || tar_type_ref.generics.types.elem_count() != 1 {
+                        return Err(Error {
+                            span,
+                            msg: format!(
+                                "Complex ADT type must have exactly one generic parameter for concretization: src={:?}, tar={:?}",
+                                src_type_ref.generics.types.elem_count(),
+                                tar_type_ref.generics.types.elem_count()
+                            ),
+                        });
+                    }
+                    
+                    let src_inner_ty = &src_type_ref.generics.types[0];
+                    let tar_inner_ty = &tar_type_ref.generics.types[0];
+                    
+                    // Create temporary locals for the inner values
+                    let temp_src_inner = locals.new_var(Some("temp_src_inner".into()), src_inner_ty.clone());
+                    let temp_tar_inner = locals.new_var(Some("temp_tar_inner".into()), tar_inner_ty.clone());
+                    
+                    // Step 1: Unpack the outer wrapper 
+                    // For smart pointer types, we need to access the inner value via field projection
+                    // Most smart pointer types are single-field structs containing the inner value
+                    let field_proj_kind = FieldProjKind::Adt(
+                        match &src_type_ref.id {
+                            TypeId::Adt(type_decl_id) => type_decl_id.clone(),
+                            _ => return Err(Error {
+                                span,
+                                msg: format!("Expected ADT type, got: {:?}", src_type_ref.id),
+                            }),
+                        },
+                        None, // No variant for struct types like Rc, Arc, Pin
+                    );
+                    
+                    let unpack_place = src_place.clone().project(
+                        ProjectionElem::Field(field_proj_kind, FieldId::ZERO),
+                        src_inner_ty.clone(),
+                    );
+                    let unpack_rvalue = Rvalue::Use(Operand::Copy(unpack_place));
+                    statements.push(Statement::new(
+                        span,
+                        RawStatement::Assign(temp_src_inner.clone(), unpack_rvalue),
+                    ));
+                    
+                    // Step 2: Recursively handle the inner concretization
+                    generate_concretization(
+                        locals,
+                        statements,
+                        &temp_src_inner,
+                        &temp_tar_inner,
+                        src_inner_ty,
+                        tar_inner_ty,
+                        span,
+                    )?;
+                    
+                    // Step 3: Re-pack the result into the target wrapper type
+                    // This constructs the new wrapper: tar_place := WrapperType { inner: temp_tar_inner }
+                    let repack_rvalue = Rvalue::Aggregate(
+                        AggregateKind::Adt(
+                            TypeDeclRef {
+                                id: tar_type_ref.id.clone(),
+                                generics: tar_type_ref.generics.clone(),
+                            },
+                            None, // No variant for struct types
+                            None, // No specific field for struct construction
+                        ),
+                        vec![Operand::Move(temp_tar_inner)],
+                    );
+                    statements.push(Statement::new(
+                        span,
+                        RawStatement::Assign(tar_place.clone(), repack_rvalue),
+                    ));
+                }
+                
+                _ => {
+                    return Err(Error {
+                        span,
+                        msg: format!("Unsupported type ID for concretization: {:?}", src_type_ref.id),
+                    });
+                }
+            }
+        }
+        
+        _ => {
+            return Err(Error {
+                span,
+                msg: format!(
+                    "Cannot concretize between incompatible types: {:?} -> {:?}",
+                    src_ty.kind(),
+                    tar_ty.kind()
+                ),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 fn dummy_public_attr_info() -> AttrInfo {
     AttrInfo {
         public: true,
@@ -857,35 +1057,19 @@ impl ItemTransCtx<'_, '_> {
         // Add a local for the target receiver
         let target_self_place = locals.new_var(Some("target_self".into()), target_receiver.clone());
 
-        // Cast from shim receiver to target receiver
-        // target_self := concretize_cast<ShimReceiverTy, TargetReceiverTy>(shim_self);
-        // Check if CastKind::Concretize is valid for this receiver type
+        // Cast from shim receiver to target receiver using the new concretization function
         let shim_receiver_ty = &shim_signature.inputs[0];
-        let cast_rvalue = if is_valid_concretize_cast(shim_receiver_ty) {
-            // Direct concretize cast for references, raw pointers, and builtin Box
-            Rvalue::UnaryOp(
-                UnOp::Cast(CastKind::Concretize(
-                    shim_receiver_ty.clone(),
-                    target_receiver.clone(),
-                )),
-                Operand::Move(shim_self_place),
-            )
-        } else {
-            // For other types (like Rc, Arc), we need to implement unpack/cast/re-box pattern
-            // For now, return an error as this case needs more complex handling
-            return Err(Error {
-                span,
-                msg: format!("Unsupported receiver type for vtable shim: {:?}. Only references (&/&mut), raw pointers (*const/*mut), and builtin Box are currently supported for CastKind::Concretize", shim_receiver_ty.kind()),
-            });
-        };
-
-        let statements = vec![Statement::new(
+        let mut statements = Vec::new();
+        
+        generate_concretization(
+            &mut locals,
+            &mut statements,
+            &shim_self_place,
+            &target_self_place,
+            shim_receiver_ty,
+            target_receiver,
             span,
-            RawStatement::Assign(
-                target_self_place.clone(),
-                cast_rvalue,
-            ),
-        )];
+        )?;
 
         // Prepare arguments for the impl function call  
         let mut call_args = vec![Operand::Move(target_self_place)];
