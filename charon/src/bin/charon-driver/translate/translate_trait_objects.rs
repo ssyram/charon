@@ -1,3 +1,7 @@
+use std::str::FromStr;
+
+use crate::translate::translate_crate::RustcItem;
+
 use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
     translate_predicates::PredicateLocation,
@@ -5,10 +9,14 @@ use super::{
 
 use charon_lib::formatter::IntoFormatter;
 use charon_lib::ids::Vector;
+use charon_lib::name_matcher::Pattern;
 use charon_lib::pretty::FmtWithCtx;
 use charon_lib::ullbc_ast::*;
+use either::Either::{self, Left, Right};
 use hax_frontend_exporter as hax;
 use itertools::Itertools;
+use rustc_span::{Symbol, sym};
+use rustc_hir::lang_items::LangItem;
 
 fn dummy_public_attr_info() -> AttrInfo {
     AttrInfo {
@@ -439,6 +447,13 @@ impl ItemTransCtx<'_, '_> {
     }
 }
 
+enum SpecialReceiver {
+    Rc,
+    Box,
+    Arc,
+    Pin,
+}
+
 //// Generate a vtable value.
 impl ItemTransCtx<'_, '_> {
     pub fn translate_vtable_instance_ref(
@@ -787,9 +802,94 @@ impl ItemTransCtx<'_, '_> {
         }
     }
 
+    fn compute_special_receiver_kind(
+        &mut self,
+        span: Span,
+        receiver_hax_def: &hax::FullDef,
+    ) -> Result<SpecialReceiver, Error> {
+        match receiver_hax_def.lang_item.as_deref() {
+            Some("owned_box") => return Ok(SpecialReceiver::Box),
+            Some("pin") => return Ok(SpecialReceiver::Pin),
+            _ => {}
+        }
+        match receiver_hax_def.diagnostic_item.as_deref() {
+            Some("Rc") => return Ok(SpecialReceiver::Rc),
+            Some("Arc") => return Ok(SpecialReceiver::Arc),
+            _ => {}
+        }
+        raise_error!(
+            self,
+            span,
+            "Unknown special receiver type for type: \"{receiver_hax_def:?}\"",
+        )
+    }
+
+    fn register_translation(&mut self, hax_def_id: &hax::DefId) -> Result<(), Error> {
+        let name = self
+            .t_ctx
+            .tcx
+            .def_path_str(hax_def_id.as_rust_def_id().unwrap());
+        let pat = Pattern::from_str(&name)?;
+        self.t_ctx
+            .options
+            .item_opacities
+            .push((pat, ItemOpacity::Transparent));
+        Ok(())
+    }
+
+    fn ty_decl_ref_from_adt_ty(&self, span: Span, ty: &Ty) -> Result<TypeDeclRef, Error> {
+        match ty.kind() {
+            TyKind::Adt(decl_ref) => Ok(decl_ref.clone()),
+            _ => raise_error!(
+                self,
+                span,
+                "Expected an ADT type, got \"{}\"",
+                ty.with_ctx(&self.into_fmt())
+            ),
+        }
+    }
+
+    fn ty_id_from_adt_ty(&self, span: Span, ty: &Ty) -> Result<TypeDeclId, Error> {
+        match ty.kind() {
+            TyKind::Adt(TypeDeclRef { id: TypeId::Adt(id), .. }) => Ok(*id),
+            _ => raise_error!(
+                self,
+                span,
+                "Expected an ADT type, got \"{}\"",
+                ty.with_ctx(&self.into_fmt())
+            ),
+        }
+    }
+
+    fn rustc_ty(
+        &mut self,
+        span: Span,
+        target: Either<Symbol, LangItem>,
+        should_translate_internal: bool,
+        ty_args: Vec<Ty>
+    ) -> Result<Ty, Error> {
+        let tcx = self.t_ctx.tcx;
+        let rid = match target {
+            Left(sym) => tcx.get_diagnostic_item(sym).unwrap(),
+            Right(item) => tcx.lang_items().get(item).unwrap()
+        };
+        let hax_state = &self.hax_state_with_id();
+        
+        let def_id: &hax::DefId = &self.t_ctx.catch_sinto(hax_state, span, &rid)?;
+        
+        if should_translate_internal {
+            self.register_translation(def_id)?;
+        }
+
+        let ty_id = self.register_and_enqueue(span, TransItemSource { item: RustcItem::Poly(*def_id), kind: TransItemSourceKind::Type });
+
+        todo!()
+    }
+
     fn generate_concretization(
         &mut self,
         span: Span,
+        locals: &mut Locals,
         statements: &mut Vec<Statement>,
         shim_self: &Place,
         target_self: &Place,
@@ -797,16 +897,314 @@ impl ItemTransCtx<'_, '_> {
         // guarantees that both types are valid
         self.check_concretization_ty_match(span, shim_self.ty(), target_self.ty())?;
 
-        let rval = Rvalue::UnaryOp(
-            UnOp::Cast(CastKind::Concretize(
-                shim_self.ty().clone(),
-                target_self.ty().clone(),
-            )),
-            Operand::Move(shim_self.clone()),
-        );
-        let stmt = RawStatement::Assign(target_self.clone(), rval);
-        statements.push(Statement::new(span, stmt));
+        // let mut push_raw_stmt = |raw_stmt| statements.push(Statement::new(span, raw_stmt));
+        let mut new_var = |statements: &mut Vec<Statement>, ty| {
+            let ret = locals.new_var(None, ty);
+            statements.push(Statement::new(
+                span,
+                RawStatement::StorageLive(ret.as_local().unwrap()),
+            ));
+            ret
+        };
 
+        match shim_self.ty.kind() {
+            TyKind::Ref(..)
+            | TyKind::Adt(TypeDeclRef {
+                id: TypeId::Builtin(..),
+                ..
+            }) => {
+                let rval = Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(
+                        shim_self.ty().clone(),
+                        target_self.ty().clone(),
+                    )),
+                    Operand::Move(shim_self.clone()),
+                );
+                let stmt = RawStatement::Assign(target_self.clone(), rval);
+                statements.push(Statement::new(span, stmt));
+            }
+            TyKind::Adt(TypeDeclRef {
+                id: TypeId::Adt(id),
+                generics,
+            }) => {
+                // FIXME(ssyram): handle also monomorphization for these cases.
+                // Considerably, one should inquire hax for the monomorphized type of 
+                // something like `Box<T, A>` for some concrete `T` & `A`.
+                if self.monomorphize() {
+                    raise_error!(
+                        self,
+                        span,
+                        "Currently, monomorphization is not supported for ADT receiver: \"{}\"",
+                        id.with_ctx(&self.into_fmt())
+                    );
+                }
+
+                let hax_source = self
+                    .t_ctx
+                    .reverse_id_map
+                    .get(&AnyTransId::from(*id))
+                    .unwrap();
+                let hax_item = hax_source.item.clone();
+                let hax_def = match &hax_item {
+                    RustcItem::Mono(item) => self.hax_def(item).unwrap(),
+                    RustcItem::Poly(item) => self.poly_hax_def(item).unwrap(),
+                };
+
+                // Register the translation of this type id.
+                // This is to ensure that the internal structures is known here for re-packing.
+                self.register_translation(hax_def.def_id())?;
+
+                let receiver_kind = self.compute_special_receiver_kind(span, &hax_def)?;
+                // The internal type of the shim self, e.g., `T` in `Pin<T>`,
+                // or `T` in `Box<T, A>`, or `T` in `Rc<T>`, or `T` in `Arc<T>`.
+                let shim_internal_ty = generics.types[0].clone();
+                let target_self_ty_decl_ref = self.ty_decl_ref_from_adt_ty(span, target_self.ty())?;
+                // The internal `T` in the special receivers
+                let internal_ty = target_self_ty_decl_ref.generics.types[0].clone();
+
+                match receiver_kind {
+                    SpecialReceiver::Rc => {
+                        todo!("Handle the case when the receiver is `Rc`.");
+                    }
+                    SpecialReceiver::Arc => {
+                        todo!("Handle the case when the receiver is `Arc`.");
+                    }
+                    SpecialReceiver::Box => {
+                        // The complex internal structure of `Box` is:
+                        // ```ignore
+                        // struct Box<T, A> (Unique<T>, A);
+                        // ```
+                        // and:
+                        // ```ignore
+                        // struct Unique<T> {
+                        //     pointer: NonNull<T>,
+                        //     _marker: PhantomData<T>,
+                        // }
+                        // ```
+                        // and:
+                        // ```ignore
+                        // struct NonNull<T> {
+                        //     pointer: *const T,
+                        // }
+                        // ```
+                        // 
+                        // We will need to unpack until the final `pointer` field in `NonNull<T>`,
+                        // and then re-pack it into the `Box` structure.
+                        //
+                        // Specifically:
+                        // Box(Unique {
+                        //   pointer: NonNull {
+                        //     pointer: concretize_cast<*const dyn Trait, *const T>(shim_self.0.pointer.pointer)
+                        //   }, 
+                        //   _marker: PhantomData<T> 
+                        // }, shim_self.1)
+
+                        // Firstly, we need to unpack the `Box` structure from `shim_self`:
+                        // It is to get the projection `self.0.pointer.pointer`
+
+                        // `self.0`: `Unique<dyn Trait>`
+                        let shim_unique_ty = self.rustc_ty(
+                            span,
+                            Right(LangItem::PtrUnique),
+                            true,
+                            vec![shim_internal_ty.clone()]
+                        )?;
+                        let shim_unique_ty_id = self.ty_id_from_adt_ty(span, &shim_unique_ty)?;
+                        // `self.0.pointer`: `NonNull<dyn Trait>`
+                        let shim_non_null_ty = self.rustc_ty(
+                            span,
+                            Left(sym::NonNull),
+                            true,
+                            vec![shim_internal_ty.clone()]
+                        )?;
+                        let shim_non_null_ty_id = self.ty_id_from_adt_ty(span, &shim_non_null_ty)?;
+                        // `self.0.pointer.pointer`: the `*const T` part
+                        let shim_const_ptr_ty = Ty::new(TyKind::RawPtr(shim_internal_ty.clone(), RefKind::Shared));
+
+                        // The target projection `self.0.pointer.pointer`
+                        let shim_const_ptr = Place {
+                            kind: PlaceKind::Projection(Box::new(Place {
+                                kind: PlaceKind::Projection(Box::new(Place {
+                                    kind: PlaceKind::Projection(Box::new(shim_self.clone()), ProjectionElem::Field(FieldProjKind::Tuple(2), FieldId::new(0))),
+                                    ty: shim_unique_ty,
+                                }), ProjectionElem::Field(FieldProjKind::Adt(shim_unique_ty_id, None), FieldId::new(0))),
+                                ty: shim_non_null_ty.clone(),
+                            }), ProjectionElem::Field(FieldProjKind::Adt(shim_non_null_ty_id, None), FieldId::new(0))),
+                            ty: shim_const_ptr_ty.clone(),
+                        };
+                        
+                        // Then, we concretize the inner-most const ptr from the shim const ptr.
+                        // `*const T`
+                        let const_ptr_ty = Ty::new(TyKind::RawPtr(
+                            internal_ty.clone(),
+                            RefKind::Shared,
+                        ));
+                        // The place to perform the concretization cast
+                        // from `*const dyn Trait` to `*const T`
+                        let const_ptr = new_var(statements, const_ptr_ty.clone());
+
+                        // Perform the concretization cast
+                        statements.push(Statement::new(
+                            span,
+                            RawStatement::Assign(
+                                const_ptr.clone(),
+                                Rvalue::UnaryOp(
+                                    UnOp::Cast(CastKind::Concretize(
+                                        shim_const_ptr_ty.clone(),
+                                        const_ptr_ty.clone(),
+                                    )),
+                                    Operand::Move(shim_const_ptr),
+                                ),
+                            ),
+                        ));
+
+                        // Finally, we need to re-pack the `Box` structure from the inner-most
+                        // re-pack `NonNull<T>`
+                        // The target `Box<T, A>` type
+                        let non_null_ty = self.rustc_ty(span, Left(sym::NonNull), true, vec![internal_ty.clone()])?;
+                        let non_null = new_var(statements, non_null_ty.clone());
+                        let shim_non_null_ty_ref = self.ty_decl_ref_from_adt_ty(span, &shim_non_null_ty)?;
+                        // `non_null := NonNull<T> { pointer: move const_ptr }`
+                        statements.push(Statement::new(
+                            span,
+                            RawStatement::Assign(
+                                non_null.clone(),
+                                Rvalue::Aggregate(
+                                    AggregateKind::Adt(shim_non_null_ty_ref, None, None),
+                                    vec![Operand::Move(const_ptr)],
+                                ),
+                            ),
+                        ));
+
+                        // re-pack `Unique<T>`
+                        // The target `Unique<T>` type
+                        let unique_ty = self.rustc_ty(span, Right(LangItem::PtrUnique), false, vec![internal_ty.clone()])?;
+                        let unique_ty_decl_ref = self.ty_decl_ref_from_adt_ty(span, &unique_ty)?;
+                        let unique = new_var(statements, unique_ty.clone());
+                        // prepare the `PhantomData<T>` for the `Unique<T>`
+                        let phantom_data_ty = self.rustc_ty(span, Right(LangItem::PhantomData), true, vec![internal_ty.clone()])?;
+                        let phantom_data_ty_decl_ref =
+                            self.ty_decl_ref_from_adt_ty(span, &phantom_data_ty)?;
+                        let phantom_data = new_var(statements, phantom_data_ty.clone());
+
+                        // `phantom := PhantomData<T> { }` -- empty `PhantomData`
+                        statements.push(Statement::new(
+                            span,
+                            RawStatement::Assign(
+                                phantom_data.clone(),
+                                Rvalue::Aggregate(
+                                    AggregateKind::Adt(phantom_data_ty_decl_ref, None, None),
+                                    vec![]
+                                ),
+                            ),
+                        ));
+                        // `unique := Unique<T> { pointer: move non_null, _marker: move phantom_data }`
+                        statements.push(Statement::new(
+                            span,
+                            RawStatement::Assign(
+                                unique.clone(),
+                                Rvalue::Aggregate(
+                                    AggregateKind::Adt(unique_ty_decl_ref, None, None),
+                                    vec![
+                                        Operand::Move(non_null),
+                                        Operand::Move(phantom_data),
+                                    ],
+                                ),
+                            ),
+                        ));
+
+                        // Supportive types that will be involved during the re-packing.
+                        let box_alloc_ty = generics.types[1].clone();
+                        // Supportive data structures
+                        let box_alloc = Place {
+                            kind: PlaceKind::Projection(
+                                Box::new(shim_self.clone()),
+                                ProjectionElem::Field(
+                                    FieldProjKind::Tuple(2),
+                                    FieldId::new(1),
+                                ),
+                            ),
+                            ty: box_alloc_ty,
+                        };
+
+                        // Finally, we re-pack `Box`
+                        statements.push(Statement::new(
+                            span,
+                            RawStatement::Assign(
+                                target_self.clone(),
+                                Rvalue::Aggregate(
+                                    AggregateKind::Adt(target_self_ty_decl_ref.clone(), None, None),
+                                    vec![Operand::Move(unique), Operand::Move(box_alloc)],
+                                ),
+                            ),
+                        ));
+                    }
+
+                    // May induce recursion -- `Pin`
+                    SpecialReceiver::Pin => {
+                        // The definition of `Pin` is:
+                        // ```ignore
+                        // struct Pin<P> {
+                        //     __pointer: P,
+                        // }
+                        // ```
+                        // For `Pin`, we need to unpack the `__pointer` field and re-pack it.
+                        let new_target_self = new_var(statements, internal_ty);
+
+                        let new_shim_self = Place {
+                            kind: PlaceKind::Projection(
+                                Box::new(shim_self.clone()),
+                                ProjectionElem::Field(
+                                    FieldProjKind::Adt(*id, None),
+                                    FieldId::new(0),
+                                ),
+                            ),
+                            ty: shim_internal_ty,
+                        };
+
+                        self.generate_concretization(
+                            span,
+                            locals,
+                            statements,
+                            &new_shim_self,
+                            &new_target_self,
+                        )?;
+
+                        // target_self := Pin { __pointer: move new_target_self }
+                        statements.push(Statement::new(
+                            span,
+                            RawStatement::Assign(
+                                target_self.clone(),
+                                Rvalue::Aggregate(
+                                    AggregateKind::Adt(target_self_ty_decl_ref.clone(), None, None),
+                                    vec![Operand::Move(new_target_self)],
+                                ),
+                            ),
+                        ));
+                    }
+                }
+
+                // We should handle this by the following:
+                // 1. force the translation of the internal structures of this type id --
+                //    notably, the internal structures for, e.g., `Rc`, are missing
+                // 2. get the real type to see if it is one of `Rc`, `Arc`, `Box` or `Pin`
+                // 3. then perform the operations differently based on the corresponding strucure:
+                //    E.g., for `Pin`, it has only one field `__pointer`, so, we recurse by
+                //    the `shim_self` be the place `shim_self.__pointer`
+                //    the `target_self` be a fresh variable V for the internal structure,
+                //    and then the current `target_self` be the aggreated value:
+                //    ``` Pin { __pointer: move V } ```
+                todo!("Handle the cases when the receiver is `Rc`, `Arc`, `Box` or `Pin`.");
+            }
+            _ => {
+                raise_error!(
+                    self,
+                    span,
+                    "Unknown shim type \"{}\" to cast",
+                    shim_self.ty().with_ctx(&self.into_fmt())
+                );
+            }
+        }
         Ok(())
     }
 
@@ -908,7 +1306,7 @@ impl ItemTransCtx<'_, '_> {
 
         // Perform the core concretization cast, need to unpack & re-pack the structure
         // for cases like `Rc`, `Arc`, `Pin` and (when --raw-boxes is on) `Box`
-        self.generate_concretization(span, &mut statements, &shim_self, &target_self)?;
+        self.generate_concretization(span, &mut locals, &mut statements, &shim_self, &target_self)?;
 
         let call = {
             let fun_id = self.register_item(span, &impl_func_def.this(), TransItemSourceKind::Fun);

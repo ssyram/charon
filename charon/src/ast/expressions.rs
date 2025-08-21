@@ -205,8 +205,6 @@ pub enum CastKind {
     ///
     /// For possible receivers, see: https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility.
     /// Other receivers, e.g., `Rc` should be unpacked before the cast and re-boxed after.
-    /// FIXME(ssyram): but this is not implemented yet, namely, there may still be
-    ///     something like `Rc<dyn Trait<...>> -> Rc<T>` in the types.
     Concretize(Ty, Ty),
 }
 
