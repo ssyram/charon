@@ -899,7 +899,7 @@ impl ItemTransCtx<'_, '_> {
         };
 
         let ret_place = new_var(None, shim_signature.output.clone());
-        let shim_self = new_var(None, target_receiver.clone());
+        let shim_self = new_var(None, shim_signature.inputs[0].clone());
         let args = shim_signature.inputs[1..]
             .iter()
             .map(|ty| new_var(None, ty.clone()))
