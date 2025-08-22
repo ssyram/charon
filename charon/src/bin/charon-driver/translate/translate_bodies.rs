@@ -431,7 +431,7 @@ impl BodyTransCtx<'_, '_, '_> {
                 let tref = ty.as_adt().unwrap();
                 let cg = match tref.id {
                     TypeId::Builtin(BuiltinTy::Array) => {
-                        Some(tref.generics.const_generics[0].clone())
+                        tref.generics.const_generics.get(0.into()).cloned()
                     }
                     TypeId::Builtin(BuiltinTy::Slice) => None,
                     _ => unreachable!(),
