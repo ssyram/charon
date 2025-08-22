@@ -181,7 +181,7 @@ fn {impl Display for String}::{vtable}() -> core::fmt::Display::{vtable}
 {
     let ret@0: core::fmt::Display::{vtable}; // return
 
-    ret@0 := core::fmt::Display::{vtable} { size: const (Opaque(unknown size)), align: const (Opaque(unknown align)), drop: const (Opaque(unknown drop)), method_fmt: const ({vtable_method}) }
+    ret@0 := core::fmt::Display::{vtable} { size: const (Opaque(unknown size)), align: const (Opaque(unknown align)), drop: const (Opaque(unknown drop)), method_fmt: const ({vtable_method}<'_, '_, '_>) }
     return
 }
 

@@ -535,7 +535,8 @@ impl ItemTransCtx<'_, '_> {
         self_ty: &Ty,
         dyn_self: &Ty,
         item: &hax::ImplAssocItem,
-        mut mk_field: impl FnMut(RawConstantExpr),
+        mut next_ty: impl FnMut() -> Ty,
+        mut mk_field: impl FnMut(RawConstantExpr, Ty),
     ) -> Result<(), Error> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
@@ -545,7 +546,7 @@ impl ItemTransCtx<'_, '_> {
             _ => return Ok(()),
         }
 
-        let const_kind = match &item.value {
+        let (const_kind, ty) = match &item.value {
             hax::ImplAssocItemValue::Provided {
                 def_id: item_def_id,
                 ..
@@ -553,22 +554,37 @@ impl ItemTransCtx<'_, '_> {
                 // The method is vtable safe so it has no generics, hence we can reuse the impl
                 // generics.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
-                let shim_ref = self.translate_item(
+                let mut shim_ref: FnPtr = self.translate_item(
                     span,
                     &item_ref,
                     TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
                 )?;
-                RawConstantExpr::FnPtr(shim_ref)
+                let ty = next_ty();
+                match ty.kind() {
+                    TyKind::FnPtr(sig) => {
+                        let regions = shim_ref.generics.regions;
+                        // Add a bunch of erased regions to avoid the type mismatch.
+                        shim_ref.generics.regions = sig.regions.iter().map(|_| Region::Erased).chain(regions.into_iter()).collect();
+                    }
+                    _ => {
+                        raise_error!(
+                            self,
+                            span,
+                            "expected a function pointer type for vtable method"
+                        );
+                    }
+                }
+                (RawConstantExpr::FnPtr(shim_ref), ty)
             }
-            hax::ImplAssocItemValue::DefaultedFn { .. } => RawConstantExpr::Opaque(
+            hax::ImplAssocItemValue::DefaultedFn { .. } => (RawConstantExpr::Opaque(
                 "shim for default methods \
                     aren't yet supported"
                     .to_string(),
-            ),
+            ), next_ty()),
             _ => return Ok(()),
         };
 
-        mk_field(const_kind);
+        mk_field(const_kind, ty);
 
         Ok(())
     }
@@ -578,7 +594,8 @@ impl ItemTransCtx<'_, '_> {
         span: Span,
         trait_def: &hax::FullDef,
         impl_def: &hax::FullDef,
-        mut mk_field: impl FnMut(RawConstantExpr),
+        mut next_ty: impl FnMut() -> Ty,
+        mut mk_field: impl FnMut(RawConstantExpr, Ty),
     ) -> Result<(), Error> {
         let hax::FullDefKind::TraitImpl {
             implied_impl_exprs, ..
@@ -626,7 +643,7 @@ impl ItemTransCtx<'_, '_> {
                 // TODO(dyn): builtin impls
                 _ => RawConstantExpr::Opaque("missing supertrait vtable".into()),
             };
-            mk_field(kind);
+            mk_field(kind, next_ty());
         }
         Ok(())
     }
@@ -696,15 +713,15 @@ impl ItemTransCtx<'_, '_> {
         let mut aggregate_fields = vec![];
         // For each vtable field, assign the desired value to a new local.
         let mut field_ty_iter = field_tys.into_iter();
-        let mut mk_field = |kind| {
-            let ty = field_ty_iter.next().unwrap();
+        let mut next_ty = || field_ty_iter.next().unwrap();
+        let mut mk_field = |kind, ty| {
             aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
         };
 
         // TODO(dyn): provide values
-        mk_field(RawConstantExpr::Opaque("unknown size".to_string()));
-        mk_field(RawConstantExpr::Opaque("unknown align".to_string()));
-        mk_field(RawConstantExpr::Opaque("unknown drop".to_string()));
+        mk_field(RawConstantExpr::Opaque("unknown size".to_string()), next_ty());
+        mk_field(RawConstantExpr::Opaque("unknown align".to_string()), next_ty());
+        mk_field(RawConstantExpr::Opaque("unknown drop".to_string()), next_ty());
 
         for item in items {
             self.add_method_to_vtable_value(
@@ -713,11 +730,12 @@ impl ItemTransCtx<'_, '_> {
                 &self_ty,
                 &dyn_self,
                 item,
+                &mut next_ty,
                 &mut mk_field,
             )?;
         }
 
-        self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut mk_field)?;
+        self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut next_ty, &mut mk_field)?;
 
         if field_ty_iter.next().is_some() {
             raise_error!(
