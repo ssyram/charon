@@ -145,9 +145,9 @@ fn slice_pat3()
     let @10: bool; // anonymous local
     let @11: (); // anonymous local
     let @12: (); // anonymous local
-    let @13: usize; // anonymous local
-    let @14: usize; // anonymous local
-    let @15: usize; // anonymous local
+    let @13: (); // anonymous local
+    let @14: (); // anonymous local
+    let @15: (); // anonymous local
     let @16: usize; // anonymous local
     let @17: &'_ (Slice<i32>); // anonymous local
     let @18: usize; // anonymous local
@@ -194,7 +194,7 @@ fn slice_pat3()
         panic(core::panicking::panic_explicit)
     }
     storage_live(@15)
-    @15 := ptr_metadata(copy (slice@1))
+    @15 := ()
     storage_live(@26)
     @26 := ptr_metadata(copy (slice@1))
     storage_live(@27)
@@ -203,7 +203,7 @@ fn slice_pat3()
     @28 := @SliceIndexShared<'_, i32>(move (@27), const (0 : usize))
     _a@5 := &(*(@28), move (@15))
     storage_live(@14)
-    @14 := ptr_metadata(copy (slice@1))
+    @14 := ()
     storage_live(@21)
     @21 := ptr_metadata(copy (slice@1))
     storage_live(@22)
@@ -217,7 +217,7 @@ fn slice_pat3()
     @25 := @SliceSubSliceShared<'_, i32>(move (@22), const (1 : usize), copy (@24))
     _b@6 := &(*(@25), move (@14))
     storage_live(@13)
-    @13 := ptr_metadata(copy (slice@1))
+    @13 := ()
     storage_live(@16)
     @16 := ptr_metadata(copy (slice@1))
     storage_live(@17)
