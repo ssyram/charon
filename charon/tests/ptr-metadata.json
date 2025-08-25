@@ -8,7 +8,7 @@
   "test_crate::DynTrait": {
     "VTable": {
       "id": {
-        "Adt": 11
+        "Adt": 13
       },
       "generics": {
         "regions": [],
@@ -18,7 +18,8 @@
       }
     }
   },
-  "test_crate::GenericInLastField": {
+  "test_crate::GenericInLastField": "None",
+  "test_crate::GenericWithUnsize": {
     "InheritFrom": {
       "TypeVar": {
         "Free": 0
@@ -27,13 +28,8 @@
   },
   "test_crate::GenericNotLastField": "None",
   "test_crate::GenericBehindIndirection": "None",
-  "test_crate::ThinGeneric": {
-    "InheritFrom": {
-      "TypeVar": {
-        "Free": 0
-      }
-    }
-  },
+  "test_crate::GenericBehindIndirectionUnsized": "None",
+  "test_crate::ThinGeneric": "None",
   "test_crate::Showable::{vtable}": "None",
   "alloc::alloc::Global": "None",
   "core::cmp::Ordering": "None",

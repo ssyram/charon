@@ -63,7 +63,7 @@ fn is_last_field_of_ty_decl_id(
         // Same as `enum` above
         TypeDeclKind::Union(..) => false,
         TypeDeclKind::Opaque => panic!(
-            "Accessing the field {} of an opaque type {}! Cannot tell whether this is the last field",
+            "Accessing the field {} of an opaque type {}! Cannot tell whether this is the last field. Please consider translating the opaque type definition by `--include`.",
             field, type_decl_id.with_ctx(&ctx.into_fmt())
         ),
         TypeDeclKind::Alias(ty) => match ty.kind() {
@@ -145,6 +145,8 @@ fn get_ptr_metadata_aux<T: PtrMetadataComputable>(ctx: &mut T, place: &Place) ->
     Some(Operand::Move(new_place))
 }
 
+/// No metadata, use unit, but as const ADT (for `()`) is not allowed
+/// Introduce a new local to hold this
 fn no_metadata<T: PtrMetadataComputable>(ctx: &mut T) -> Operand {
     let new_place = ctx.fresh_var(None, Ty::mk_unit());
     ctx.insert_assn_stmt(new_place.clone(), Rvalue::unit_value());
@@ -160,8 +162,6 @@ pub fn place_ptr_metadata_operand<T: PtrMetadataComputable>(ctx: &mut T, place: 
         PtrMetadata::None => return no_metadata(ctx),
         _ => match get_ptr_metadata_aux(ctx, place) {
             Some(metadata) => metadata,
-            // No metadata, use unit, but as const ADT (for `()`) is not allowed
-            // Introduce a new local to hold this
             None => no_metadata(ctx),
         },
     }

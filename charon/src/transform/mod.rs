@@ -38,6 +38,7 @@ pub mod skip_trait_refs_when_known;
 pub mod ullbc_to_llbc;
 pub mod unbind_item_vars;
 pub mod update_block_indices;
+pub mod resolve_sized_ptr_metadata_inherit;
 pub mod utils;
 
 use Pass::*;
@@ -71,6 +72,9 @@ pub static INITIAL_CLEANUP_PASSES: &[Pass] = &[
     // directly instead of going via a `TraitRef`. This is done before `reorder_decls` to remove
     // some sources of mutual recursion.
     UnstructuredBody(&skip_trait_refs_when_known::Transform),
+    // For the `PtrMetadata::InheritFrom` case in the type definitions
+    // If the given inherited type var is bounded by `Sized`, we resolve it to `None`.
+    NonBody(&resolve_sized_ptr_metadata_inherit::Transform),
     // Compute the metadata & insert for Rvalue
     UnstructuredBody(&insert_ptr_metadata::Transform),
     // Change trait associated types to be type parameters instead. See the module for details.

@@ -4645,7 +4645,7 @@ where
     let ptr@15: NonNull<T>; // local
     let ptr@16: PhantomData<T>; // local
     let @17: (); // anonymous local
-    let @18: PtrMetadata<A>; // anonymous local
+    let @18: (); // anonymous local
 
     storage_live(layout@2)
     storage_live(@4)
@@ -4691,7 +4691,7 @@ where
         _ => {
             storage_live(@7)
             storage_live(@18)
-            @18 := ptr_metadata(copy (self@1))
+            @18 := ()
             @7 := &((*(self@1)).1, move (@18))
             storage_live(@14)
             @14 := cast<*mut T, *const u8>(copy (@4))

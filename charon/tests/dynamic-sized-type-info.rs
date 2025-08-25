@@ -45,12 +45,20 @@ fn ptr_metadata() -> anyhow::Result<()> {
         x: u32,
         y: T,
     }
+    struct GenericWithUnsize<T: ?Sized> {
+        x: u32,
+        y: T
+    }
     struct GenericNotLastField<T> {
         x: u32,
         y: T,
         z: u32,
     }
     struct GenericBehindIndirection<T> {
+        x: u32,
+        y: Box<T>,
+    }
+    struct GenericBehindIndirectionUnsized<T: ?Sized> {
         x: u32,
         y: Box<T>,
     }
