@@ -770,6 +770,103 @@ impl ItemTransCtx<'_, '_> {
         }))
     }
 
+    /// Generate the body of the vtable instance function for closures.
+    /// This is similar to the normal vtable instance initialization but adapted for closure trait impls.
+    fn gen_vtable_instance_init_body_for_closure(
+        &mut self,
+        span: Span,
+        impl_def: &hax::FullDef,
+        vtable_struct_ref: TypeDeclRef,
+    ) -> Result<Body, Error> {
+        let mut locals = Locals {
+            arg_count: 0,
+            locals: Vector::new(),
+        };
+        let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
+        let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
+
+        let hax::FullDefKind::Closure {
+            args,
+            ..
+        } = &impl_def.kind()
+        else {
+            raise_error!(
+                self,
+                span,
+                "Expected closure definition for closure vtable generation"
+            );
+        };
+
+        // For closure vtables, we need to construct the vtable based on the closure's trait implementation
+        // The closure itself is the implementing type, and the trait is one of Fn/FnMut/FnOnce
+        
+        // Get the closure type
+        let closure_type_ref = self.translate_closure_type_ref(span, args)?;
+        let _self_ty = TyKind::Adt(closure_type_ref).into_ty();
+        
+        // For now, we'll create a simple vtable with opaque entries
+        // This is a conservative approach that at least allows the code to compile
+        let mut statements = vec![];
+        let mut aggregate_fields = vec![];
+
+        // Retreive the expected field types from the struct definition
+        let field_tys = {
+            let vtable_decl_id = vtable_struct_ref.id.as_adt().unwrap().clone();
+            let AnyTransItem::Type(vtable_def) =
+                self.t_ctx.get_or_translate(vtable_decl_id.into())?
+            else {
+                unreachable!()
+            };
+            let TypeDeclKind::Struct(fields) = &vtable_def.kind else {
+                unreachable!()
+            };
+            fields
+                .iter()
+                .map(|f| &f.ty)
+                .cloned()
+                .map(|ty| ty.substitute(&vtable_struct_ref.generics))
+                .collect_vec()
+        };
+
+        let field_count = field_tys.len();
+        let mut field_ty_iter = field_tys.into_iter();
+        let mut mk_field = |kind, ty| {
+            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
+        };
+
+        // For now, we'll use opaque values for all vtable fields
+        // TODO: In the future, this should be enhanced to properly construct the vtable
+        // with the correct method pointers, size, align, etc.
+        for _field_idx in 0..field_count {
+            let ty = field_ty_iter.next().unwrap();
+            mk_field(RawConstantExpr::Opaque("closure vtable field".to_string()), ty);
+        }
+
+        // Construct the final struct
+        statements.push(Statement::new(
+            span,
+            RawStatement::Assign(
+                ret_place,
+                Rvalue::Aggregate(
+                    AggregateKind::Adt(vtable_struct_ref.clone(), None, None),
+                    aggregate_fields,
+                ),
+            ),
+        ));
+
+        let block = BlockData {
+            statements,
+            terminator: Terminator::new(span, RawTerminator::Return),
+        };
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: Vec::new(),
+            body: [block].into(),
+        }))
+    }
+
     fn check_concretization_ty_match(
         &self,
         span: Span,
@@ -857,6 +954,10 @@ impl ItemTransCtx<'_, '_> {
         let body = match impl_kind {
             TraitImplSource::Normal => {
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;
+                Ok(body)
+            }
+            TraitImplSource::Closure(_) => {
+                let body = self.gen_vtable_instance_init_body_for_closure(span, impl_def, vtable_struct_ref)?;
                 Ok(body)
             }
             _ => {
