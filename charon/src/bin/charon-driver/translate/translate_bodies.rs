@@ -850,7 +850,7 @@ impl BodyTransCtx<'_, '_, '_> {
                 ..
             } => {
                 // Check if this is a dynamic trait method call that needs vtable transformation
-                if let Some((trait_ref, method_name)) = self.is_dyn_trait_method_call(span, fun)? {
+                if let Some((trait_ref, method_name, hax_trait_ref)) = self.is_dyn_trait_method_call(span, fun)? {
                     trace!(
                         "Detected dynamic trait method call: {} - transforming to use vtable",
                         method_name
@@ -859,6 +859,7 @@ impl BodyTransCtx<'_, '_, '_> {
                         span,
                         &trait_ref,
                         &method_name,
+                        &hax_trait_ref,
                         args,
                         destination,
                         target,
@@ -1095,15 +1096,18 @@ impl BodyTransCtx<'_, '_, '_> {
         &mut self,
         span: Span,
         fun: &hax::FunOperand,
-    ) -> Result<Option<(TraitRef, TraitItemName)>, Error> {
+    ) -> Result<Option<(TraitRef, TraitItemName, hax::TraitRef)>, Error> {
         if let hax::FunOperand::Static(item) = fun {
             let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
             let fn_ptr = fn_ptr_with_binder.erase();
 
             if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
                 if matches!(trait_ref.kind, TraitRefKind::Dyn) {
-                    // Enable vtable transformation - let's see what happens
-                    return Ok(Some((trait_ref.clone(), method_name.clone())));
+                    // Extract the original HAX trait reference from the ItemRef
+                    if let Some(impl_expr) = &item.in_trait {
+                        // The HAX trait reference is in impl_expr.trait
+                        return Ok(Some((trait_ref.clone(), method_name.clone(), impl_expr.r#trait.hax_skip_binder_ref().clone())));
+                    }
                 }
             }
         }
@@ -1114,8 +1118,9 @@ impl BodyTransCtx<'_, '_, '_> {
     fn translate_dyn_trait_method_call(
         &mut self,
         span: Span,
-        trait_ref: &TraitRef,
+        _trait_ref: &TraitRef,
         method_name: &TraitItemName,
+        hax_trait_ref: &hax::TraitRef,
         args: &Vec<hax::Spanned<hax::Operand>>,
         destination: &hax::Place,
         target: &Option<hax::BasicBlock>,
@@ -1137,7 +1142,7 @@ impl BodyTransCtx<'_, '_, '_> {
         let receiver = &t_args[0];
 
         // Step 1: Extract vtable from receiver
-        let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, statements)?;
+        let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, hax_trait_ref, statements)?;
         
         // Step 2: Extract method pointer from vtable
         let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements)?;
@@ -1189,46 +1194,41 @@ impl BodyTransCtx<'_, '_, '_> {
         span: Span,
         method_name: &TraitItemName,
         receiver: &Operand,
+        hax_trait_ref: &hax::TraitRef,
         statements: &mut Vec<Statement>,
     ) -> Result<Place, Error> {
-        // Get the vtable struct type from the receiver's dyn trait type
-        // The receiver should be &dyn Trait - we need to find the corresponding vtable struct
-        let receiver_ty = match receiver {
-            Operand::Copy(place) | Operand::Move(place) => place.ty(),
-            Operand::Const(constant_expr) => &constant_expr.ty,
-        };
-        let vtable_ty = self.get_vtable_type_from_receiver_type(span, receiver_ty)?;
+        // Get the vtable struct type using existing vtable that should already be translated
+        // When dyn traits are processed, vtable structs are created. We need to find that same struct.
+        // We should NOT create new vtable structs here - just look up existing ones.
         
-        let vtable_place = self
+        // For now, let's get the raw vtable pointer and see if we can cast it properly
+        let raw_vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
+        let raw_vtable_place = self
             .locals
-            .new_var(Some(format!("vtable@{}", method_name)), vtable_ty);
+            .new_var(Some(format!("raw_vtable@{}", method_name)), raw_vtable_ty.clone());
 
-        // Add storage live for the vtable variable
-        self.add_storage_live_if_local(&vtable_place, span, statements);
+        // Add storage live for the raw vtable variable
+        self.add_storage_live_if_local(&raw_vtable_place, span, statements);
 
-        // Generate: vtable = ptr_metadata(receiver)
-        let vtable_assign = Statement::new(
+        // Generate: raw_vtable = ptr_metadata(receiver)
+        let raw_vtable_assign = Statement::new(
             span,
             RawStatement::Assign(
-                vtable_place.clone(),
+                raw_vtable_place.clone(),
                 Rvalue::UnaryOp(UnOp::PtrMetadata, receiver.clone()),
             ),
         );
-        statements.push(vtable_assign);
+        statements.push(raw_vtable_assign);
 
-        Ok(vtable_place)
+        // Now we need to cast to the proper vtable struct type.
+        // For now, let's skip the casting and see if we can determine what type is expected.
+        // The field lookup function will tell us what vtable type it expects.
+        
+        // TODO: We need to determine the correct vtable struct type here
+        // and cast raw_vtable to that type. For now, return the raw vtable.
+        Ok(raw_vtable_place)
     }
     
-    /// Get the vtable struct type from the receiver's dyn trait type.
-    fn get_vtable_type_from_receiver_type(
-        &mut self,
-        span: Span,
-        receiver_ty: &Ty,
-    ) -> Result<Ty, Error> {
-        // For now, return a raw pointer type and see what the exact error is
-        // This will help us understand the correct type structure
-        Ok(Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared)))
-    }
 
     /// Generate method pointer lookup from vtable.
     fn generate_method_pointer_lookup(
