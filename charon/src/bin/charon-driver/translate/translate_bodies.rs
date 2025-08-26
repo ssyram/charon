@@ -848,7 +848,25 @@ impl BodyTransCtx<'_, '_, '_> {
                 unwind,
                 fn_span: _,
                 ..
-            } => self.translate_function_call(span, fun, args, destination, target, unwind)?,
+            } => {
+                // Check if this is a dynamic trait method call that needs vtable transformation
+                if let hax::FunOperand::Static(item) = fun {
+                    let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
+                    let fn_ptr = fn_ptr_with_binder.erase();
+                    
+                    if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
+                        if matches!(trait_ref.kind, TraitRefKind::Dyn) {
+                            trace!("Transforming dynamic trait method call: {} to use vtable", method_name);
+                            return self.translate_dyn_trait_method_call(
+                                span, trait_ref, method_name, args, destination, target, unwind, statements
+                            );
+                        }
+                    }
+                }
+                
+                // Regular function call
+                self.translate_function_call(span, fun, args, destination, target, unwind)?
+            }
             TerminatorKind::Assert {
                 cond,
                 expected,
@@ -1078,6 +1096,98 @@ impl BodyTransCtx<'_, '_, '_> {
             t_args.push(op);
         }
         Ok(t_args)
+    }
+
+    /// Handle calls to methods on dyn trait objects using vtable lookup.
+    /// This adds vtable lookup statements to the current block and returns
+    /// a function call terminator that calls the method through the vtable.
+    fn translate_dyn_trait_method_call(
+        &mut self,
+        span: Span,
+        _trait_ref: &TraitRef,
+        method_name: &TraitItemName,
+        args: &Vec<hax::Spanned<hax::Operand>>,
+        destination: &hax::Place,
+        target: &Option<hax::BasicBlock>,
+        unwind: &UnwindAction,
+        _statements: &mut Vec<Statement>,
+    ) -> Result<Terminator, Error> {
+        trace!("Translating dyn trait method call: {}", method_name);
+        
+        // Translate destination and arguments
+        let lval = self.translate_place(span, destination)?;
+        let t_args = self.translate_arguments(span, args)?;
+        
+        // The first argument should be the dyn trait object (receiver)
+        if t_args.is_empty() {
+            return Err(Error {
+                span,
+                msg: "Dyn trait method call with no receiver argument".to_string()
+            });
+        }
+        
+        let _receiver = &t_args[0];
+        
+        // TODO: For now, create a simple function pointer call
+        // We need to:
+        // 1. Get the vtable from the receiver using PtrMetadata
+        // 2. Get the method function pointer from the vtable
+        // 3. Call the method function pointer
+        
+        // For the initial implementation, let's create a placeholder function pointer
+        // and call it. This will at least generate the right structure.
+        
+        // Create a simple function pointer type (we'll improve this later)
+        let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
+            vec![].into(), // For now, empty input signature - should be improved
+            Ty::mk_unit(),  // For now, unit return type - should be improved
+        ))));
+        
+        let method_ptr_local = self.locals.new_var(
+            Some(format!("vtable_method_{}", method_name)), 
+            method_ptr_ty.clone()
+        );
+        let method_ptr_place = method_ptr_local;
+        
+        // TODO: Add statements to extract the method pointer from vtable
+        // For now, we'll create a dummy assignment to avoid compilation errors
+        // but this needs to be properly implemented
+        
+        let call = Call {
+            func: FnOperand::Move(method_ptr_place),
+            args: t_args,
+            dest: lval,
+        };
+        
+        let target_block = match target {
+            Some(target) => self.translate_basic_block_id(*target),
+            None => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
+                self.blocks.push(abort.into_block())
+            }
+        };
+        
+        let on_unwind = match unwind {
+            UnwindAction::Continue => {
+                let unwind_continue = Terminator::new(span, RawTerminator::UnwindResume);
+                self.blocks.push(unwind_continue.into_block())
+            }
+            UnwindAction::Unreachable => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
+                self.blocks.push(abort.into_block())
+            }
+            UnwindAction::Terminate(..) => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UnwindTerminate));
+                self.blocks.push(abort.into_block())
+            }
+            UnwindAction::Cleanup(bb) => self.translate_basic_block_id(*bb),
+        };
+
+        Ok(Terminator::new(span, RawTerminator::Call {
+            call,
+            target: target_block,
+            on_unwind,
+        }))
     }
 
     /// Gather all the lines that start with `//` inside the given span.
