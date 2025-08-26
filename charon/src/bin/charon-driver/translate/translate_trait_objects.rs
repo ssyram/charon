@@ -564,7 +564,12 @@ impl ItemTransCtx<'_, '_> {
                     TyKind::FnPtr(sig) => {
                         let regions = shim_ref.generics.regions;
                         // Add a bunch of erased regions to avoid the type mismatch.
-                        shim_ref.generics.regions = sig.regions.iter().map(|_| Region::Erased).chain(regions.into_iter()).collect();
+                        shim_ref.generics.regions = sig
+                            .regions
+                            .iter()
+                            .map(|_| Region::Erased)
+                            .chain(regions.into_iter())
+                            .collect();
                     }
                     _ => {
                         raise_error!(
@@ -576,11 +581,14 @@ impl ItemTransCtx<'_, '_> {
                 }
                 (RawConstantExpr::FnPtr(shim_ref), ty)
             }
-            hax::ImplAssocItemValue::DefaultedFn { .. } => (RawConstantExpr::Opaque(
-                "shim for default methods \
+            hax::ImplAssocItemValue::DefaultedFn { .. } => (
+                RawConstantExpr::Opaque(
+                    "shim for default methods \
                     aren't yet supported"
-                    .to_string(),
-            ), next_ty()),
+                        .to_string(),
+                ),
+                next_ty(),
+            ),
             _ => return Ok(()),
         };
 
@@ -719,9 +727,18 @@ impl ItemTransCtx<'_, '_> {
         };
 
         // TODO(dyn): provide values
-        mk_field(RawConstantExpr::Opaque("unknown size".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown align".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown drop".to_string()), next_ty());
+        mk_field(
+            RawConstantExpr::Opaque("unknown size".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("unknown align".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("unknown drop".to_string()),
+            next_ty(),
+        );
 
         for item in items {
             self.add_method_to_vtable_value(
@@ -735,7 +752,13 @@ impl ItemTransCtx<'_, '_> {
             )?;
         }
 
-        self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut next_ty, &mut mk_field)?;
+        self.add_supertraits_to_vtable_value(
+            span,
+            &trait_def,
+            impl_def,
+            &mut next_ty,
+            &mut mk_field,
+        )?;
 
         if field_ty_iter.next().is_some() {
             raise_error!(
