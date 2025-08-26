@@ -1194,39 +1194,58 @@ impl BodyTransCtx<'_, '_, '_> {
         span: Span,
         method_name: &TraitItemName,
         receiver: &Operand,
-        hax_trait_ref: &hax::TraitRef,
+        _hax_trait_ref: &hax::TraitRef,
         statements: &mut Vec<Statement>,
     ) -> Result<Place, Error> {
-        // Get the vtable struct type using existing vtable that should already be translated
-        // When dyn traits are processed, vtable structs are created. We need to find that same struct.
-        // We should NOT create new vtable structs here - just look up existing ones.
+        // Get the receiver type to extract the vtable information from the dyn trait type
+        let receiver_ty = match receiver {
+            Operand::Copy(place) | Operand::Move(place) => &place.ty,
+            Operand::Const(_) => return Err(Error {
+                span,
+                msg: "Dyn trait method calls with constant receiver are not supported".to_string(),
+            }),
+        };
         
-        // For now, let's get the raw vtable pointer and see if we can cast it properly
-        let raw_vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
-        let raw_vtable_place = self
+        // For a dyn trait object, the receiver type should be a reference to a dyn trait
+        // We need to extract the vtable type from the dyn trait type
+        let dyn_trait_ty = match receiver_ty.kind() {
+            TyKind::Ref(_, inner_ty, _) => inner_ty,
+            _ => return Err(Error {
+                span,
+                msg: format!("Expected reference type for dyn trait receiver, got: {:?}", receiver_ty.kind()),
+            }),
+        };
+        
+        let pred = match dyn_trait_ty.kind() {
+            TyKind::DynTrait(pred) => pred,
+            _ => return Err(Error {
+                span,
+                msg: format!("Expected dyn trait type, got: {:?}", dyn_trait_ty.kind()),
+            }),
+        };
+        
+        // The dyn trait type should have vtable information
+        // We need to find the vtable struct type that corresponds to this trait
+        // For now, create a simple vtable type - we'll improve this later
+        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
+        let vtable_place = self
             .locals
-            .new_var(Some(format!("raw_vtable@{}", method_name)), raw_vtable_ty.clone());
+            .new_var(Some(format!("vtable@{}", method_name)), vtable_ty);
 
-        // Add storage live for the raw vtable variable
-        self.add_storage_live_if_local(&raw_vtable_place, span, statements);
+        // Add storage live for the vtable variable
+        self.add_storage_live_if_local(&vtable_place, span, statements);
 
-        // Generate: raw_vtable = ptr_metadata(receiver)
-        let raw_vtable_assign = Statement::new(
+        // Generate: vtable = ptr_metadata(receiver)
+        let vtable_assign = Statement::new(
             span,
             RawStatement::Assign(
-                raw_vtable_place.clone(),
+                vtable_place.clone(),
                 Rvalue::UnaryOp(UnOp::PtrMetadata, receiver.clone()),
             ),
         );
-        statements.push(raw_vtable_assign);
+        statements.push(vtable_assign);
 
-        // Now we need to cast to the proper vtable struct type.
-        // For now, let's skip the casting and see if we can determine what type is expected.
-        // The field lookup function will tell us what vtable type it expects.
-        
-        // TODO: We need to determine the correct vtable struct type here
-        // and cast raw_vtable to that type. For now, return the raw vtable.
-        Ok(raw_vtable_place)
+        Ok(vtable_place)
     }
     
 
@@ -1255,10 +1274,30 @@ impl BodyTransCtx<'_, '_, '_> {
         let (vtable_decl_id, field_id) =
             self.get_vtable_method_field_id(span, vtable_place, method_name)?;
 
-        // Create field access: vtable.method_<name>
-        let method_field_place = Place {
+        // Create field access: (*vtable).method_<name>
+        // We need to dereference the raw pointer first, then access the field
+        
+        // Extract the inner ADT type from the *const ADT vtable type
+        let vtable_ty = vtable_place.ty();
+        let inner_ty = match vtable_ty.kind() {
+            TyKind::RawPtr(inner, RefKind::Shared) => inner,
+            _ => return Err(Error {
+                span,
+                msg: format!("Expected *const ADT type for vtable field access, got: {:?}", vtable_ty.kind()),
+            }),
+        };
+        
+        let deref_vtable_place = Place {
             kind: PlaceKind::Projection(
                 Box::new(vtable_place.clone()),
+                ProjectionElem::Deref,
+            ),
+            ty: inner_ty.clone(), // inner_ty is the ADT type inside the *const ADT
+        };
+        
+        let method_field_place = Place {
+            kind: PlaceKind::Projection(
+                Box::new(deref_vtable_place),
                 ProjectionElem::Field(FieldProjKind::Adt(vtable_decl_id, None), field_id),
             ),
             ty: method_ptr_ty,
@@ -1286,10 +1325,19 @@ impl BodyTransCtx<'_, '_, '_> {
     ) -> Result<(TypeDeclId, FieldId), Error> {
         // Extract the vtable type from the place
         let vtable_ty = vtable_place.ty();
-        let TyKind::Adt(vtable_ref) = vtable_ty.kind() else {
+        
+        // The vtable place should have type *const ADT, so we need to unwrap the raw pointer
+        let TyKind::RawPtr(inner_ty, RefKind::Shared) = vtable_ty.kind() else {
             return Err(Error {
                 span,
-                msg: format!("Expected ADT type for vtable, got: {:?}", vtable_ty.kind()),
+                msg: format!("Expected *const ADT type for vtable, got: {:?}", vtable_ty.kind()),
+            });
+        };
+
+        let TyKind::Adt(vtable_ref) = inner_ty.kind() else {
+            return Err(Error {
+                span,
+                msg: format!("Expected ADT inside raw pointer for vtable, got: {:?}", inner_ty.kind()),
             });
         };
 

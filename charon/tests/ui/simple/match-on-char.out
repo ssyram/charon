@@ -4,4 +4,14 @@ error: Can't match on type char
 3 |     match 'x' {
   |     ^^^^^^^^^
 
-ERROR Charon failed to translate this code (1 errors)
+
+thread 'rustc' panicked at src/bin/charon-driver/translate/translate_items.rs:429:27:
+Translation error: Error { span: Span { span: RawSpan { file_id: 0, beg: Loc { line: 3, col: 4 }, end: Loc { line: 3, col: 13 } }, generated_from_span: None }, msg: "Can't match on type char" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: Thread panicked when extracting item `test_crate::main`.
+ --> tests/ui/simple/match-on-char.rs:2:1
+  |
+2 | fn main() {
+  | ^^^^^^^^^
+
+ERROR Charon failed to translate this code (2 errors)
