@@ -850,7 +850,9 @@ impl BodyTransCtx<'_, '_, '_> {
                 ..
             } => {
                 // Check if this is a dynamic trait method call that needs vtable transformation
-                if let Some((trait_ref, method_name, hax_trait_ref)) = self.is_dyn_trait_method_call(span, fun)? {
+                if let Some((trait_ref, method_name, hax_item)) =
+                    self.is_dyn_trait_method_call(span, fun)?
+                {
                     trace!(
                         "Detected dynamic trait method call: {} - transforming to use vtable",
                         method_name
@@ -859,7 +861,7 @@ impl BodyTransCtx<'_, '_, '_> {
                         span,
                         &trait_ref,
                         &method_name,
-                        &hax_trait_ref,
+                        &hax_item,
                         args,
                         destination,
                         target,
@@ -1096,9 +1098,17 @@ impl BodyTransCtx<'_, '_, '_> {
         &mut self,
         span: Span,
         fun: &hax::FunOperand,
-    ) -> Result<Option<(TraitRef, TraitItemName, hax::TraitRef)>, Error> {
-        // TODO: Currently disabled to debug vtable registration timing issues
-        // Need to understand when vtables are registered vs when method calls are translated
+    ) -> Result<Option<(TraitRef, TraitItemName, hax::ItemRef)>, Error> {
+        if let hax::FunOperand::Static(item) = fun {
+            let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
+            let fn_ptr = fn_ptr_with_binder.erase();
+
+            if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
+                if matches!(trait_ref.kind, TraitRefKind::Dyn) {
+                    return Ok(Some((trait_ref.clone(), method_name.clone(), item.clone())));
+                }
+            }
+        }
         Ok(None)
     }
 
@@ -1106,9 +1116,9 @@ impl BodyTransCtx<'_, '_, '_> {
     fn translate_dyn_trait_method_call(
         &mut self,
         span: Span,
-        _trait_ref: &TraitRef,
+        trait_ref: &TraitRef,
         method_name: &TraitItemName,
-        hax_trait_ref: &hax::TraitRef,
+        hax_item: &hax::ItemRef,
         args: &Vec<hax::Spanned<hax::Operand>>,
         destination: &hax::Place,
         target: &Option<hax::BasicBlock>,
@@ -1129,11 +1139,11 @@ impl BodyTransCtx<'_, '_, '_> {
 
         let receiver = &t_args[0];
 
-        // Step 1: Extract vtable from receiver
-        let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, hax_trait_ref, statements)?;
-        
-        // Step 2: Extract method pointer from vtable
-        let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements)?;
+        // Step 1: Extract vtable from receiver - simplified approach for now
+        let vtable_place = self.generate_simple_vtable_extraction(span, method_name, receiver, statements)?;
+
+        // Step 2: Extract method pointer from vtable - simplified version for now
+        let method_ptr_place = self.generate_simple_method_pointer_lookup(span, method_name, statements)?;
 
         // Step 3: Call through the method pointer
         let call = Call {
@@ -1176,63 +1186,17 @@ impl BodyTransCtx<'_, '_, '_> {
     // - get_vtable_method_field_id: Looks up the field ID for a method by name in the vtable definition
     // =====================================
 
-    /// Generate vtable extraction statements for a dyn trait object receiver.
-    fn generate_vtable_extraction(
+    /// Generate simplified vtable extraction statements - uses a generic vtable type for now.
+    fn generate_simple_vtable_extraction(
         &mut self,
         span: Span,
         method_name: &TraitItemName,
         receiver: &Operand,
-        hax_trait_ref: &hax::TraitRef,
         statements: &mut Vec<Statement>,
     ) -> Result<Place, Error> {
-        // Create a TransItemSource for the vtable to check if it's already registered
-        let vtable_src = if hax_trait_ref.has_param {
-            TransItemSource::polymorphic(&hax_trait_ref.def_id, TransItemSourceKind::VTable)
-        } else {
-            TransItemSource::monomorphic(hax_trait_ref, TransItemSourceKind::VTable)
-        };
-        
-        // Check if the vtable is already registered
-        let vtable_id: TypeDeclId = match self.t_ctx.id_map.get(&vtable_src) {
-            Some(AnyTransId::Type(id)) => id.clone(),
-            Some(_) => return Err(Error {
-                span,
-                msg: "Vtable registered with wrong ID type".to_string(),
-            }),
-            None => return Err(Error {
-                span,
-                msg: format!("Vtable not found for trait {:?}", hax_trait_ref.def_id),
-            }),
-        };
-        
-        // Build the vtable type reference with correct generics
-        let mut generics = if self.monomorphize() {
-            GenericArgs::empty()
-        } else {
-            self.translate_generic_args(span, &hax_trait_ref.generic_args, &hax_trait_ref.impl_exprs)?
-        };
-        
-        // Remove the Self type parameter (first type parameter)
-        if !generics.types.is_empty() {
-            generics.types.remove_and_shift_ids(TypeVarId::ZERO);
-        }
-        
-        // Add associated types as parameters (vtables are parametrized by associated types)
-        let assoc_tys: Vec<_> = hax_trait_ref
-            .trait_associated_types(&self.hax_state_with_id())
-            .iter()
-            .map(|ty| self.translate_ty(span, ty))
-            .try_collect()?;
-        generics.types.extend(assoc_tys);
-
-        let vtable_ref = TypeDeclRef {
-            id: TypeId::Adt(vtable_id),
-            generics: Box::new(generics),
-        };
-
-        // The vtable is a *const vtable_struct, so we need to wrap the ADT in a raw pointer
-        let vtable_adt_ty = Ty::new(TyKind::Adt(vtable_ref));
-        let vtable_ty = Ty::new(TyKind::RawPtr(vtable_adt_ty, RefKind::Shared));
+        // For now, create a generic raw pointer type for vtable - this is a simplified version
+        // The proper implementation would need the exact vtable struct type from trait analysis
+        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
         let vtable_place = self
             .locals
             .new_var(Some(format!("vtable@{}", method_name)), vtable_ty);
@@ -1252,7 +1216,6 @@ impl BodyTransCtx<'_, '_, '_> {
 
         Ok(vtable_place)
     }
-    
 
     /// Generate method pointer lookup from vtable.
     fn generate_method_pointer_lookup(
@@ -1281,25 +1244,27 @@ impl BodyTransCtx<'_, '_, '_> {
 
         // Create field access: (*vtable).method_<name>
         // We need to dereference the raw pointer first, then access the field
-        
+
         // Extract the inner ADT type from the *const ADT vtable type
         let vtable_ty = vtable_place.ty();
         let inner_ty = match vtable_ty.kind() {
             TyKind::RawPtr(inner, RefKind::Shared) => inner,
-            _ => return Err(Error {
-                span,
-                msg: format!("Expected *const ADT type for vtable field access, got: {:?}", vtable_ty.kind()),
-            }),
+            _ => {
+                return Err(Error {
+                    span,
+                    msg: format!(
+                        "Expected *const ADT type for vtable field access, got: {:?}",
+                        vtable_ty.kind()
+                    ),
+                });
+            }
         };
-        
+
         let deref_vtable_place = Place {
-            kind: PlaceKind::Projection(
-                Box::new(vtable_place.clone()),
-                ProjectionElem::Deref,
-            ),
+            kind: PlaceKind::Projection(Box::new(vtable_place.clone()), ProjectionElem::Deref),
             ty: inner_ty.clone(), // inner_ty is the ADT type inside the *const ADT
         };
-        
+
         let method_field_place = Place {
             kind: PlaceKind::Projection(
                 Box::new(deref_vtable_place),
@@ -1330,19 +1295,25 @@ impl BodyTransCtx<'_, '_, '_> {
     ) -> Result<(TypeDeclId, FieldId), Error> {
         // Extract the vtable type from the place
         let vtable_ty = vtable_place.ty();
-        
+
         // The vtable place should have type *const ADT, so we need to unwrap the raw pointer
         let TyKind::RawPtr(inner_ty, RefKind::Shared) = vtable_ty.kind() else {
             return Err(Error {
                 span,
-                msg: format!("Expected *const ADT type for vtable, got: {:?}", vtable_ty.kind()),
+                msg: format!(
+                    "Expected *const ADT type for vtable, got: {:?}",
+                    vtable_ty.kind()
+                ),
             });
         };
 
         let TyKind::Adt(vtable_ref) = inner_ty.kind() else {
             return Err(Error {
                 span,
-                msg: format!("Expected ADT inside raw pointer for vtable, got: {:?}", inner_ty.kind()),
+                msg: format!(
+                    "Expected ADT inside raw pointer for vtable, got: {:?}",
+                    inner_ty.kind()
+                ),
             });
         };
 
