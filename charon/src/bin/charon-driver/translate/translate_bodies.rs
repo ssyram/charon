@@ -1097,20 +1097,8 @@ impl BodyTransCtx<'_, '_, '_> {
         span: Span,
         fun: &hax::FunOperand,
     ) -> Result<Option<(TraitRef, TraitItemName, hax::TraitRef)>, Error> {
-        if let hax::FunOperand::Static(item) = fun {
-            let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
-            let fn_ptr = fn_ptr_with_binder.erase();
-
-            if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
-                if matches!(trait_ref.kind, TraitRefKind::Dyn) {
-                    // Extract the original HAX trait reference from the ItemRef
-                    if let Some(impl_expr) = &item.in_trait {
-                        // The HAX trait reference is in impl_expr.trait
-                        return Ok(Some((trait_ref.clone(), method_name.clone(), impl_expr.r#trait.hax_skip_binder_ref().clone())));
-                    }
-                }
-            }
-        }
+        // TODO: Currently disabled to debug vtable registration timing issues
+        // Need to understand when vtables are registered vs when method calls are translated
         Ok(None)
     }
 
@@ -1194,40 +1182,57 @@ impl BodyTransCtx<'_, '_, '_> {
         span: Span,
         method_name: &TraitItemName,
         receiver: &Operand,
-        _hax_trait_ref: &hax::TraitRef,
+        hax_trait_ref: &hax::TraitRef,
         statements: &mut Vec<Statement>,
     ) -> Result<Place, Error> {
-        // Get the receiver type to extract the vtable information from the dyn trait type
-        let receiver_ty = match receiver {
-            Operand::Copy(place) | Operand::Move(place) => &place.ty,
-            Operand::Const(_) => return Err(Error {
+        // Create a TransItemSource for the vtable to check if it's already registered
+        let vtable_src = if hax_trait_ref.has_param {
+            TransItemSource::polymorphic(&hax_trait_ref.def_id, TransItemSourceKind::VTable)
+        } else {
+            TransItemSource::monomorphic(hax_trait_ref, TransItemSourceKind::VTable)
+        };
+        
+        // Check if the vtable is already registered
+        let vtable_id: TypeDeclId = match self.t_ctx.id_map.get(&vtable_src) {
+            Some(AnyTransId::Type(id)) => id.clone(),
+            Some(_) => return Err(Error {
                 span,
-                msg: "Dyn trait method calls with constant receiver are not supported".to_string(),
+                msg: "Vtable registered with wrong ID type".to_string(),
+            }),
+            None => return Err(Error {
+                span,
+                msg: format!("Vtable not found for trait {:?}", hax_trait_ref.def_id),
             }),
         };
         
-        // For a dyn trait object, the receiver type should be a reference to a dyn trait
-        // We need to extract the vtable type from the dyn trait type
-        let dyn_trait_ty = match receiver_ty.kind() {
-            TyKind::Ref(_, inner_ty, _) => inner_ty,
-            _ => return Err(Error {
-                span,
-                msg: format!("Expected reference type for dyn trait receiver, got: {:?}", receiver_ty.kind()),
-            }),
+        // Build the vtable type reference with correct generics
+        let mut generics = if self.monomorphize() {
+            GenericArgs::empty()
+        } else {
+            self.translate_generic_args(span, &hax_trait_ref.generic_args, &hax_trait_ref.impl_exprs)?
         };
         
-        let pred = match dyn_trait_ty.kind() {
-            TyKind::DynTrait(pred) => pred,
-            _ => return Err(Error {
-                span,
-                msg: format!("Expected dyn trait type, got: {:?}", dyn_trait_ty.kind()),
-            }),
-        };
+        // Remove the Self type parameter (first type parameter)
+        if !generics.types.is_empty() {
+            generics.types.remove_and_shift_ids(TypeVarId::ZERO);
+        }
         
-        // The dyn trait type should have vtable information
-        // We need to find the vtable struct type that corresponds to this trait
-        // For now, create a simple vtable type - we'll improve this later
-        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
+        // Add associated types as parameters (vtables are parametrized by associated types)
+        let assoc_tys: Vec<_> = hax_trait_ref
+            .trait_associated_types(&self.hax_state_with_id())
+            .iter()
+            .map(|ty| self.translate_ty(span, ty))
+            .try_collect()?;
+        generics.types.extend(assoc_tys);
+
+        let vtable_ref = TypeDeclRef {
+            id: TypeId::Adt(vtable_id),
+            generics: Box::new(generics),
+        };
+
+        // The vtable is a *const vtable_struct, so we need to wrap the ADT in a raw pointer
+        let vtable_adt_ty = Ty::new(TyKind::Adt(vtable_ref));
+        let vtable_ty = Ty::new(TyKind::RawPtr(vtable_adt_ty, RefKind::Shared));
         let vtable_place = self
             .locals
             .new_var(Some(format!("vtable@{}", method_name)), vtable_ty);
