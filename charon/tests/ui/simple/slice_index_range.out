@@ -113,6 +113,31 @@ pub fn new_const<'a, const N : usize>(@1: &'a (Array<&'static (Str), const N : u
     return
 }
 
+// Full name: core::intrinsics::abort
+pub fn abort() -> !
+{
+    let @0: !; // return
+
+    undefined_behavior
+}
+
+// Full name: core::panic::location::Location
+#[lang_item("panic_location")]
+pub struct Location<'a> {
+  filename: NonNull<Str>,
+  line: u32,
+  col: u32,
+  _filename: PhantomData<&'a (Str)>,
+}
+
+// Full name: core::intrinsics::caller_location
+pub fn caller_location() -> &'static (Location<'static>)
+{
+    let @0: &'_ (Location<'_>); // return
+
+    undefined_behavior
+}
+
 fn core::slice::index::slice_end_index_len_fail::do_panic::runtime(@1: usize, @2: usize) -> !
 
 fn core::slice::index::slice_index_order_fail::do_panic::runtime(@1: usize, @2: usize) -> !
@@ -176,9 +201,8 @@ where
   exhausted: bool,
 }
 
-// Full name: core::ops::range::{RangeInclusive<Idx>[@TraitClause0]}::new
 #[lang_item("range_inclusive_new")]
-pub fn new<Idx>(@1: Idx, @2: Idx) -> RangeInclusive<Idx>[@TraitClause0]
+pub fn core::ops::range::{RangeInclusive<Idx>[@TraitClause0]}::new<Idx>(@1: Idx, @2: Idx) -> RangeInclusive<Idx>[@TraitClause0]
 where
     [@TraitClause0]: Sized<Idx>,
 {
@@ -187,6 +211,39 @@ where
     let end@2: Idx; // arg #2
 
     @0 := RangeInclusive { start: copy (start@1), end: copy (end@2), exhausted: const (false) }
+    return
+}
+
+// Full name: core::panic::location::{Location<'a>}::caller
+pub fn caller<'a>() -> &'static (Location<'static>)
+{
+    let @0: &'_ (Location<'_>); // return
+
+    @0 := caller_location()
+    return
+}
+
+// Full name: core::panic::panic_info::PanicInfo
+#[lang_item("panic_info")]
+pub struct PanicInfo<'a>
+where
+    'a : 'a,
+{
+  message: &'a (Arguments<'a>),
+  location: &'a (Location<'a>),
+  can_unwind: bool,
+  force_no_backtrace: bool,
+}
+
+fn core::panic::panic_info::{PanicInfo<'a>}::new<'a>(@1: &'a (Arguments<'a>), @2: &'a (Location<'a>), @3: bool, @4: bool) -> PanicInfo<'a>
+{
+    let @0: PanicInfo<'_>; // return
+    let message@1: &'_ (Arguments<'_>); // arg #1
+    let location@2: &'_ (Location<'_>); // arg #2
+    let can_unwind@3: bool; // arg #3
+    let force_no_backtrace@4: bool; // arg #4
+
+    @0 := PanicInfo { message: copy (message@1), location: copy (location@2), can_unwind: copy (can_unwind@3), force_no_backtrace: copy (force_no_backtrace@4) }
     return
 }
 
@@ -206,6 +263,65 @@ fn core::slice::index::slice_index_order_fail::do_panic(@1: usize, @2: usize) ->
     let end@2: usize; // arg #2
 
     @0 := core::slice::index::slice_index_order_fail::do_panic::runtime(move (index@1), move (end@2))
+}
+
+// Full name: core::panicking::panic_fmt::panic_impl
+unsafe fn panic_impl<'_0, '_1>(@1: &'_0 (PanicInfo<'_1>)) -> !
+
+// Full name: core::panicking::panic_fmt
+#[lang_item("panic_fmt")]
+pub fn panic_fmt<'_0>(@1: Arguments<'_0>) -> !
+{
+    let @0: !; // return
+    let fmt@1: Arguments<'_>; // arg #1
+    let @2: (); // anonymous local
+    let @3: bool; // anonymous local
+    let @4: !; // anonymous local
+    let pi@5: PanicInfo<'_>; // local
+    let @6: &'_ (Arguments<'_>); // anonymous local
+    let @7: &'_ (Arguments<'_>); // anonymous local
+    let @8: &'_ (Location<'_>); // anonymous local
+    let @9: &'_ (Location<'_>); // anonymous local
+    let @10: &'_ (PanicInfo<'_>); // anonymous local
+    let @11: &'_ (PanicInfo<'_>); // anonymous local
+
+    storage_live(@4)
+    storage_live(pi@5)
+    storage_live(@6)
+    storage_live(@7)
+    storage_live(@8)
+    storage_live(@9)
+    storage_live(@10)
+    storage_live(@11)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := const (false)
+    if move (@3) {
+    }
+    else {
+        storage_dead(@3)
+        storage_dead(@2)
+        storage_live(pi@5)
+        storage_live(@6)
+        storage_live(@7)
+        @7 := &fmt@1
+        @6 := &*(@7)
+        storage_live(@8)
+        storage_live(@9)
+        @9 := caller<'_>()
+        @8 := &*(@9)
+        pi@5 := core::panic::panic_info::{PanicInfo<'a>}::new<'_>(move (@6), move (@8), const (true), const (false))
+        storage_dead(@8)
+        storage_dead(@6)
+        storage_dead(@9)
+        storage_dead(@7)
+        storage_live(@10)
+        storage_live(@11)
+        @11 := &pi@5
+        @10 := &*(@11)
+        @0 := panic_impl<'_, '_>(move (@10))
+    }
+    @4 := abort()
 }
 
 // Full name: core::panicking::panic_nounwind_fmt
@@ -1484,7 +1600,7 @@ pub fn slice_index_range<'_0>(@1: &'_0 (Slice<u8>)) -> &'_0 (Slice<u8>)
     storage_live(@4)
     @4 := &*(slice@1)
     storage_live(@5)
-    @5 := new<usize>[Sized<usize>](const (0 : usize), const (10 : usize))
+    @5 := core::ops::range::{RangeInclusive<Idx>[@TraitClause0]}::new<usize>[Sized<usize>](const (0 : usize), const (10 : usize))
     @3 := {impl Index<I> for Slice<T>}::index<'_, u8, RangeInclusive<usize>[Sized<usize>]>[Sized<u8>, Sized<RangeInclusive<usize>[Sized<usize>]>, {impl SliceIndex<Slice<T>> for RangeInclusive<usize>[Sized<usize>]}<u8>[Sized<u8>]](move (@4), move (@5))
     storage_dead(@5)
     storage_dead(@4)

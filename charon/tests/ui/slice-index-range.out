@@ -122,6 +122,10 @@ fn core::slice::index::slice_index_order_fail::do_panic(@1: usize, @2: usize) ->
 // Full name: core::panicking::panic_nounwind_fmt
 pub fn panic_nounwind_fmt<'_0>(@1: Arguments<'_0>, @2: bool) -> !
 
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'static (Str)) -> !
+
 // Full name: core::slice::index::private_slice_index::Sealed
 pub trait Sealed<Self>
 {

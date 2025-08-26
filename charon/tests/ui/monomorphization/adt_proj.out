@@ -12,6 +12,9 @@ pub trait Sized::<u32>
     non-dyn-compatible
 }
 
+// Full name: core::panicking::panic_explicit
+pub fn panic_explicit() -> !
+
 // Full name: core::result::Result::<u32, u32>
 #[lang_item("Result")]
 pub enum Result::<u32, u32> {

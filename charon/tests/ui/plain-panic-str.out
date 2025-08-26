@@ -9,6 +9,10 @@ where
 // Full name: core::fmt::rt::{Arguments<'a>}::new_const
 pub fn new_const<'a, const N : usize>(@1: &'a (Array<&'static (Str), const N : usize>)) -> Arguments<'a>
 
+// Full name: core::panicking::panic_fmt
+#[lang_item("panic_fmt")]
+pub fn panic_fmt<'_0>(@1: Arguments<'_0>) -> !
+
 // Full name: test_crate::main
 fn main()
 {

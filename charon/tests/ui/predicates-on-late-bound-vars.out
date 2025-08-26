@@ -95,6 +95,10 @@ where
   Some(T),
 }
 
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'static (Str)) -> !
+
 // Full name: core::result::Result::{impl Drop for Result<T, E>[@TraitClause0, @TraitClause1]}::drop
 fn {impl Drop for Result<T, E>[@TraitClause0, @TraitClause1]}::drop<'_0, T, E>(@1: &'_0 mut (Result<T, E>[@TraitClause0, @TraitClause1]))
 where

@@ -518,7 +518,9 @@ where
     let @6: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)); // anonymous local
     let @7: &'_ (T); // anonymous local
     let vtable_method_modify@8: fn(); // local
+    let vtable_modify@9: *const (); // local
 
+    storage_live(vtable_modify@9)
     storage_live(vtable_method_modify@8)
     storage_live(x@2)
     storage_live(@3)
@@ -534,6 +536,8 @@ where
     @6 := &two-phase-mut *(x@2)
     storage_live(@7)
     @7 := &*(arg@1)
+    vtable_modify@9 := ptr_metadata(move (@6))
+    vtable_method_modify@8 := copy ((vtable_modify@9).3)
     @0 := (move vtable_method_modify@8)(move (@6), move (@7))
     storage_dead(@7)
     storage_dead(@6)
@@ -847,13 +851,17 @@ fn use_lifetime_trait<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Life
     let @4: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // anonymous local
     let @5: &'_ (i32); // anonymous local
     let vtable_method_lifetime_method@6: fn(); // local
+    let vtable_lifetime_method@7: *const (); // local
 
+    storage_live(vtable_lifetime_method@7)
     storage_live(vtable_method_lifetime_method@6)
     storage_live(@3)
     storage_live(@4)
     @4 := &*(x@1)
     storage_live(@5)
     @5 := &*(y@2)
+    vtable_lifetime_method@7 := ptr_metadata(move (@4))
+    vtable_method_lifetime_method@6 := copy ((vtable_lifetime_method@7).3)
     @3 := (move vtable_method_lifetime_method@6)(move (@4), move (@5))
     @0 := &*(@3)
     storage_dead(@5)
@@ -876,7 +884,9 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     let @8: &'_ (i64); // anonymous local
     let @9: i64; // anonymous local
     let vtable_method_both_operate@10: fn(); // local
+    let vtable_both_operate@11: *const (); // local
 
+    storage_live(vtable_both_operate@11)
     storage_live(vtable_method_both_operate@10)
     storage_live(@2)
     storage_live(@3)
@@ -893,6 +903,8 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     @9 := const (200 : i64)
     @8 := &@9
     @7 := &*(@8)
+    vtable_both_operate@11 := ptr_metadata(move (@3))
+    vtable_method_both_operate@10 := copy ((vtable_both_operate@11).3)
     @2 := (move vtable_method_both_operate@10)(move (@3), move (@4), move (@7))
     storage_dead(@7)
     storage_dead(@4)
@@ -974,9 +986,13 @@ fn main()
     let @61: &'_ (i64); // anonymous local
     let @62: i64; // anonymous local
     let vtable_method_check@63: fn(); // local
-    let vtable_method_modify@64: fn(); // local
-    let vtable_method_dummy@65: fn(); // local
-    let vtable_method_both_operate@66: fn(); // local
+    let vtable_check@64: *const (); // local
+    let vtable_method_modify@65: fn(); // local
+    let vtable_modify@66: *const (); // local
+    let vtable_method_dummy@67: fn(); // local
+    let vtable_dummy@68: *const (); // local
+    let vtable_method_both_operate@69: fn(); // local
+    let vtable_both_operate@70: *const (); // local
 
     storage_live(@21)
     storage_live(@22)
@@ -1020,10 +1036,14 @@ fn main()
     storage_live(@60)
     storage_live(@61)
     storage_live(@62)
+    storage_live(vtable_method_modify@65)
+    storage_live(vtable_modify@66)
+    storage_live(vtable_method_dummy@67)
+    storage_live(vtable_dummy@68)
+    storage_live(vtable_method_both_operate@69)
+    storage_live(vtable_both_operate@70)
+    storage_live(vtable_check@64)
     storage_live(vtable_method_check@63)
-    storage_live(vtable_method_modify@64)
-    storage_live(vtable_method_dummy@65)
-    storage_live(vtable_method_both_operate@66)
     storage_live(x@1)
     storage_live(@2)
     storage_live(@3)
@@ -1038,6 +1058,8 @@ fn main()
     storage_live(@6)
     storage_live(@7)
     @7 := &*(x@1)
+    vtable_check@64 := ptr_metadata(move (@7))
+    vtable_method_check@63 := copy ((vtable_check@64).3)
     @6 := (move vtable_method_check@63)(move (@7))
     if move (@6) {
     }
@@ -1083,6 +1105,8 @@ fn main()
         storage_dead(@14)
         drop[{impl Drop for String}] @15
         drop[{impl Drop for String}] @18
+        storage_live(vtable_modify@66)
+        storage_live(vtable_method_modify@65)
         storage_dead(@20)
         storage_dead(@18)
         storage_dead(@17)
@@ -1101,7 +1125,9 @@ fn main()
         @28 := const (100 : i32)
         @27 := &mut @28
         @26 := &*(@27)
-        @24 := (move vtable_method_modify@64)(move (@25), move (@26))
+        vtable_modify@66 := ptr_metadata(move (@25))
+        vtable_method_modify@65 := copy ((vtable_modify@66).3)
+        @24 := (move vtable_method_modify@65)(move (@25), move (@26))
         storage_dead(@26)
         storage_dead(@25)
         @23 := &@24
@@ -1164,6 +1190,8 @@ fn main()
         @47 := &@48
         @46 := &*(@47)
         @45 := to_dyn_obj<'_, i32>[Sized<i32>, {impl NoParam for i32}](move (@46))
+        storage_live(vtable_dummy@68)
+        storage_live(vtable_method_dummy@67)
         @44 := &*(@45)
         z@43 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), NoParam<(dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)>>(move (@44))
         storage_dead(@46)
@@ -1174,7 +1202,11 @@ fn main()
         storage_live(@49)
         storage_live(@50)
         @50 := &*(z@43)
-        @49 := (move vtable_method_dummy@65)(move (@50))
+        vtable_dummy@68 := ptr_metadata(move (@50))
+        vtable_method_dummy@67 := copy ((vtable_dummy@68).3)
+        @49 := (move vtable_method_dummy@67)(move (@50))
+        storage_live(vtable_both_operate@70)
+        storage_live(vtable_method_both_operate@69)
         storage_dead(@50)
         storage_dead(@49)
         storage_live(a@51)
@@ -1202,7 +1234,9 @@ fn main()
         @62 := const (200 : i64)
         @61 := &@62
         @60 := &*(@61)
-        @55 := (move vtable_method_both_operate@66)(move (@56), move (@57), move (@60))
+        vtable_both_operate@70 := ptr_metadata(move (@56))
+        vtable_method_both_operate@69 := copy ((vtable_both_operate@70).3)
+        @55 := (move vtable_method_both_operate@69)(move (@56), move (@57), move (@60))
         storage_dead(@60)
         storage_dead(@57)
         storage_dead(@56)

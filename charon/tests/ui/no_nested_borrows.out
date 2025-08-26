@@ -54,6 +54,13 @@ pub fn core::ops::drop::Drop::drop<'_0, Self>(@1: &'_0 mut (Self))
 where
     [@TraitClause0]: Drop<Self>,
 
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'static (Str)) -> !
+
+// Full name: core::panicking::panic_explicit
+pub fn panic_explicit() -> !
+
 // Full name: alloc::alloc::Global
 #[lang_item("global_alloc_ty")]
 pub struct Global {}

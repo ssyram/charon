@@ -107,6 +107,10 @@ where
     non-dyn-compatible
 }
 
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'static (Str)) -> !
+
 // Full name: core::result::Result
 #[lang_item("Result")]
 pub enum Result<T, E>

@@ -55,6 +55,10 @@ where
 // Full name: core::panicking::panic_nounwind_fmt
 pub fn panic_nounwind_fmt<'_0>(@1: Arguments<'_0>, @2: bool) -> !
 
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'static (Str)) -> !
+
 // Full name: core::ptr::const_ptr::{*const T}::offset::precondition_check
 fn precondition_check(@1: *const (), @2: isize, @3: usize)
 {

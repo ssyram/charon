@@ -1137,10 +1137,11 @@ impl BodyTransCtx<'_, '_, '_> {
         // For the initial implementation, let's create a placeholder function pointer
         // and call it. This will at least generate the right structure.
         
-        // Create a simple function pointer type (we'll improve this later)
+        // Create a simple function pointer type for now
+        // TODO: Extract proper signature from the original method
         let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
-            vec![].into(), // For now, empty input signature - should be improved
-            Ty::mk_unit(),  // For now, unit return type - should be improved
+            vec![].into(), // For now, use empty signature - will be improved
+            Ty::mk_unit(),
         ))));
         
         let method_ptr_local = self.locals.new_var(
@@ -1149,9 +1150,59 @@ impl BodyTransCtx<'_, '_, '_> {
         );
         let method_ptr_place = method_ptr_local;
         
-        // TODO: Add statements to extract the method pointer from vtable
-        // For now, we'll create a dummy assignment to avoid compilation errors
-        // but this needs to be properly implemented
+        // Generate statements to get vtable and method pointer
+        // 1. Get the vtable from the receiver using PtrMetadata
+        let receiver = &t_args[0];
+        
+        // Create a local for the vtable
+        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared)); // Placeholder vtable type
+        let vtable_place = self.locals.new_var(
+            Some(format!("vtable_{}", method_name)),
+            vtable_ty.clone()
+        );
+        
+        // Generate: vtable = PtrMetadata(receiver)
+        let vtable_assign = Statement::new(span, RawStatement::Assign(
+            vtable_place.clone(),
+            Rvalue::UnaryOp(UnOp::PtrMetadata, receiver.clone())
+        ));
+        
+        // Add the vtable assignment to the current block  
+        _statements.push(vtable_assign);
+        
+        // TODO: Generate method pointer extraction from vtable
+        // Access the specific method field from the vtable: method_ptr = vtable.method_<name>
+        // We need to create a field projection to access the method from vtable
+        
+        // For now, create a placeholder field access
+        // The vtable struct has fields like method_check, method_modify, etc.
+        // We should access vtable.method_<method_name>
+        
+        // TODO: Get the proper field ID for the method in the vtable struct
+        // For now, we use a simplified field access
+        let method_field_place = Place {
+            kind: PlaceKind::Projection(
+                Box::new(vtable_place.clone()),
+                // TODO: Use proper field ID based on method name and vtable structure
+                ProjectionElem::Field(FieldProjKind::Adt(TypeDeclId::new(0), None), FieldId::new(3))
+            ),
+            ty: method_ptr_ty.clone(),
+        };
+        
+        let method_assign = Statement::new(span, RawStatement::Assign(
+            method_ptr_place.clone(),
+            Rvalue::Use(Operand::Copy(method_field_place))
+        ));
+        
+        _statements.push(method_assign);
+        
+        // Add storage_live for our new locals
+        if let PlaceKind::Local(vtable_local_id) = &vtable_place.kind {
+            _statements.insert(0, Statement::new(span, RawStatement::StorageLive(*vtable_local_id)));
+        }
+        if let PlaceKind::Local(method_ptr_local_id) = &method_ptr_place.kind {
+            _statements.insert(1, Statement::new(span, RawStatement::StorageLive(*method_ptr_local_id)));
+        }
         
         let call = Call {
             func: FnOperand::Move(method_ptr_place),

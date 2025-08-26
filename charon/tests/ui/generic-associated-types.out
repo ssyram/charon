@@ -178,6 +178,18 @@ error: Error during trait resolution: Found unsupported GAT `Type` when resolvin
 55 |         x.foo()
    |         ^^^^^^^
 
+error: Found unsupported GAT `Type` when resolving trait `test_crate::lifetimes::Foo<@TraitClause1::Type, &'_ (&'_ (&'_ (())))>`
+  --> tests/ui/generic-associated-types.rs:55:9
+   |
+55 |         x.foo()
+   |         ^^^^^^^
+
+error: Error during trait resolution: Found unsupported GAT `Type` when resolving trait `test_crate::lifetimes::Foo<@TraitClause1::Type, &'_ (&'_ (&'_ (())))>`
+  --> tests/ui/generic-associated-types.rs:55:9
+   |
+55 |         x.foo()
+   |         ^^^^^^^
+
 error: Found unsupported GAT `Type` when resolving trait `core::marker::MetaSized<@TraitClause1::Type>`
   --> tests/ui/generic-associated-types.rs:56:5
    |
@@ -214,4 +226,4 @@ error: Error during trait resolution: Found unsupported GAT `Type` when resolvin
 56 |     }
    |     ^
 
-ERROR Charon failed to translate this code (36 errors)
+ERROR Charon failed to translate this code (38 errors)

@@ -36,11 +36,46 @@ impl Default for u32 {
     non-dyn-compatible
 }
 
+// Full name: core::fmt::Error
+pub struct Error {}
+
 // Full name: core::fmt::Arguments
 #[lang_item("format_arguments")]
 pub opaque type Arguments<'a>
 where
     'a : 'a,
+
+// Full name: core::result::Result
+#[lang_item("Result")]
+pub enum Result<T, E>
+where
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Sized<E>,
+{
+  Ok(T),
+  Err(E),
+}
+
+// Full name: core::fmt::Debug
+#[lang_item("Debug")]
+pub trait Debug<Self>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Debug::fmt<'_0_0, '_0_1, '_0_2, Self>[Self]
+    vtable: core::fmt::Debug::{vtable}
+}
+
+pub fn core::fmt::Debug::fmt<'_0, '_1, '_2, Self>(@1: &'_0 (Self), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
+where
+    [@TraitClause0]: Debug<Self>,
+
+// Full name: core::fmt::num::{impl Debug for u32}::fmt
+pub fn {impl Debug for u32}::fmt<'_0, '_1, '_2>(@1: &'_0 (u32), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
+
+// Full name: core::fmt::num::{impl Debug for u32}
+impl Debug for u32 {
+    fn fmt<'_0, '_1, '_2> = {impl Debug for u32}::fmt<'_0_0, '_0_1, '_0_2>
+    vtable: {impl Debug for u32}::{vtable}
+}
 
 // Full name: core::ops::drop::Drop
 #[lang_item("drop")]
@@ -72,6 +107,14 @@ pub enum AssertKind {
   Ne,
   Match,
 }
+
+// Full name: core::panicking::assert_failed
+pub fn assert_failed<'_0, '_1, '_2, T, U>(@1: AssertKind, @2: &'_0 (T), @3: &'_1 (U), @4: Option<Arguments<'_2>>[Sized<Arguments<'_2>>]) -> !
+where
+    [@TraitClause0]: MetaSized<T>,
+    [@TraitClause1]: MetaSized<U>,
+    [@TraitClause2]: Debug<T>,
+    [@TraitClause3]: Debug<U>,
 
 // Full name: core::slice::{Slice<T>}::len
 #[lang_item("slice_len_fn")]

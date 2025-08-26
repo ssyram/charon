@@ -61,6 +61,10 @@ pub trait Drop::<bool>
 // Full name: core::ops::drop::Drop::drop::<bool>
 pub fn drop::<bool><'_0>(@1: &'_0 mut (bool))
 
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'_ (Str)) -> !
+
 // Full name: test_crate::do_test::<bool>
 fn do_test::<bool>(@1: bool, @2: bool)
 {

@@ -1,5 +1,8 @@
 # Final LLBC before serialization:
 
+// Full name: core::panicking::panic_explicit
+pub fn panic_explicit() -> !
+
 // Full name: test_crate::slice_pat1
 fn slice_pat1()
 {

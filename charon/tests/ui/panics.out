@@ -1,5 +1,45 @@
 # Final LLBC before serialization:
 
+// Full name: core::marker::MetaSized
+#[lang_item("meta_sized")]
+pub trait MetaSized<Self>
+
+// Full name: core::any::TypeId
+pub opaque type TypeId
+
+// Full name: core::any::Any
+#[lang_item("Any")]
+pub trait Any<Self>
+where
+    Self : 'static,
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    fn type_id<'_0> = core::any::Any::type_id<'_0_0, Self>[Self]
+    vtable: core::any::Any::{vtable}
+}
+
+pub fn core::any::Any::type_id<'_0, Self>(@1: &'_0 (Self)) -> TypeId
+where
+    [@TraitClause0]: Any<Self>,
+    Self : 'static,
+
+// Full name: core::any::{impl Any for T}::type_id
+pub fn {impl Any for T}::type_id<'_0, T>(@1: &'_0 (T)) -> TypeId
+where
+    [@TraitClause0]: MetaSized<T>,
+    T : 'static,
+
+// Full name: core::any::{impl Any for T}
+impl<T> Any for T
+where
+    [@TraitClause0]: MetaSized<T>,
+    T : 'static,
+{
+    parent_clause0 = @TraitClause0
+    fn type_id<'_0> = {impl Any for T}::type_id<'_0_0, T>[@TraitClause0]
+    vtable: {impl Any for T}::{vtable}<T>[@TraitClause0]
+}
+
 // Full name: core::fmt::Arguments
 #[lang_item("format_arguments")]
 pub opaque type Arguments<'a>
@@ -15,6 +55,48 @@ pub fn new_const<'a, const N : usize>(@1: &'a (Array<&'static (Str), const N : u
 
 // Full name: core::fmt::rt::{Arguments<'a>}::new_v1
 pub fn new_v1<'a, const P : usize, const A : usize>(@1: &'a (Array<&'static (Str), const P : usize>), @2: &'a (Array<Argument<'a>, const A : usize>)) -> Arguments<'a>
+
+// Full name: core::marker::Send
+#[lang_item("Send")]
+pub trait Send<Self>
+
+// Full name: core::marker::Sync
+#[lang_item("sync")]
+pub trait Sync<Self>
+
+// Full name: core::marker::{impl Send for &'_0 (T)}
+impl<'_0, T> Send for &'_0 (T)
+where
+    [@TraitClause0]: Sync<T>,
+{    vtable: {impl Send for &'_0 (T)}::{vtable}<'_0, T>[@TraitClause0]
+}
+
+// Full name: core::marker::Sized
+#[lang_item("sized")]
+pub trait Sized<Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    non-dyn-compatible
+}
+
+// Full name: core::panicking::panic_fmt
+#[lang_item("panic_fmt")]
+pub fn panic_fmt<'_0>(@1: Arguments<'_0>) -> !
+
+// Full name: core::panicking::panic
+#[lang_item("panic")]
+pub fn panic(@1: &'static (Str)) -> !
+
+// Full name: core::panicking::panic_explicit
+pub fn panic_explicit() -> !
+
+// Full name: std::panicking::begin_panic
+#[lang_item("begin_panic")]
+pub fn begin_panic<M>(@1: M) -> !
+where
+    [@TraitClause0]: Sized<M>,
+    [@TraitClause1]: Any<M>,
+    [@TraitClause2]: Send<M>,
 
 // Full name: test_crate::panic1
 fn panic1()
