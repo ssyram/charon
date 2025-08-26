@@ -426,7 +426,7 @@ impl ItemTransCtx<'_, '_> {
                 Ok(Err(Opaque)) => Err(Opaque),
                 // Translation error.
                 // FIXME: handle error cases more explicitly.
-                Err(_) => Err(Opaque),
+                Err(e) => panic!("Translation error: {:?}", e),
             }
         };
         Ok(FunDecl {

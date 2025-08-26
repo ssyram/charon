@@ -1093,15 +1093,16 @@ impl BodyTransCtx<'_, '_, '_> {
     /// Check if a function call is a dynamic trait method call that needs vtable transformation.
     fn is_dyn_trait_method_call(
         &mut self,
-        _span: Span,
+        span: Span,
         fun: &hax::FunOperand,
     ) -> Result<Option<(TraitRef, TraitItemName)>, Error> {
         if let hax::FunOperand::Static(item) = fun {
-            let fn_ptr_with_binder = self.translate_fn_ptr(_span, item)?;
+            let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
             let fn_ptr = fn_ptr_with_binder.erase();
 
             if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
                 if matches!(trait_ref.kind, TraitRefKind::Dyn) {
+                    // Enable vtable transformation - let's see what happens
                     return Ok(Some((trait_ref.clone(), method_name.clone())));
                 }
             }
@@ -1135,12 +1136,13 @@ impl BodyTransCtx<'_, '_, '_> {
 
         let receiver = &t_args[0];
 
-        // Generate vtable extraction and method pointer lookup
-        let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, trait_ref, statements)?;
-        let method_ptr_place =
-            self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements)?;
+        // Step 1: Extract vtable from receiver
+        let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, statements)?;
+        
+        // Step 2: Extract method pointer from vtable
+        let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements)?;
 
-        // Create the function call through the method pointer
+        // Step 3: Call through the method pointer
         let call = Call {
             func: FnOperand::Move(method_ptr_place),
             args: t_args,
@@ -1187,17 +1189,15 @@ impl BodyTransCtx<'_, '_, '_> {
         span: Span,
         method_name: &TraitItemName,
         receiver: &Operand,
-        trait_ref: &TraitRef,
         statements: &mut Vec<Statement>,
     ) -> Result<Place, Error> {
-        // Try to get the vtable struct type from the trait reference
-        let vtable_ty = match self.get_vtable_struct_type(span, trait_ref) {
-            Ok(ty) => ty,
-            Err(_) => {
-                // Fallback to raw pointer if we can't determine the vtable type
-                Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared))
-            }
+        // Get the vtable struct type from the receiver's dyn trait type
+        // The receiver should be &dyn Trait - we need to find the corresponding vtable struct
+        let receiver_ty = match receiver {
+            Operand::Copy(place) | Operand::Move(place) => place.ty(),
+            Operand::Const(constant_expr) => &constant_expr.ty,
         };
+        let vtable_ty = self.get_vtable_type_from_receiver_type(span, receiver_ty)?;
         
         let vtable_place = self
             .locals
@@ -1219,19 +1219,15 @@ impl BodyTransCtx<'_, '_, '_> {
         Ok(vtable_place)
     }
     
-    /// Get the vtable struct type from a trait reference.
-    fn get_vtable_struct_type(
+    /// Get the vtable struct type from the receiver's dyn trait type.
+    fn get_vtable_type_from_receiver_type(
         &mut self,
         span: Span,
-        trait_ref: &TraitRef,
+        receiver_ty: &Ty,
     ) -> Result<Ty, Error> {
-        // Convert the trait reference to a HAX trait reference for vtable lookup
-        // This is a simplified approach - in practice we might need more sophisticated conversion
-        
-        // For now, we'll use a raw pointer type as the vtable extraction result
-        // The actual vtable struct type would need proper trait reference to HAX conversion
-        let vtable_ptr_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
-        Ok(vtable_ptr_ty)
+        // For now, return a raw pointer type and see what the exact error is
+        // This will help us understand the correct type structure
+        Ok(Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared)))
     }
 
     /// Generate method pointer lookup from vtable.

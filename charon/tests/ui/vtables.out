@@ -363,12 +363,6 @@ where
     vtable: {impl Modifiable<T> for i32}::{vtable}<T>[@TraitClause0, @TraitClause1]
 }
 
-// Full name: test_crate::modify_trait_object
-fn modify_trait_object<'_0, T>(@1: &'_0 (T)) -> T
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Clone<T>,
-
 // Full name: test_crate::BaseOn
 trait BaseOn<Self, T>
 {
@@ -645,15 +639,6 @@ impl LifetimeTrait for i32 {
     fn lifetime_method<'a, '_1> = {impl LifetimeTrait for i32}::lifetime_method<'a, '_0_1>
     vtable: {impl LifetimeTrait for i32}::{vtable}
 }
-
-// Full name: test_crate::use_lifetime_trait
-fn use_lifetime_trait<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_1 + @TraitClause1_0::Ty = i32)), @2: &'a (i32)) -> &'a (i32)
-
-// Full name: test_crate::use_alias
-fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_0)))
-
-// Full name: test_crate::main
-fn main()
 
 
 
