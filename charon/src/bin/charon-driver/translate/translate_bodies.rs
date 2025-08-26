@@ -1044,30 +1044,8 @@ impl BodyTransCtx<'_, '_, '_> {
             dest: lval,
         };
 
-        let target = match target {
-            Some(target) => self.translate_basic_block_id(*target),
-            None => {
-                let abort =
-                    Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
-                self.blocks.push(abort.into_block())
-            }
-        };
-        let on_unwind = match unwind {
-            UnwindAction::Continue => {
-                let unwind_continue = Terminator::new(span, RawTerminator::UnwindResume);
-                self.blocks.push(unwind_continue.into_block())
-            }
-            UnwindAction::Unreachable => {
-                let abort =
-                    Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
-                self.blocks.push(abort.into_block())
-            }
-            UnwindAction::Terminate(..) => {
-                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UnwindTerminate));
-                self.blocks.push(abort.into_block())
-            }
-            UnwindAction::Cleanup(bb) => self.translate_basic_block_id(*bb),
-        };
+        let target = self.get_target_block(span, target);
+        let on_unwind = self.create_unwind_target(span, unwind);
         Ok(RawTerminator::Call {
             call,
             target,
@@ -1091,6 +1069,10 @@ impl BodyTransCtx<'_, '_, '_> {
         Ok(t_args)
     }
 
+    // =====================================
+    // Dynamic trait method call handling
+    // =====================================
+
     /// Check if a function call is a dynamic trait method call that needs vtable transformation.
     fn is_dyn_trait_method_call(
         &mut self, 
@@ -1108,91 +1090,6 @@ impl BodyTransCtx<'_, '_, '_> {
             }
         }
         Ok(None)
-    }
-
-    /// Generate vtable extraction statements for a dyn trait object receiver.
-    fn generate_vtable_extraction(
-        &mut self,
-        span: Span,
-        method_name: &TraitItemName,
-        receiver: &Operand,
-        statements: &mut Vec<Statement>,
-    ) -> Place {
-        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
-        let vtable_place = self.locals.new_var(
-            Some(format!("vtable@{}", method_name)),
-            vtable_ty,
-        );
-
-        if let PlaceKind::Local(vtable_local_id) = &vtable_place.kind {
-            statements.push(Statement::new(span, RawStatement::StorageLive(*vtable_local_id)));
-        }
-
-        let vtable_assign = Statement::new(span, RawStatement::Assign(
-            vtable_place.clone(),
-            Rvalue::UnaryOp(UnOp::PtrMetadata, receiver.clone())
-        ));
-        statements.push(vtable_assign);
-
-        vtable_place
-    }
-
-    /// Generate method pointer lookup from vtable.
-    fn generate_method_pointer_lookup(
-        &mut self,
-        span: Span,
-        method_name: &TraitItemName,
-        vtable_place: &Place,
-        statements: &mut Vec<Statement>,
-    ) -> Place {
-        let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
-            vec![].into(),
-            Ty::mk_unit(),
-        ))));
-
-        let method_ptr_place = self.locals.new_var(
-            Some(format!("method_ptr@{}", method_name)),
-            method_ptr_ty.clone()
-        );
-
-        if let PlaceKind::Local(method_ptr_local_id) = &method_ptr_place.kind {
-            statements.push(Statement::new(span, RawStatement::StorageLive(*method_ptr_local_id)));
-        }
-
-        let method_field_place = Place {
-            kind: PlaceKind::Projection(
-                Box::new(vtable_place.clone()),
-                ProjectionElem::Field(FieldProjKind::Adt(TypeDeclId::new(0), None), FieldId::new(3))
-            ),
-            ty: method_ptr_ty,
-        };
-
-        let method_assign = Statement::new(span, RawStatement::Assign(
-            method_ptr_place.clone(),
-            Rvalue::Use(Operand::Copy(method_field_place))
-        ));
-        statements.push(method_assign);
-
-        method_ptr_place
-    }
-
-    /// Create unwind target blocks for function calls.
-    fn create_unwind_target(&mut self, span: Span, unwind: &UnwindAction) -> BlockId {
-        match unwind {
-            UnwindAction::Continue => {
-                let unwind_continue = Terminator::new(span, RawTerminator::UnwindResume);
-                self.blocks.push(unwind_continue.into_block())
-            }
-            UnwindAction::Unreachable => {
-                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
-                self.blocks.push(abort.into_block())
-            }
-            UnwindAction::Terminate(..) => {
-                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UnwindTerminate));
-                self.blocks.push(abort.into_block())
-            }
-            UnwindAction::Cleanup(bb) => self.translate_basic_block_id(*bb),
-        }
     }
 
     /// Handle calls to methods on dyn trait objects using vtable lookup.
@@ -1221,26 +1118,18 @@ impl BodyTransCtx<'_, '_, '_> {
 
         let receiver = &t_args[0];
 
-        // Generate vtable extraction: vtable = ptr_metadata(receiver)
+        // Generate vtable extraction and method pointer lookup
         let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, statements);
-
-        // Generate method pointer lookup: method_ptr = vtable.method_<name>
         let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements);
 
+        // Create the function call through the method pointer
         let call = Call {
             func: FnOperand::Move(method_ptr_place),
             args: t_args,
             dest: lval,
         };
 
-        let target_block = match target {
-            Some(target) => self.translate_basic_block_id(*target),
-            None => {
-                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
-                self.blocks.push(abort.into_block())
-            }
-        };
-
+        let target_block = self.get_target_block(span, target);
         let on_unwind = self.create_unwind_target(span, unwind);
 
         Ok(Terminator::new(span, RawTerminator::Call {
@@ -1248,6 +1137,118 @@ impl BodyTransCtx<'_, '_, '_> {
             target: target_block,
             on_unwind,
         }))
+    }
+
+    // =====================================
+    // Vtable extraction and method lookup helpers
+    // =====================================
+
+    /// Generate vtable extraction statements for a dyn trait object receiver.
+    fn generate_vtable_extraction(
+        &mut self,
+        span: Span,
+        method_name: &TraitItemName,
+        receiver: &Operand,
+        statements: &mut Vec<Statement>,
+    ) -> Place {
+        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
+        let vtable_place = self.locals.new_var(
+            Some(format!("vtable@{}", method_name)),
+            vtable_ty,
+        );
+
+        // Add storage live for the vtable variable
+        self.add_storage_live_if_local(&vtable_place, span, statements);
+
+        // Generate: vtable = ptr_metadata(receiver)
+        let vtable_assign = Statement::new(span, RawStatement::Assign(
+            vtable_place.clone(),
+            Rvalue::UnaryOp(UnOp::PtrMetadata, receiver.clone())
+        ));
+        statements.push(vtable_assign);
+
+        vtable_place
+    }
+
+    /// Generate method pointer lookup from vtable.
+    fn generate_method_pointer_lookup(
+        &mut self,
+        span: Span,
+        method_name: &TraitItemName,
+        vtable_place: &Place,
+        statements: &mut Vec<Statement>,
+    ) -> Place {
+        let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
+            vec![].into(),
+            Ty::mk_unit(),
+        ))));
+
+        let method_ptr_place = self.locals.new_var(
+            Some(format!("method_ptr@{}", method_name)),
+            method_ptr_ty.clone()
+        );
+
+        // Add storage live for the method pointer variable
+        self.add_storage_live_if_local(&method_ptr_place, span, statements);
+
+        // Create field access: vtable.method_<name> (using field index 3 as placeholder)
+        let method_field_place = Place {
+            kind: PlaceKind::Projection(
+                Box::new(vtable_place.clone()),
+                ProjectionElem::Field(FieldProjKind::Adt(TypeDeclId::new(0), None), FieldId::new(3))
+            ),
+            ty: method_ptr_ty,
+        };
+
+        // Generate: method_ptr = copy(vtable.method_<name>)
+        let method_assign = Statement::new(span, RawStatement::Assign(
+            method_ptr_place.clone(),
+            Rvalue::Use(Operand::Copy(method_field_place))
+        ));
+        statements.push(method_assign);
+
+        method_ptr_place
+    }
+
+    // =====================================
+    // Common helper functions
+    // =====================================
+
+    /// Add StorageLive statement if the place is a local variable.
+    fn add_storage_live_if_local(&self, place: &Place, span: Span, statements: &mut Vec<Statement>) {
+        if let PlaceKind::Local(local_id) = &place.kind {
+            statements.push(Statement::new(span, RawStatement::StorageLive(*local_id)));
+        }
+    }
+
+    /// Get target block for function calls, creating abort block if None.
+    fn get_target_block(&mut self, span: Span, target: &Option<hax::BasicBlock>) -> BlockId {
+        match target {
+            Some(target) => self.translate_basic_block_id(*target),
+            None => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
+                self.blocks.push(abort.into_block())
+            }
+        }
+    }
+
+    /// Create unwind target blocks for function calls.
+    fn create_unwind_target(&mut self, span: Span, unwind: &UnwindAction) -> BlockId {
+        match unwind {
+            UnwindAction::Continue => {
+                let unwind_continue = Terminator::new(span, RawTerminator::UnwindResume);
+                self.blocks.push(unwind_continue.into_block())
+            }
+            UnwindAction::Unreachable => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
+                self.blocks.push(abort.into_block())
+            }
+            UnwindAction::Terminate(..) => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UnwindTerminate));
+                self.blocks.push(abort.into_block())
+            }
+            UnwindAction::Cleanup(bb) => self.translate_basic_block_id(*bb),
+        }
     }
 
     /// Gather all the lines that start with `//` inside the given span.
