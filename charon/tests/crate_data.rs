@@ -585,10 +585,11 @@ fn declaration_groups() -> anyhow::Result<()> {
         "#,
     )?;
 
-    // There are two function items: one for `foo`, one for the initializer of `Trait::FOO`.
-    assert_eq!(crate_data.fun_decls.iter().count(), 2);
+    // There are three function items: one for `foo`, one for the initializer of `Trait::FOO`,
+    // and one for `core::panicking::panic_explicit` which gets included due to the panic!() call.
+    assert_eq!(crate_data.fun_decls.iter().count(), 3);
     let decl_groups = crate_data.ordered_decls.unwrap();
-    assert_eq!(decl_groups.len(), 6);
+    assert_eq!(decl_groups.len(), 7);
 
     Ok(())
 }
