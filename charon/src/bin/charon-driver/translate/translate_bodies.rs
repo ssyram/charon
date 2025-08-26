@@ -1044,13 +1044,8 @@ impl BodyTransCtx<'_, '_, '_> {
             dest: lval,
         };
 
-        let target = self.get_target_block(span, target);
-        let on_unwind = self.create_unwind_target(span, unwind);
-        Ok(RawTerminator::Call {
-            call,
-            target,
-            on_unwind,
-        })
+        // Follow established practice for call terminator creation
+        self.create_call_terminator(span, call, target, unwind).map(|term| term.content)
     }
 
     /// Evaluate function arguments in a context, and return the list of computed
@@ -1071,6 +1066,17 @@ impl BodyTransCtx<'_, '_, '_> {
 
     // =====================================
     // Dynamic trait method call handling
+    // 
+    // This section handles the transformation of dynamic trait method calls (`&dyn Trait`)
+    // from direct trait method calls into vtable-based dispatch. The process involves:
+    // 1. Detecting when a function call is a dynamic trait method call
+    // 2. Extracting the vtable pointer from the dyn trait object using ptr_metadata
+    // 3. Looking up the correct method function pointer from the vtable struct
+    // 4. Calling through the method function pointer instead of the direct trait method
+    //
+    // This transformation is essential for proper dynamic dispatch semantics in the
+    // generated LLBC, allowing formal verification tools to understand the actual
+    // runtime behavior of trait object method calls.
     // =====================================
 
     /// Check if a function call is a dynamic trait method call that needs vtable transformation.
@@ -1120,7 +1126,7 @@ impl BodyTransCtx<'_, '_, '_> {
 
         // Generate vtable extraction and method pointer lookup
         let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, statements);
-        let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements);
+        let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements)?;
 
         // Create the function call through the method pointer
         let call = Call {
@@ -1129,6 +1135,18 @@ impl BodyTransCtx<'_, '_, '_> {
             dest: lval,
         };
 
+        // Follow established practice for call terminator creation
+        self.create_call_terminator(span, call, target, unwind)
+    }
+
+    /// Create a Call terminator following the established practice.
+    fn create_call_terminator(
+        &mut self,
+        span: Span,
+        call: Call,
+        target: &Option<hax::BasicBlock>,
+        unwind: &UnwindAction,
+    ) -> Result<Terminator, Error> {
         let target_block = self.get_target_block(span, target);
         let on_unwind = self.create_unwind_target(span, unwind);
 
@@ -1141,6 +1159,11 @@ impl BodyTransCtx<'_, '_, '_> {
 
     // =====================================
     // Vtable extraction and method lookup helpers
+    //
+    // These helper functions perform the core vtable operations:
+    // - generate_vtable_extraction: Creates ptr_metadata operation to extract vtable from dyn object
+    // - generate_method_pointer_lookup: Finds and extracts the correct method pointer from vtable struct
+    // - get_vtable_method_field_id: Looks up the field ID for a method by name in the vtable definition
     // =====================================
 
     /// Generate vtable extraction statements for a dyn trait object receiver.
@@ -1177,7 +1200,7 @@ impl BodyTransCtx<'_, '_, '_> {
         method_name: &TraitItemName,
         vtable_place: &Place,
         statements: &mut Vec<Statement>,
-    ) -> Place {
+    ) -> Result<Place, Error> {
         let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
             vec![].into(),
             Ty::mk_unit(),
@@ -1191,11 +1214,14 @@ impl BodyTransCtx<'_, '_, '_> {
         // Add storage live for the method pointer variable
         self.add_storage_live_if_local(&method_ptr_place, span, statements);
 
-        // Create field access: vtable.method_<name> (using field index 3 as placeholder)
+        // Get the correct field index by looking up the vtable struct definition
+        let (vtable_decl_id, field_id) = self.get_vtable_method_field_id(span, vtable_place, method_name)?;
+        
+        // Create field access: vtable.method_<name>
         let method_field_place = Place {
             kind: PlaceKind::Projection(
                 Box::new(vtable_place.clone()),
-                ProjectionElem::Field(FieldProjKind::Adt(TypeDeclId::new(0), None), FieldId::new(3))
+                ProjectionElem::Field(FieldProjKind::Adt(vtable_decl_id, None), field_id)
             ),
             ty: method_ptr_ty,
         };
@@ -1207,11 +1233,65 @@ impl BodyTransCtx<'_, '_, '_> {
         ));
         statements.push(method_assign);
 
-        method_ptr_place
+        Ok(method_ptr_place)
+    }
+
+    /// Get the correct vtable struct declaration ID and field ID for a method by name.
+    fn get_vtable_method_field_id(
+        &mut self,
+        span: Span,
+        vtable_place: &Place,
+        method_name: &TraitItemName,
+    ) -> Result<(TypeDeclId, FieldId), Error> {
+        // Extract the vtable type from the place
+        let vtable_ty = vtable_place.ty();
+        let TyKind::Adt(vtable_ref) = vtable_ty.kind() else {
+            return Err(Error {
+                span,
+                msg: format!("Expected ADT type for vtable, got: {:?}", vtable_ty.kind())
+            });
+        };
+        
+        let vtable_decl_id = vtable_ref.id.as_adt().unwrap();
+        
+        // Get the vtable struct definition
+        let AnyTransItem::Type(vtable_def) = self.t_ctx.get_or_translate((*vtable_decl_id).into())?
+        else {
+            return Err(Error {
+                span,
+                msg: "Expected type declaration for vtable".to_string()
+            });
+        };
+        
+        let TypeDeclKind::Struct(fields) = &vtable_def.kind else {
+            return Err(Error {
+                span,
+                msg: "Expected struct type for vtable".to_string()
+            });
+        };
+        
+        // Find the field with the matching method name
+        let method_field_name = format!("method_{}", method_name.0);
+        for (field_id, field) in fields.iter_indexed() {
+            if let Some(field_name) = &field.name {
+                if *field_name == method_field_name {
+                    return Ok((vtable_decl_id.clone(), field_id));
+                }
+            }
+        }
+        
+        Err(Error {
+            span,
+            msg: format!("Method field '{}' not found in vtable struct", method_field_name)
+        })
     }
 
     // =====================================
     // Common helper functions
+    //
+    // These functions provide common functionality used by both regular function calls
+    // and dynamic trait method calls, following established patterns in the codebase.
+    // They handle storage operations, target block creation, and unwind handling.
     // =====================================
 
     /// Add StorageLive statement if the place is a local variable.
