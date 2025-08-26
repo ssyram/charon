@@ -850,18 +850,11 @@ impl BodyTransCtx<'_, '_, '_> {
                 ..
             } => {
                 // Check if this is a dynamic trait method call that needs vtable transformation
-                if let hax::FunOperand::Static(item) = fun {
-                    let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
-                    let fn_ptr = fn_ptr_with_binder.erase();
-                    
-                    if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
-                        if matches!(trait_ref.kind, TraitRefKind::Dyn) {
-                            trace!("Transforming dynamic trait method call: {} to use vtable", method_name);
-                            return self.translate_dyn_trait_method_call(
-                                span, trait_ref, method_name, args, destination, target, unwind, statements
-                            );
-                        }
-                    }
+                if let Some((trait_ref, method_name)) = self.is_dyn_trait_method_call(span, fun)? {
+                    trace!("Detected dynamic trait method call: {} - transforming to use vtable", method_name);
+                    return self.translate_dyn_trait_method_call(
+                        span, &trait_ref, &method_name, args, destination, target, unwind, statements
+                    );
                 }
                 
                 // Regular function call
@@ -1098,127 +1091,94 @@ impl BodyTransCtx<'_, '_, '_> {
         Ok(t_args)
     }
 
-    /// Handle calls to methods on dyn trait objects using vtable lookup.
-    /// This adds vtable lookup statements to the current block and returns
-    /// a function call terminator that calls the method through the vtable.
-    fn translate_dyn_trait_method_call(
+    /// Check if a function call is a dynamic trait method call that needs vtable transformation.
+    fn is_dyn_trait_method_call(
+        &mut self, 
+        span: Span, 
+        fun: &hax::FunOperand
+    ) -> Result<Option<(TraitRef, TraitItemName)>, Error> {
+        if let hax::FunOperand::Static(item) = fun {
+            let fn_ptr_with_binder = self.translate_fn_ptr(span, item)?;
+            let fn_ptr = fn_ptr_with_binder.erase();
+            
+            if let FunIdOrTraitMethodRef::Trait(trait_ref, method_name, _) = &*fn_ptr.func {
+                if matches!(trait_ref.kind, TraitRefKind::Dyn) {
+                    return Ok(Some((trait_ref.clone(), method_name.clone())));
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    /// Generate vtable extraction statements for a dyn trait object receiver.
+    fn generate_vtable_extraction(
         &mut self,
         span: Span,
-        _trait_ref: &TraitRef,
         method_name: &TraitItemName,
-        args: &Vec<hax::Spanned<hax::Operand>>,
-        destination: &hax::Place,
-        target: &Option<hax::BasicBlock>,
-        unwind: &UnwindAction,
-        _statements: &mut Vec<Statement>,
-    ) -> Result<Terminator, Error> {
-        trace!("Translating dyn trait method call: {}", method_name);
-        
-        // Translate destination and arguments
-        let lval = self.translate_place(span, destination)?;
-        let t_args = self.translate_arguments(span, args)?;
-        
-        // The first argument should be the dyn trait object (receiver)
-        if t_args.is_empty() {
-            return Err(Error {
-                span,
-                msg: "Dyn trait method call with no receiver argument".to_string()
-            });
-        }
-        
-        let _receiver = &t_args[0];
-        
-        // TODO: For now, create a simple function pointer call
-        // We need to:
-        // 1. Get the vtable from the receiver using PtrMetadata
-        // 2. Get the method function pointer from the vtable
-        // 3. Call the method function pointer
-        
-        // For the initial implementation, let's create a placeholder function pointer
-        // and call it. This will at least generate the right structure.
-        
-        // Create a simple function pointer type for now
-        // TODO: Extract proper signature from the original method
-        let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
-            vec![].into(), // For now, use empty signature - will be improved
-            Ty::mk_unit(),
-        ))));
-        
-        let method_ptr_local = self.locals.new_var(
-            Some(format!("vtable_method_{}", method_name)), 
-            method_ptr_ty.clone()
-        );
-        let method_ptr_place = method_ptr_local;
-        
-        // Generate statements to get vtable and method pointer
-        // 1. Get the vtable from the receiver using PtrMetadata
-        let receiver = &t_args[0];
-        
-        // Create a local for the vtable
-        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared)); // Placeholder vtable type
+        receiver: &Operand,
+        statements: &mut Vec<Statement>,
+    ) -> Place {
+        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
         let vtable_place = self.locals.new_var(
-            Some(format!("vtable_{}", method_name)),
-            vtable_ty.clone()
+            Some(format!("vtable@{}", method_name)),
+            vtable_ty,
         );
-        
-        // Generate: vtable = PtrMetadata(receiver)
+
+        if let PlaceKind::Local(vtable_local_id) = &vtable_place.kind {
+            statements.push(Statement::new(span, RawStatement::StorageLive(*vtable_local_id)));
+        }
+
         let vtable_assign = Statement::new(span, RawStatement::Assign(
             vtable_place.clone(),
             Rvalue::UnaryOp(UnOp::PtrMetadata, receiver.clone())
         ));
-        
-        // Add the vtable assignment to the current block  
-        _statements.push(vtable_assign);
-        
-        // TODO: Generate method pointer extraction from vtable
-        // Access the specific method field from the vtable: method_ptr = vtable.method_<name>
-        // We need to create a field projection to access the method from vtable
-        
-        // For now, create a placeholder field access
-        // The vtable struct has fields like method_check, method_modify, etc.
-        // We should access vtable.method_<method_name>
-        
-        // TODO: Get the proper field ID for the method in the vtable struct
-        // For now, we use a simplified field access
+        statements.push(vtable_assign);
+
+        vtable_place
+    }
+
+    /// Generate method pointer lookup from vtable.
+    fn generate_method_pointer_lookup(
+        &mut self,
+        span: Span,
+        method_name: &TraitItemName,
+        vtable_place: &Place,
+        statements: &mut Vec<Statement>,
+    ) -> Place {
+        let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
+            vec![].into(),
+            Ty::mk_unit(),
+        ))));
+
+        let method_ptr_place = self.locals.new_var(
+            Some(format!("method_ptr@{}", method_name)),
+            method_ptr_ty.clone()
+        );
+
+        if let PlaceKind::Local(method_ptr_local_id) = &method_ptr_place.kind {
+            statements.push(Statement::new(span, RawStatement::StorageLive(*method_ptr_local_id)));
+        }
+
         let method_field_place = Place {
             kind: PlaceKind::Projection(
                 Box::new(vtable_place.clone()),
-                // TODO: Use proper field ID based on method name and vtable structure
                 ProjectionElem::Field(FieldProjKind::Adt(TypeDeclId::new(0), None), FieldId::new(3))
             ),
-            ty: method_ptr_ty.clone(),
+            ty: method_ptr_ty,
         };
-        
+
         let method_assign = Statement::new(span, RawStatement::Assign(
             method_ptr_place.clone(),
             Rvalue::Use(Operand::Copy(method_field_place))
         ));
-        
-        _statements.push(method_assign);
-        
-        // Add storage_live for our new locals
-        if let PlaceKind::Local(vtable_local_id) = &vtable_place.kind {
-            _statements.insert(0, Statement::new(span, RawStatement::StorageLive(*vtable_local_id)));
-        }
-        if let PlaceKind::Local(method_ptr_local_id) = &method_ptr_place.kind {
-            _statements.insert(1, Statement::new(span, RawStatement::StorageLive(*method_ptr_local_id)));
-        }
-        
-        let call = Call {
-            func: FnOperand::Move(method_ptr_place),
-            args: t_args,
-            dest: lval,
-        };
-        
-        let target_block = match target {
-            Some(target) => self.translate_basic_block_id(*target),
-            None => {
-                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
-                self.blocks.push(abort.into_block())
-            }
-        };
-        
-        let on_unwind = match unwind {
+        statements.push(method_assign);
+
+        method_ptr_place
+    }
+
+    /// Create unwind target blocks for function calls.
+    fn create_unwind_target(&mut self, span: Span, unwind: &UnwindAction) -> BlockId {
+        match unwind {
             UnwindAction::Continue => {
                 let unwind_continue = Terminator::new(span, RawTerminator::UnwindResume);
                 self.blocks.push(unwind_continue.into_block())
@@ -1232,7 +1192,56 @@ impl BodyTransCtx<'_, '_, '_> {
                 self.blocks.push(abort.into_block())
             }
             UnwindAction::Cleanup(bb) => self.translate_basic_block_id(*bb),
+        }
+    }
+
+    /// Handle calls to methods on dyn trait objects using vtable lookup.
+    fn translate_dyn_trait_method_call(
+        &mut self,
+        span: Span,
+        _trait_ref: &TraitRef,
+        method_name: &TraitItemName,
+        args: &Vec<hax::Spanned<hax::Operand>>,
+        destination: &hax::Place,
+        target: &Option<hax::BasicBlock>,
+        unwind: &UnwindAction,
+        statements: &mut Vec<Statement>,
+    ) -> Result<Terminator, Error> {
+        trace!("Transforming dynamic trait method call: {}", method_name);
+
+        let lval = self.translate_place(span, destination)?;
+        let t_args = self.translate_arguments(span, args)?;
+
+        if t_args.is_empty() {
+            return Err(Error {
+                span,
+                msg: "Dyn trait method call with no receiver argument".to_string()
+            });
+        }
+
+        let receiver = &t_args[0];
+
+        // Generate vtable extraction: vtable = ptr_metadata(receiver)
+        let vtable_place = self.generate_vtable_extraction(span, method_name, receiver, statements);
+
+        // Generate method pointer lookup: method_ptr = vtable.method_<name>
+        let method_ptr_place = self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements);
+
+        let call = Call {
+            func: FnOperand::Move(method_ptr_place),
+            args: t_args,
+            dest: lval,
         };
+
+        let target_block = match target {
+            Some(target) => self.translate_basic_block_id(*target),
+            None => {
+                let abort = Terminator::new(span, RawTerminator::Abort(AbortKind::UndefinedBehavior));
+                self.blocks.push(abort.into_block())
+            }
+        };
+
+        let on_unwind = self.create_unwind_target(span, unwind);
 
         Ok(Terminator::new(span, RawTerminator::Call {
             call,
