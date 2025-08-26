@@ -1139,11 +1139,18 @@ impl BodyTransCtx<'_, '_, '_> {
 
         let receiver = &t_args[0];
 
-        // Step 1: Extract vtable from receiver - simplified approach for now
-        let vtable_place = self.generate_simple_vtable_extraction(span, method_name, receiver, statements)?;
+        // Step 1: Extract vtable from receiver using proper trait information
+        let vtable_place = self.generate_vtable_extraction_with_proper_registration(
+            span,
+            method_name,
+            receiver,
+            trait_ref,
+            statements,
+        )?;
 
-        // Step 2: Extract method pointer from vtable - simplified version for now
-        let method_ptr_place = self.generate_simple_method_pointer_lookup(span, method_name, statements)?;
+        // Step 2: Extract method pointer from vtable
+        let method_ptr_place =
+            self.generate_method_pointer_lookup(span, method_name, &vtable_place, statements)?;
 
         // Step 3: Call through the method pointer
         let call = Call {
@@ -1186,17 +1193,65 @@ impl BodyTransCtx<'_, '_, '_> {
     // - get_vtable_method_field_id: Looks up the field ID for a method by name in the vtable definition
     // =====================================
 
-    /// Generate simplified vtable extraction statements - uses a generic vtable type for now.
-    fn generate_simple_vtable_extraction(
+    /// Generate vtable extraction using proper get_or_translate registration as advised by @ssyram.
+    fn generate_vtable_extraction_with_proper_registration(
         &mut self,
         span: Span,
         method_name: &TraitItemName,
         receiver: &Operand,
+        trait_ref: &TraitRef,
         statements: &mut Vec<Statement>,
     ) -> Result<Place, Error> {
-        // For now, create a generic raw pointer type for vtable - this is a simplified version
-        // The proper implementation would need the exact vtable struct type from trait analysis
-        let vtable_ty = Ty::new(TyKind::RawPtr(Ty::mk_unit(), RefKind::Shared));
+        // Following @ssyram's guidance: just register and enqueue, framework handles duplication automatically
+        // Use get_or_translate to get the proper vtable TypeDeclRef
+        
+        // Get the trait declaration ID from the TraitRef  
+        let trait_decl_id = trait_ref.trait_decl_ref.skip_binder.id;
+        
+        // Create TransItemSource for the vtable following existing patterns
+        let vtable_src = TransItemSource::monomorphic_item(&trait_decl_id, TransItemSourceKind::VTable);
+        
+        // Use the framework's registration mechanism - get_or_translate with vtable source
+        let vtable_trans_id = match self.i_ctx.t_ctx.id_map.get(&vtable_src) {
+            Some(AnyTransId::Type(id)) => *id,
+            Some(_) => return Err(Error {
+                span,
+                msg: "Vtable registered with wrong ID type".to_string(),
+            }),
+            None => {
+                // Register the vtable now using the framework
+                let trans_id = self.i_ctx.t_ctx.reserve_id(&vtable_src);
+                if let AnyTransId::Type(id) = trans_id {
+                    id
+                } else {
+                    return Err(Error {
+                        span,
+                        msg: "Expected Type ID for vtable".to_string(),
+                    });
+                }
+            }
+        };
+
+        // Get vtable struct definition using get_or_translate  
+        let AnyTransItem::Type(vtable_def) = 
+            self.i_ctx.t_ctx.get_or_translate(AnyTransId::Type(vtable_trans_id))?
+        else {
+            return Err(Error {
+                span,
+                msg: "Expected type declaration for vtable".to_string(),
+            });
+        };
+
+        // Build proper vtable type reference
+        let generics = trait_ref.trait_decl_ref.skip_binder.generics.clone();
+        let vtable_ref = TypeDeclRef {
+            id: TypeId::Adt(vtable_trans_id),
+            generics,
+        };
+
+        // The vtable is a *const vtable_struct
+        let vtable_adt_ty = Ty::new(TyKind::Adt(vtable_ref));
+        let vtable_ty = Ty::new(TyKind::RawPtr(vtable_adt_ty, RefKind::Shared));
         let vtable_place = self
             .locals
             .new_var(Some(format!("vtable@{}", method_name)), vtable_ty);
