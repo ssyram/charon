@@ -3,18 +3,18 @@
 //! This pass converts direct method calls on trait objects into calls through vtable
 //! function pointers. For example:
 //!
-//! ```rust
+//! ```rust,ignore
 //! let x: &dyn Trait = &obj;
 //! x.method(args);
 //! ```
 //!
 //! is transformed from:
-//! ```
+//! ```text
 //! @0 := call TraitMethod::method(x, args)
 //! ```
 //!
 //! to:
-//! ```
+//! ```text
 //! vtable@9 := ptr_metadata(move (@receiver))              // Extract vtable pointer
 //! method_ptr@8 := copy (((*vtable@9).method_check))       // Get method from vtable
 //! @0 := (move method_ptr@8)(move (@receiver), move (@args)) // Call through function pointer
