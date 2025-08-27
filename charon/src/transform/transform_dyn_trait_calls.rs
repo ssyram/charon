@@ -134,14 +134,26 @@ impl<'a> DynTraitCallTransformer<'a> {
             }
             
             // Find the Output associated type from trait type constraints
+            // The Output constraint might be on a parent trait, not directly on Fn
+            let mut found_output = false;
             for constraint in &binder.params.trait_type_constraints {
                 let constraint_ref = &constraint.skip_binder;
-                if constraint_ref.trait_ref.trait_decl_ref.skip_binder.id == trait_ref.trait_decl_ref.skip_binder.id 
-                   && constraint_ref.type_name.to_string() == "Output" {
+                trace!("DEBUG - Checking constraint: trait_id={:?}, type_name={:?}", 
+                       constraint_ref.trait_ref.trait_decl_ref.skip_binder.id, 
+                       constraint_ref.type_name);
+                
+                // Check if this is an Output constraint (regardless of which trait it's on)
+                if constraint_ref.type_name.to_string() == "Output" {
                     generics.types.push(constraint_ref.ty.clone());
-                    trace!("DEBUG - Added Output type: {:?}", constraint_ref.ty);
+                    trace!("DEBUG - Added Output type: {:?} from trait {:?}", 
+                           constraint_ref.ty, constraint_ref.trait_ref.trait_decl_ref.skip_binder.id);
+                    found_output = true;
                     break;
                 }
+            }
+            
+            if !found_output {
+                trace!("DEBUG - No Output constraint found!");
             }
         }
         
