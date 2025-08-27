@@ -59,18 +59,23 @@ fn transform_dyn_trait_call(
         }
     }
 
-    let Some(_dyn_arg_index) = dyn_trait_arg_index else {
+    let Some(dyn_arg_index) = dyn_trait_arg_index else {
         return Ok(Vec::new()); // No dyn trait argument found
     };
 
     // For now, just log that we found a dyn trait call and return empty
-    // This allows the build to succeed while we implement the transformation
+    // TODO: Implement the actual transformation:
+    // 1. vtable := ptr_metadata(dyn_trait_receiver)
+    // 2. method_ptr := (*vtable).method_field
+    // 3. result := method_ptr(receiver, args...)
+    
     trace!(
-        "Found dynamic trait method call at {:?} - transformation not yet implemented",
-        span
+        "Found dynamic trait method call at {:?} with dyn arg at index {} - transformation logic to be implemented",
+        span,
+        dyn_arg_index
     );
 
-    // Return empty vector to indicate no transformation applied
+    // Return empty vector to indicate no transformation applied yet
     Ok(Vec::new())
 }
 
@@ -78,9 +83,6 @@ pub struct Transform;
 
 impl UllbcPass for Transform {
     fn transform_body(&self, ctx: &mut TransformCtx, body: &mut ExprBody) {
-        // Print debug info regardless of log level to a file so we can see it
-        std::fs::write("/tmp/debug_transform_dyn.txt", "TransformDynTraitCalls was called").unwrap();
-        eprintln!("DEBUG: TransformDynTraitCalls is running on body");
         trace!("TransformDynTraitCalls: Processing body");
         
         let mut new_statements_by_block: std::collections::HashMap<BlockId, Vec<Statement>> = std::collections::HashMap::new();
