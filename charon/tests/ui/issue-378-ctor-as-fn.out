@@ -51,7 +51,7 @@ fn {impl Drop for String}::drop<'_0>(@1: &'_0 mut (String))
 impl Drop for String {
     parent_clause0 = MetaSized<String>
     fn drop<'_0> = {impl Drop for String}::drop<'_0_0>
-    vtable: {impl Drop for String}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: alloc::string::{String}::new
@@ -94,7 +94,7 @@ fn {impl Drop for Foo}::drop<'_0>(@1: &'_0 mut (Foo))
 impl Drop for Foo {
     parent_clause0 = MetaSized<Foo>
     fn drop<'_0> = {impl Drop for Foo}::drop<'_0_0>
-    vtable: {impl Drop for Foo}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::Foo

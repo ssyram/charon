@@ -441,7 +441,7 @@ impl<'_0> FnOnce::<test_crate::main::closure<'_>, (u8)> {
     parent_clause2 = Tuple::<(u8)>
     type Output = u8
     fn call_once = {impl FnOnce::<test_crate::main::closure<'_>, (u8)>}::call_once<'_0>
-    vtable: {impl FnOnce::<test_crate::main::closure<'_>, (u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnMut::<test_crate::main::closure<'_>, (u8)>}
@@ -451,7 +451,7 @@ impl<'_0> FnMut::<test_crate::main::closure<'_>, (u8)> {
     parent_clause2 = Sized::<(u8)>
     parent_clause3 = Tuple::<(u8)>
     fn call_mut<'_0> = {impl FnMut::<test_crate::main::closure<'_>, (u8)>}::call_mut<'_0, '_0_0>
-    vtable: {impl FnMut::<test_crate::main::closure<'_>, (u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl Fn::<test_crate::main::closure<'_>, (u8)>}
@@ -461,7 +461,7 @@ impl<'_0> Fn::<test_crate::main::closure<'_>, (u8)> {
     parent_clause2 = Sized::<(u8)>
     parent_clause3 = Tuple::<(u8)>
     fn call<'_0> = {impl Fn::<test_crate::main::closure<'_>, (u8)>}::call<'_0, '_0_0>
-    vtable: {impl Fn::<test_crate::main::closure<'_>, (u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnOnce::<test_crate::main::closure#1<'_>, (u8)>}::call_once
@@ -486,7 +486,7 @@ impl<'_0> FnOnce::<test_crate::main::closure#1<'_>, (u8)> {
     parent_clause2 = Tuple::<(u8)>
     type Output = u8
     fn call_once = {impl FnOnce::<test_crate::main::closure#1<'_>, (u8)>}::call_once<'_0>
-    vtable: {impl FnOnce::<test_crate::main::closure#1<'_>, (u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnMut::<test_crate::main::closure#1<'_>, (u8)>}
@@ -496,7 +496,7 @@ impl<'_0> FnMut::<test_crate::main::closure#1<'_>, (u8)> {
     parent_clause2 = Sized::<(u8)>
     parent_clause3 = Tuple::<(u8)>
     fn call_mut<'_0> = {impl FnMut::<test_crate::main::closure#1<'_>, (u8)>}::call_mut<'_0, '_0_0>
-    vtable: {impl FnMut::<test_crate::main::closure#1<'_>, (u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnOnce::<test_crate::main::closure#2, (u8)>}
@@ -506,7 +506,7 @@ impl FnOnce::<test_crate::main::closure#2, (u8)> {
     parent_clause2 = Tuple::<(u8)>
     type Output = u8
     fn call_once = {impl FnOnce::<test_crate::main::closure#2, (u8)>}::call_once
-    vtable: {impl FnOnce::<test_crate::main::closure#2, (u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 

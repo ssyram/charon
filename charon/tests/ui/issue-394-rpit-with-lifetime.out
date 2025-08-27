@@ -127,7 +127,7 @@ impl<'a> FnOnce<()> for closure<'_> {
     parent_clause3 = Sized<Option<u8>[Sized<u8>]>
     type Output = Option<u8>[Sized<u8>]
     fn call_once = {impl FnOnce<()> for closure<'_>}::call_once<'a>
-    vtable: {impl FnOnce<()> for closure<'_>}::{vtable}<'a, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::sparse_transitions::{impl FnMut<()> for closure<'_>}
@@ -137,7 +137,7 @@ impl<'a> FnMut<()> for closure<'_> {
     parent_clause2 = Sized<()>
     parent_clause3 = Tuple<()>
     fn call_mut<'_0> = {impl FnMut<()> for closure<'_>}::call_mut<'a, '_0_0>
-    vtable: {impl FnMut<()> for closure<'_>}::{vtable}<'a, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::sparse_transitions

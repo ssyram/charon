@@ -109,7 +109,7 @@ where
 {
     parent_clause0 = MetaSized<Result<T, E>[@TraitClause0, @TraitClause1]>
     fn drop<'_0> = {impl Drop for Result<T, E>[@TraitClause0, @TraitClause1]}::drop<'_0_0, T, E>[@TraitClause0, @TraitClause1]
-    vtable: {impl Drop for Result<T, E>[@TraitClause0, @TraitClause1]}::{vtable}<T, E>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::wrap

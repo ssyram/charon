@@ -194,7 +194,7 @@ where
     parent_clause3 = Sized<()>
     type Output = ()
     fn call_once = {impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_once<Self>[@TraitClause0]
-    vtable: {impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::{vtable}<Self, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::Thing::foo::{impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}
@@ -207,7 +207,7 @@ where
     parent_clause2 = Sized<(@TraitClause0::Item)>
     parent_clause3 = Tuple<(@TraitClause0::Item)>
     fn call_mut<'_0> = {impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_mut<'_0_0, Self>[@TraitClause0]
-    vtable: {impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::{vtable}<Self, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::Thing::foo::{impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}
@@ -220,7 +220,7 @@ where
     parent_clause2 = Sized<(@TraitClause0::Item)>
     parent_clause3 = Tuple<(@TraitClause0::Item)>
     fn call<'_0> = {impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call<'_0_0, Self>[@TraitClause0]
-    vtable: {impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::{vtable}<Self, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0]
+    non-dyn-compatible
 }
 
 

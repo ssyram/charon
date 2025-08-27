@@ -188,7 +188,7 @@ where
     parent_clause2 = Tuple<(())>
     parent_clause3 = Sized<()>
     fn call_once = {impl FnOnce<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}::call_once<F, Clause1_Repr>[@TraitClause0, @TraitClause1]
-    vtable: {impl FnOnce<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}::{vtable}<F, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::{SqrtTables<F>[@TraitClause0]}::sqrt_common::{impl FnMut<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}
@@ -202,7 +202,7 @@ where
     parent_clause2 = Sized<(())>
     parent_clause3 = Tuple<(())>
     fn call_mut<'_0> = {impl FnMut<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}::call_mut<'_0_0, F, Clause1_Repr>[@TraitClause0, @TraitClause1]
-    vtable: {impl FnMut<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}::{vtable}<F, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::{SqrtTables<F>[@TraitClause0]}::sqrt_common::{impl Fn<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}
@@ -216,7 +216,7 @@ where
     parent_clause2 = Sized<(())>
     parent_clause3 = Tuple<(())>
     fn call<'_0> = {impl Fn<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}::call<'_0_0, F, Clause1_Repr>[@TraitClause0, @TraitClause1]
-    vtable: {impl Fn<(()), ()> for closure<F, Clause1_Repr>[@TraitClause0, @TraitClause1]}::{vtable}<F, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
 }
 
 

@@ -146,7 +146,7 @@ where
     parent_clause3 = @TraitClause0
     type Output = T
     fn call_once = {impl FnOnce<(usize)> for closure<T, const K : usize>[@TraitClause0, @TraitClause1]}::call_once<T, const K : usize>[@TraitClause0, @TraitClause1]
-    vtable: {impl FnOnce<(usize)> for closure<T, const K : usize>[@TraitClause0, @TraitClause1]}::{vtable}<T, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>"), const K : usize>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::test::{impl FnMut<(usize)> for closure<T, const K : usize>[@TraitClause0, @TraitClause1]}
@@ -160,7 +160,7 @@ where
     parent_clause2 = Sized<(usize)>
     parent_clause3 = Tuple<(usize)>
     fn call_mut<'_0> = {impl FnMut<(usize)> for closure<T, const K : usize>[@TraitClause0, @TraitClause1]}::call_mut<'_0_0, T, const K : usize>[@TraitClause0, @TraitClause1]
-    vtable: {impl FnMut<(usize)> for closure<T, const K : usize>[@TraitClause0, @TraitClause1]}::{vtable}<T, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>"), const K : usize>[@TraitClause0, @TraitClause1]
+    non-dyn-compatible
 }
 
 // Full name: test_crate::test

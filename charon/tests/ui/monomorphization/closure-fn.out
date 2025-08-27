@@ -313,7 +313,7 @@ impl<'_0, '_1> FnOnce::<closure<'_, '_>, (u8, u8)> {
     parent_clause2 = Tuple::<(u8, u8)>
     type Output = u8
     fn call_once = {impl FnOnce::<closure<'_, '_>, (u8, u8)>}::call_once<'_0, '_1>
-    vtable: {impl FnOnce::<closure<'_, '_>, (u8, u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnMut::<closure<'_, '_>, (u8, u8)>}
@@ -323,7 +323,7 @@ impl<'_0, '_1> FnMut::<closure<'_, '_>, (u8, u8)> {
     parent_clause2 = Sized::<(u8, u8)>
     parent_clause3 = Tuple::<(u8, u8)>
     fn call_mut<'_0> = {impl FnMut::<closure<'_, '_>, (u8, u8)>}::call_mut<'_0, '_1, '_0_0>
-    vtable: {impl FnMut::<closure<'_, '_>, (u8, u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl Fn::<closure<'_, '_>, (u8, u8)>}
@@ -333,7 +333,7 @@ impl<'_0, '_1> Fn::<closure<'_, '_>, (u8, u8)> {
     parent_clause2 = Sized::<(u8, u8)>
     parent_clause3 = Tuple::<(u8, u8)>
     fn call<'_0> = {impl Fn::<closure<'_, '_>, (u8, u8)>}::call<'_0, '_1, '_0_0>
-    vtable: {impl Fn::<closure<'_, '_>, (u8, u8)>}::{vtable}
+    non-dyn-compatible
 }
 
 

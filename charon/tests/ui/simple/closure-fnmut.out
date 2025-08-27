@@ -147,7 +147,7 @@ impl<'_0> FnOnce<(u8)> for closure<'_0> {
     parent_clause3 = Sized<u8>
     type Output = u8
     fn call_once = {impl FnOnce<(u8)> for closure<'_0>}::call_once<'_0>
-    vtable: {impl FnOnce<(u8)> for closure<'_0>}::{vtable}<type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnMut<(u8)> for closure<'_0>}
@@ -157,7 +157,7 @@ impl<'_0> FnMut<(u8)> for closure<'_0> {
     parent_clause2 = Sized<(u8)>
     parent_clause3 = Tuple<(u8)>
     fn call_mut<'_0> = {impl FnMut<(u8)> for closure<'_0>}::call_mut<'_0, '_0_0>
-    vtable: {impl FnMut<(u8)> for closure<'_0>}::{vtable}<type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main
