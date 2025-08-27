@@ -564,7 +564,12 @@ impl ItemTransCtx<'_, '_> {
                     TyKind::FnPtr(sig) => {
                         let regions = shim_ref.generics.regions;
                         // Add a bunch of erased regions to avoid the type mismatch.
-                        shim_ref.generics.regions = sig.regions.iter().map(|_| Region::Erased).chain(regions.into_iter()).collect();
+                        shim_ref.generics.regions = sig
+                            .regions
+                            .iter()
+                            .map(|_| Region::Erased)
+                            .chain(regions.into_iter())
+                            .collect();
                     }
                     _ => {
                         raise_error!(
@@ -576,11 +581,14 @@ impl ItemTransCtx<'_, '_> {
                 }
                 (RawConstantExpr::FnPtr(shim_ref), ty)
             }
-            hax::ImplAssocItemValue::DefaultedFn { .. } => (RawConstantExpr::Opaque(
-                "shim for default methods \
+            hax::ImplAssocItemValue::DefaultedFn { .. } => (
+                RawConstantExpr::Opaque(
+                    "shim for default methods \
                     aren't yet supported"
-                    .to_string(),
-            ), next_ty()),
+                        .to_string(),
+                ),
+                next_ty(),
+            ),
             _ => return Ok(()),
         };
 
@@ -718,10 +726,12 @@ impl ItemTransCtx<'_, '_> {
             aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
         };
 
-        // TODO(dyn): provide values
-        mk_field(RawConstantExpr::Opaque("unknown size".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown align".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown drop".to_string()), next_ty());
+        // Get size and alignment from type layout if available
+        let (size_expr, align_expr, drop_expr) = self.compute_vtable_meta_fields(span, &self_ty)?;
+        
+        mk_field(size_expr, next_ty());
+        mk_field(align_expr, next_ty());
+        mk_field(drop_expr, next_ty());
 
         for item in items {
             self.add_method_to_vtable_value(
@@ -735,7 +745,13 @@ impl ItemTransCtx<'_, '_> {
             )?;
         }
 
-        self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut next_ty, &mut mk_field)?;
+        self.add_supertraits_to_vtable_value(
+            span,
+            &trait_def,
+            impl_def,
+            &mut next_ty,
+            &mut mk_field,
+        )?;
 
         if field_ty_iter.next().is_some() {
             raise_error!(
@@ -768,6 +784,183 @@ impl ItemTransCtx<'_, '_> {
             comments: Vec::new(),
             body: [block].into(),
         }))
+    }
+
+    /// Compute the meta fields (size, alignment, drop) for a vtable based on the concrete type.
+    fn compute_vtable_meta_fields(&mut self, span: Span, self_ty: &Ty) -> Result<(RawConstantExpr, RawConstantExpr, RawConstantExpr), Error> {
+        // Try to get size and alignment from type declaration layout
+        let (size_expr, align_expr) = match self_ty.kind() {
+            TyKind::Adt(type_ref) => {
+                // Get the type declaration
+                let type_decl_id = match &type_ref.id {
+                    TypeId::Adt(type_decl_id) => type_decl_id.clone(),
+                    _ => {
+                        return Ok((
+                            RawConstantExpr::Opaque("not an ADT type".to_string()),
+                            RawConstantExpr::Opaque("not an ADT type".to_string()),
+                            RawConstantExpr::Opaque("not an ADT type".to_string()),
+                        ));
+                    }
+                };
+                match self.t_ctx.get_or_translate(AnyTransId::Type(type_decl_id)) {
+                    Ok(AnyTransItem::Type(type_decl)) => {
+                        if let Some(layout) = &type_decl.layout {
+                            let size_value = if let Some(size) = layout.size {
+                                RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, size as u128)))
+                            } else {
+                                RawConstantExpr::Opaque("generic type size unknown".to_string())
+                            };
+                            let align_value = if let Some(align) = layout.align {
+                                RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, align as u128)))
+                            } else {
+                                RawConstantExpr::Opaque("generic type alignment unknown".to_string())
+                            };
+                            (size_value, align_value)
+                        } else {
+                            (
+                                RawConstantExpr::Opaque("layout not available for type".to_string()),
+                                RawConstantExpr::Opaque("layout not available for type".to_string())
+                            )
+                        }
+                    }
+                    Ok(_) => {
+                        (
+                            RawConstantExpr::Opaque("not a type declaration".to_string()),
+                            RawConstantExpr::Opaque("not a type declaration".to_string())
+                        )
+                    }
+                    Err(_) => {
+                        (
+                            RawConstantExpr::Opaque("type declaration not found".to_string()),
+                            RawConstantExpr::Opaque("type declaration not found".to_string())
+                        )
+                    }
+                }
+            }
+            TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)) => {
+                let size = std::mem::size_of::<usize>();
+                let align = std::mem::align_of::<usize>();
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, size as u128))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, align as u128)))
+                )
+            }
+            TyKind::Literal(LiteralTy::UInt(UIntTy::U8)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 1))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 1)))
+                )
+            }
+            TyKind::Literal(LiteralTy::UInt(UIntTy::U16)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 2))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 2)))
+                )
+            }
+            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 4))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 4)))
+                )
+            }
+            TyKind::Literal(LiteralTy::UInt(UIntTy::U64)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 8))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 8)))
+                )
+            }
+            TyKind::Literal(LiteralTy::UInt(UIntTy::U128)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 16))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 16)))
+                )
+            }
+            TyKind::Literal(LiteralTy::Int(IntTy::Isize)) => {
+                let size = std::mem::size_of::<isize>();
+                let align = std::mem::align_of::<isize>();
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, size as u128))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, align as u128)))
+                )
+            }
+            TyKind::Literal(LiteralTy::Int(IntTy::I8)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 1))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 1)))
+                )
+            }
+            TyKind::Literal(LiteralTy::Int(IntTy::I16)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 2))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 2)))
+                )
+            }
+            TyKind::Literal(LiteralTy::Int(IntTy::I32)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 4))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 4)))
+                )
+            }
+            TyKind::Literal(LiteralTy::Int(IntTy::I64)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 8))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 8)))
+                )
+            }
+            TyKind::Literal(LiteralTy::Int(IntTy::I128)) => {
+                (
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 16))),
+                    RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 16)))
+                )
+            }
+            _ => {
+                (
+                    RawConstantExpr::Opaque(format!("size unknown for type: {:?}", self_ty)),
+                    RawConstantExpr::Opaque(format!("alignment unknown for type: {:?}", self_ty))
+                )
+            }
+        };
+
+        // For drop, we need to look up the Drop trait implementation
+        let drop_expr = self.compute_drop_function(span, self_ty)?;
+
+        Ok((size_expr, align_expr, drop_expr))
+    }
+
+    /// Compute the drop function for a vtable based on the concrete type.
+    fn compute_drop_function(&mut self, _span: Span, self_ty: &Ty) -> Result<RawConstantExpr, Error> {
+        // Look for a Drop trait implementation for this type
+        for (_impl_id, impl_decl) in self.t_ctx.translated.trait_impls.iter_indexed() {
+            let trait_ref = &impl_decl.impl_trait;
+            // Check if this is a Drop trait implementation
+            if let Some(trait_decl) = self.t_ctx.translated.trait_decls.get(trait_ref.id) {
+                // Check if this trait has Drop in its name (this is a simple heuristic)
+                let trait_name = &trait_decl.item_meta.name;
+                let has_drop_in_name = trait_name.name.iter().any(|elem| {
+                    matches!(elem, PathElem::Ident(name, _) if name.contains("Drop"))
+                });
+                
+                if has_drop_in_name {
+                    // Check if the impl is for our self_ty
+                    let impl_self_ty = &trait_ref.generics.types[0];
+                    if impl_self_ty == self_ty {
+                        // Found a Drop impl for our type - try to get the drop method
+                        for (method_name, method_ref) in &impl_decl.methods {
+                            if method_name.0 == "drop" {
+                                // Create a function pointer to the drop method
+                                return Ok(RawConstantExpr::FnPtr(
+                                    method_ref.skip_binder.clone().into(),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If no Drop impl found, provide a no-op drop function
+        // This is okay for types that don't need drop (like most primitives)
+        Ok(RawConstantExpr::Opaque("no drop impl found".to_string()))
     }
 
     fn check_concretization_ty_match(
