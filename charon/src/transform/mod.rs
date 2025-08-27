@@ -6,6 +6,7 @@ pub mod duplicate_return;
 pub mod expand_associated_types;
 pub mod filter_invisible_trait_impls;
 pub mod filter_unreachable_blocks;
+pub mod generate_vtable_drop_shims;
 pub mod graphs;
 pub mod hide_allocator_param;
 pub mod hide_marker_traits;
@@ -72,6 +73,8 @@ pub static INITIAL_CLEANUP_PASSES: &[Pass] = &[
     UnstructuredBody(&skip_trait_refs_when_known::Transform),
     // Change trait associated types to be type parameters instead. See the module for details.
     NonBody(&expand_associated_types::Transform),
+    // Generate drop shim functions for vtable instances
+    NonBody(&generate_vtable_drop_shims::Transform),
 ];
 
 /// Body cleanup passes on the ullbc.

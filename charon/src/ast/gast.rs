@@ -139,7 +139,6 @@ pub enum ItemKind {
         impl_ref: TraitImplRef,
     },
     VTableMethodShim,
-    VTableDropShim,
 }
 
 /// A function definition
