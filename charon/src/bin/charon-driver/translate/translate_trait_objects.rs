@@ -1235,8 +1235,11 @@ impl ItemTransCtx<'_, '_> {
         };
         let mut statements = vec![];
 
-        // Parameter: shim_self: *mut dyn Trait
-        let shim_self = locals.new_var(Some("shim_self".into()), shim_signature.inputs[0].clone());
+        // The function parameter is shim_self: *mut dyn Trait (index 0)
+        let shim_self = Place {
+            local: LocalId::ZERO, // First argument
+            projection: ProjectionElem::new(),
+        };
 
         // Check if the type has a Drop implementation
         let has_drop_impl = self.type_has_drop_impl(self_ty);
@@ -1252,21 +1255,22 @@ impl ItemTransCtx<'_, '_> {
                     shim_signature.inputs[0].clone(),
                     target_self_ty.clone(),
                 )),
-                Operand::Move(shim_self.clone()),
+                Operand::Move(shim_self),
             );
             statements.push(Statement::new(
                 span,
                 RawStatement::Assign(target_self.clone(), rval),
             ));
 
-            // Call the concrete drop function: drop_in_place(target_self)
-            // For now, we'll use an opaque call since we need to find the actual drop function
+            // Call the concrete drop function
+            // For now, generate a comment and nop since actual drop call generation is complex
             statements.push(Statement::new(
                 span,
                 RawStatement::Nop,
             ));
         } else {
             // No drop implementation needed - this is a no-op function
+            // Just add a nop statement
             statements.push(Statement::new(
                 span,
                 RawStatement::Nop,
