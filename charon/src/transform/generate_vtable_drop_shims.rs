@@ -12,7 +12,7 @@
 
 use crate::ast::*;
 use crate::transform::TransformCtx;
-use crate::ullbc_ast::{ExprBody as GExprBody, RawStatement, Statement, BlockData, Terminator, RawTerminator};
+use crate::ullbc_ast::{ExprBody as GExprBody, RawStatement, Statement, BlockData, Terminator, RawTerminator, BlockId};
 use super::ctx::TransformPass;
 use std::collections::HashMap;
 
@@ -20,29 +20,26 @@ pub struct Transform;
 
 impl TransformPass for Transform {
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
+        // Collect vtable instances first to avoid borrowing issues
+        let vtable_instances: Vec<(GlobalDeclId, TraitImplId)> = ctx
+            .translated
+            .global_decls
+            .iter_indexed()
+            .filter_map(|(global_id, global_decl)| {
+                if let ItemKind::VTableInstance { impl_ref } = &global_decl.kind {
+                    Some((global_id, impl_ref.id))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
         let mut vtable_drop_shims = HashMap::new();
         
-        // First pass: identify vtable instances and generate drop shims
-        for (global_id, global_decl) in ctx.translated.global_decls.iter_indexed() {
-            if let ItemKind::VTableInstance { impl_ref } = &global_decl.kind {
-                // Get the trait implementation to extract the concrete type
-                if let Some(trait_impl) = ctx.translated.trait_impls.get(impl_ref.id) {
-                    // Extract the concrete type (Self type) from the trait implementation
-                    let concrete_type = self.extract_concrete_type(&trait_impl.impl_trait, impl_ref);
-                    
-                    if let Some(self_type) = concrete_type {
-                        // Generate a drop shim for this concrete type
-                        let drop_shim_id = self.generate_drop_shim_for_type(
-                            ctx, 
-                            global_id,
-                            &self_type,
-                            &trait_impl.impl_trait
-                        );
-                        if let Some(shim_id) = drop_shim_id {
-                            vtable_drop_shims.insert(global_id, shim_id);
-                        }
-                    }
-                }
+        // Generate drop shims for each vtable instance
+        for (global_id, impl_id) in vtable_instances {
+            if let Some(drop_shim_id) = self.generate_drop_shim_for_vtable_impl(ctx, global_id, impl_id) {
+                vtable_drop_shims.insert(global_id, drop_shim_id);
             }
         }
         
@@ -58,11 +55,27 @@ impl TransformPass for Transform {
 }
 
 impl Transform {
+    /// Generate drop shim for a specific vtable implementation
+    fn generate_drop_shim_for_vtable_impl(
+        &self,
+        ctx: &mut TransformCtx,
+        global_id: GlobalDeclId,
+        impl_id: TraitImplId,
+    ) -> Option<FunDeclId> {
+        // Extract the required data first to avoid borrowing conflicts
+        let (concrete_type, trait_decl_ref) = {
+            let trait_impl = ctx.translated.trait_impls.get(impl_id)?;
+            let concrete_type = self.extract_concrete_type(&trait_impl.impl_trait)?;
+            (concrete_type, trait_impl.impl_trait.clone())
+        };
+        
+        self.generate_drop_shim_for_type(ctx, global_id, &concrete_type, &trait_decl_ref)
+    }
+
     /// Extract the concrete type (Self type) from a trait implementation
     fn extract_concrete_type(
         &self,
         trait_decl_ref: &TraitDeclRef,
-        _impl_ref: &TraitImplRef,
     ) -> Option<Ty> {
         // The concrete type should be the first generic argument in the trait reference
         // For `impl Trait<Args> for ConcreteType`, the ConcreteType is the Self type
@@ -226,16 +239,17 @@ impl Transform {
         vtable_id: GlobalDeclId,
         drop_shim_id: FunDeclId,
     ) {
-        // Get the vtable global declaration
-        if let Some(vtable_global) = ctx.translated.global_decls.get(vtable_id) {
-            let initializer_fun_id = vtable_global.init;
-            
-            // Update the vtable initializer function to use the drop shim
-            if let Some(init_fun) = ctx.translated.fun_decls.get_mut(initializer_fun_id) {
-                if let Ok(Body::Unstructured(ref mut body)) = &mut init_fun.body {
-                    // Find and update the drop field in the vtable initialization
-                    self.update_drop_field_in_body(body, drop_shim_id);
-                }
+        // Get the initializer function ID first
+        let initializer_fun_id = match ctx.translated.global_decls.get(vtable_id) {
+            Some(vtable_global) => vtable_global.init,
+            None => return,
+        };
+        
+        // Update the vtable initializer function to use the drop shim
+        if let Some(init_fun) = ctx.translated.fun_decls.get_mut(initializer_fun_id) {
+            if let Ok(Body::Unstructured(body)) = &mut init_fun.body {
+                // Find and update the drop field in the vtable initialization
+                self.update_drop_field_in_body(body, drop_shim_id);
             }
         }
     }
@@ -243,7 +257,7 @@ impl Transform {
     /// Update the drop field in the vtable initializer body
     fn update_drop_field_in_body(&self, body: &mut GExprBody, drop_shim_id: FunDeclId) {
         // Search through all statements in all blocks to find vtable aggregate assignments
-        for (_, block) in body.body.iter_mut() {
+        for block in body.body.iter_mut() {
             for statement in &mut block.statements {
                 if let RawStatement::Assign(_, rvalue) = &mut statement.content {
                     if let Rvalue::Aggregate(AggregateKind::Adt(..), operands) = rvalue {
@@ -260,7 +274,7 @@ impl Transform {
     fn update_drop_operand_in_aggregate(&self, operands: &mut Vec<Operand>, drop_shim_id: FunDeclId) {
         for operand in operands {
             if let Operand::Const(const_expr) = operand {
-                if let RawConstantExpr::Opaque(ref message) = const_expr.value {
+                if let RawConstantExpr::Opaque(message) = &const_expr.value {
                     // Replace opaque drop placeholders with function pointer to our shim
                     if message.contains("drop") {
                         let fn_ptr = FnPtr {
