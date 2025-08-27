@@ -514,13 +514,33 @@ impl BodyTransCtx<'_, '_, '_> {
                                     }
                                     hax::ImplExprAtom::Builtin { .. } => {
                                         // Handle builtin impl expressions (closures, drop glue, etc.)
-                                        // For builtin cases, we should still try to register the vtable
-                                        // The TraitRef already contains the correct impl reference
-                                        if let TraitRefKind::TraitImpl(_impl_ref) = &tref.kind {
-                                            trace!("Found builtin impl_expr for vtable, but registration needs trait impl ItemRef");
-                                            trace!("Builtin impl_expr details: {:?}", impl_expr);
-                                            // TODO: Find correct way to register builtin vtables
-                                        }
+                                        trace!("Registering builtin impl expression for vtable: {:?}", impl_expr);
+                                        
+                                        // Get the trait definition to determine the lang_item
+                                        let trait_ref = &impl_expr.r#trait;
+                                        let erased_trait_ref = trait_ref.hax_skip_binder_ref().erase(&self.hax_state_with_id());
+                                        let trait_def = self.hax_def(&erased_trait_ref)?;
+                                        
+                                        // Determine the trait implementation source based on lang_item
+                                        let source = if let Some(lang_item) = &trait_def.lang_item {
+                                            match lang_item.as_str() {
+                                                "fn_once" => TraitImplSource::Closure(ClosureKind::FnOnce),
+                                                "fn_mut" => TraitImplSource::Closure(ClosureKind::FnMut),
+                                                "r#fn" => TraitImplSource::Closure(ClosureKind::Fn),
+                                                "drop" => TraitImplSource::DropGlue,
+                                                _ => TraitImplSource::TraitAlias,
+                                            }
+                                        } else {
+                                            TraitImplSource::TraitAlias
+                                        };
+                                        
+                                        // Register the vtable instance for builtin implementations
+                                        // Use the trait reference as the impl item
+                                        let _: GlobalDeclId = self.register_item(
+                                            span,
+                                            trait_ref.hax_skip_binder_ref(),
+                                            TransItemSourceKind::VTableInstance(source),
+                                        );
                                     }
                                     _ => {
                                         trace!(

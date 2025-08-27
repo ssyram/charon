@@ -643,7 +643,37 @@ impl ItemTransCtx<'_, '_> {
                     });
                     RawConstantExpr::Ref(global)
                 }
-                // TODO(dyn): builtin impls
+                hax::ImplExprAtom::Builtin { .. } => {
+                    // Handle builtin impl expressions for supertraits
+                    let trait_ref = &impl_expr.r#trait;
+                    let erased_trait_ref = trait_ref.hax_skip_binder_ref().erase(&self.hax_state_with_id());
+                    let trait_def = self.hax_def(&erased_trait_ref)?;
+                    
+                    // Determine the trait implementation source
+                    let source = if let Some(lang_item) = &trait_def.lang_item {
+                        match lang_item.as_str() {
+                            "fn_once" => TraitImplSource::Closure(ClosureKind::FnOnce),
+                            "fn_mut" => TraitImplSource::Closure(ClosureKind::FnMut), 
+                            "r#fn" => TraitImplSource::Closure(ClosureKind::Fn),
+                            "drop" => TraitImplSource::DropGlue,
+                            _ => TraitImplSource::TraitAlias,
+                        }
+                    } else {
+                        TraitImplSource::TraitAlias
+                    };
+                    
+                    let vtable_instance_ref = self
+                        .translate_region_binder(span, &impl_expr.r#trait, |ctx, tref| {
+                            ctx.translate_vtable_instance_ref(span, tref, trait_ref.hax_skip_binder_ref(), source)
+                        })?
+                        .erase()
+                        .expect("builtin trait should be dyn compatible");
+                    let global = Box::new(ConstantExpr {
+                        value: RawConstantExpr::Global(vtable_instance_ref),
+                        ty: fn_ptr_ty,
+                    });
+                    RawConstantExpr::Ref(global)
+                }
                 _ => RawConstantExpr::Opaque("missing supertrait vtable".into()),
             };
             mk_field(kind, next_ty());
