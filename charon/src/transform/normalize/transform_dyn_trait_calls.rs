@@ -69,6 +69,10 @@ impl<'a> DynTraitCallTransformer<'a> {
     }
 
     /// Get the vtable declaration reference with the current generics applied
+    /// The key difficulty involves matching the associated types in the vtable's generics
+    /// We will need to extract the associated types from the `dyn_self`'s binder
+    /// 
+    /// Rustc guarantees that the values of all associated types are specified in a `dyn Trait` type
     fn get_vtable_ref(&self, trait_ref: &TraitRef, dyn_self_ty: &Ty) -> Result<TypeDeclRef, Error> {
         let trait_name = trait_ref
             .trait_decl_ref
@@ -165,8 +169,8 @@ impl<'a> DynTraitCallTransformer<'a> {
             generics.types.push(assoc_ty);
         }
 
-        // Note: here we take the vtable_ref's ID with the trait-ref's generics from the dyn-self applied, additionally
-        // we add the associated types in the correct order as per the vtable's generics
+        // Note: here we take the vtable_ref's ID with the trait-ref's generics from the dyn-self applied
+        // Additionally, we add the associated types in the correct order following the vtable's generics
         Ok(TypeDeclRef {
             id: vtable_ref.id,
             generics,
@@ -307,13 +311,18 @@ impl<'a> DynTraitCallTransformer<'a> {
         }
     }
 
-    /// The receiver type can be one of the following:
+    /// The receiver type can be one of the following (as per Rustc):
     /// - `&[mut] dyn Trait`
     /// - `*[mut] dyn Trait`
     /// - `Box<dyn Trait>`
     /// - `Rc<dyn Trait>`
     /// - `Arc<dyn Trait>`
     /// - `Pin<T>` where `T` is one of the above
+    /// 
+    /// See: https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
+    /// for more details.
+    /// 
+    /// This function gets the internal `dyn Trait` out
     fn unpack_dyn_trait_ty(&self, ty: &Ty) -> Result<Ty, Error> {
         match ty.kind() {
             TyKind::Ref(_, inner_ty, _) => self.unpack_dyn_trait_ty(inner_ty),
