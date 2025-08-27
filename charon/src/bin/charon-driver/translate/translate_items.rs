@@ -1043,6 +1043,8 @@ impl ItemTransCtx<'_, '_> {
         def_id: TraitImplId,
         item_meta: ItemMeta,
         vimpl: &hax::VirtualTraitImpl,
+        impl_source: Option<TraitImplSource>,
+        impl_ref: Option<&hax::ItemRef>,
     ) -> Result<TraitImpl, Error> {
         let span = item_meta.span;
         let trait_def = self.hax_def(&vimpl.trait_pred.trait_ref)?;
@@ -1073,6 +1075,14 @@ impl ItemTransCtx<'_, '_> {
         }
 
         let generics = self.the_only_binder().params.clone();
+        
+        // Generate vtable instance for builtin traits if we have the impl source
+        let vtable = if let (Some(impl_source), Some(impl_ref)) = (impl_source, impl_ref) {
+            self.translate_virtual_vtable_instance_ref(span, &vimpl.trait_pred.trait_ref, impl_ref, impl_source)?
+        } else {
+            None
+        };
+        
         Ok(TraitImpl {
             def_id,
             item_meta,
@@ -1083,8 +1093,7 @@ impl ItemTransCtx<'_, '_> {
             consts: vec![],
             types,
             methods: vec![],
-            // TODO(dyn): generate vtable instances for builtin traits
-            vtable: None,
+            vtable,
         })
     }
 }

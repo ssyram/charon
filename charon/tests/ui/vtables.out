@@ -126,7 +126,7 @@ fn {impl Drop for String}::drop<'_0>(@1: &'_0 mut (String))
 impl Drop for String {
     parent_clause0 = MetaSized<String>
     fn drop<'_0> = {impl Drop for String}::drop<'_0_0>
-    non-dyn-compatible
+    vtable: {impl Drop for String}::{vtable}
 }
 
 // Full name: alloc::string::{String}::is_empty
