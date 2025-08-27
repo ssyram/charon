@@ -113,9 +113,15 @@ impl<'a> DynTraitCallTransformer<'a> {
 
         // The `Trait<_dyn, ...>` reference
         let trait_ref = binder.params.trait_clauses[0].trait_.clone().erase();
+        trace!(
+            "Getting vtable ref with trait-decl-ref {}.",
+            trait_ref.with_ctx(&self.ctx.into_fmt())
+        );
         let mut generics = trait_ref.generics.clone();
         // remove the `_dyn` type argument
         generics.types.remove_and_shift_ids(TypeVarId::ZERO);
+        // Move out of the predicate binder itself from binding `_dyn`
+        generics = generics.move_from_under_binder().unwrap();
 
         // We should put in the same order as the assoc types to the generics
         // We need to collect the associated types from the vtable's generics --
@@ -172,7 +178,7 @@ impl<'a> DynTraitCallTransformer<'a> {
         &self,
         vtable_ref: &TypeDeclRef,
         method_name: &TraitItemName,
-    ) -> Result<(FieldId, Ty), Error> {
+    ) -> Result<FieldId, Error> {
         let vtable_name = vtable_ref.id.with_ctx(&self.ctx.into_fmt()).to_string();
 
         let TypeId::Adt(vtable_id) = vtable_ref.id else {
@@ -201,7 +207,7 @@ impl<'a> DynTraitCallTransformer<'a> {
         // Find the index from the fields
         for (index, field) in fields.iter().enumerate() {
             if format!("method_{}", method_name) == *field.name.as_ref().unwrap() {
-                return Ok((FieldId::new(index), field.ty.clone()));
+                return Ok(FieldId::new(index));
             }
         }
 
@@ -226,7 +232,7 @@ impl<'a> DynTraitCallTransformer<'a> {
         // In complete implementation this would be the actual vtable struct type
         let vtable_ty = Ty::new(TyKind::RawPtr(
             Ty::new(TyKind::Adt(vtable_ref.clone())),
-            RefKind::Mut,
+            RefKind::Shared,
         ));
 
         let vtable_place = self.locals.new_var(None, vtable_ty);
@@ -333,6 +339,12 @@ impl<'a> DynTraitCallTransformer<'a> {
         }
     }
 
+    fn fun_ty_from_call(&self, call: &Call) -> Result<Ty, Error> {
+        let input = call.args.iter().map(|arg| arg.ty().clone()).collect();
+        let output = call.dest.ty().clone();
+        Ok(Ty::new(TyKind::FnPtr(RegionBinder::empty((input, output)))))
+    }
+
     /// Transform a call to a trait method on a dyn trait object
     fn transform_dyn_trait_call(&mut self, call: &mut Call) -> Result<Option<()>, Error> {
         // 1. Detect if this call should be transformed
@@ -355,7 +367,8 @@ impl<'a> DynTraitCallTransformer<'a> {
         let vtable_ref = self.get_vtable_ref(&trait_ref, &dyn_self_ty)?;
 
         // 3. Get the correct field index for the method
-        let (field_id, field_ty) = self.get_method_field_info(&vtable_ref, &method_name)?;
+        let field_id = self.get_method_field_info(&vtable_ref, &method_name)?;
+        let field_ty = self.fun_ty_from_call(call)?;
 
         // 4. Create local variables for vtable and method pointer
         let (vtable_place, method_ptr_place) = self.create_vtable_locals(&vtable_ref, &field_ty);
