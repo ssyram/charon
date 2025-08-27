@@ -122,8 +122,8 @@ impl ItemTransCtx<'_, '_> {
             impl_id, 
             item_meta, 
             drop_impl, 
-            TraitImplSource::DropGlue,
-            def.this(),
+            None,
+            None,
         )?;
 
         // Construct the method reference.
