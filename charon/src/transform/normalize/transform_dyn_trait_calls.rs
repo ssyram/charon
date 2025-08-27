@@ -61,27 +61,29 @@ impl<'a> DynTraitCallTransformer<'a> {
         let FnPtrKind::Trait(trait_ref, method_name, _) = &fn_ptr.kind else {
             return None; // Not a trait method call
         };
-        
+
         match &trait_ref.kind {
             TraitRefKind::Dyn => Some((trait_ref.clone(), method_name.clone())),
             _ => None,
         }
     }
 
-    /// Get the correct field index for a method in the vtable struct.
-    /// Returns None if the method index cannot be determined.
-    fn get_method_field_index(
-        &self,
-        trait_ref: &TraitRef,
-        method_name: &TraitItemName,
-    ) -> Result<FieldId, Error> {
-        let trait_name = trait_ref.trait_decl_ref.skip_binder.id.with_ctx(&self.ctx.into_fmt()).to_string();
+    /// Get the vtable declaration reference with the current generics applied
+    fn get_vtable_ref(&self, trait_ref: &TraitRef, dyn_self_ty: &Ty) -> Result<TypeDeclRef, Error> {
+        let trait_name = trait_ref
+            .trait_decl_ref
+            .skip_binder
+            .id
+            .with_ctx(&self.ctx.into_fmt())
+            .to_string();
 
         // Try to find the trait declaration
-        let Some(trait_decl) = self.ctx
+        let Some(trait_decl) = self
+            .ctx
             .translated
             .trait_decls
-            .get(trait_ref.trait_decl_ref.skip_binder.id) else {
+            .get(trait_ref.trait_decl_ref.skip_binder.id)
+        else {
             raise_error!(
                 self.ctx,
                 self.span,
@@ -90,7 +92,8 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        let Some(TypeDeclRef { id: TypeId::Adt(vtable_id), .. }) = trait_decl.vtable else {
+        // Get the vtable type out from its vtable
+        let Some(vtable_ref) = &trait_decl.vtable else {
             raise_error!(
                 self.ctx,
                 self.span,
@@ -99,53 +102,134 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        let Some(TypeDecl { kind: TypeDeclKind::Struct(fields), .. }) = self.ctx.translated.type_decls.get(vtable_id) else {
+        let TyKind::DynTrait(DynPredicate { binder }) = dyn_self_ty.kind() else {
             raise_error!(
                 self.ctx,
                 self.span,
-                "Vtable struct for trait {} is not found when searching for vtable index!",
-                trait_name
+                "Expected dyn trait type for dyn method calling receiver, found {}",
+                dyn_self_ty.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+
+        // The `Trait<_dyn, ...>` reference
+        let trait_ref = binder.params.trait_clauses[0].trait_.clone().erase();
+        let mut generics = trait_ref.generics.clone();
+        // remove the `_dyn` type argument
+        generics.types.remove_and_shift_ids(TypeVarId::ZERO);
+
+        // We should put in the same order as the assoc types to the generics
+        // We need to collect the associated types from the vtable's generics --
+        // Notably, the decl guarantees that the vtable_ref will be of the form:
+        // `{vtable}<TraitArg1, ..., SuperTrait::Assoc1, ..., Self::AssocN>`
+        let assoc_tys = vtable_ref
+            .generics
+            .types
+            .iter()
+            .filter_map(|ty| {
+                if let TyKind::TraitType(tref, name) = &ty.kind() {
+                    Some((tref.trait_decl_ref.skip_binder.id, name.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Then, for each assoc type in order, find the correct type from the dyn trait's constraints
+        for (trait_id, assoc_name) in assoc_tys {
+            // find the correct assoc type constraint and push it to the generics
+            let Some(assoc_ty) = binder.params.trait_type_constraints.iter().find_map(|c| {
+                let c = c.clone().erase();
+                if c.trait_ref.trait_decl_ref.skip_binder.id == trait_id
+                    && c.type_name == assoc_name
+                {
+                    Some(c.ty.clone())
+                } else {
+                    None
+                }
+            }) else {
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Could not find associated type {}::{} for vtable of trait {}",
+                    trait_id.with_ctx(&self.ctx.into_fmt()),
+                    assoc_name,
+                    trait_name
+                );
+            };
+            generics.types.push(assoc_ty);
+        }
+
+        // Note: here we take the vtable_ref's ID with the trait-ref's generics from the dyn-self applied, additionally
+        // we add the associated types in the correct order as per the vtable's generics
+        Ok(TypeDeclRef {
+            id: vtable_ref.id,
+            generics,
+        })
+    }
+
+    /// Get the correct field index for a method in the vtable struct.
+    fn get_method_field_info(
+        &self,
+        vtable_ref: &TypeDeclRef,
+        method_name: &TraitItemName,
+    ) -> Result<(FieldId, Ty), Error> {
+        let vtable_name = vtable_ref.id.with_ctx(&self.ctx.into_fmt()).to_string();
+
+        let TypeId::Adt(vtable_id) = vtable_ref.id else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Vtable reference {} is not an ADT type!",
+                vtable_name
+            );
+        };
+
+        // Get the vtable struct declaration by its ID
+        let Some(TypeDecl {
+            kind: TypeDeclKind::Struct(fields),
+            ..
+        }) = self.ctx.translated.type_decls.get(vtable_id)
+        else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Definition of vtable struct {} is not found!",
+                vtable_name
             );
         };
 
         // Find the index from the fields
         for (index, field) in fields.iter().enumerate() {
             if format!("method_{}", method_name) == *field.name.as_ref().unwrap() {
-                return Ok(FieldId::new(index));
+                return Ok((FieldId::new(index), field.ty.clone()));
             }
         }
 
+        // If we reach here, the method was not found in the vtable, which is an error
         raise_error!(
             self.ctx,
             self.span,
-            "Could not determine method index for {} in vtable of trait {}",
+            "Could not determine method index for {} in vtable {}",
             method_name,
-            trait_name
+            vtable_name
         );
     }
 
     /// Create local variables needed for vtable dispatch
-    fn create_vtable_locals(&mut self, call: &Call) -> (Place, Place) {
+    /// TODO: use the vtable ref to create the correct types
+    fn create_vtable_locals(
+        &mut self,
+        vtable_ref: &TypeDeclRef,
+        method_ptr_ty: &Ty,
+    ) -> (Place, Place) {
         // Create vtable type - for now use a raw pointer as placeholder
         // In complete implementation this would be the actual vtable struct type
         let vtable_ty = Ty::new(TyKind::RawPtr(
-            Ty::mk_unit(), // Placeholder vtable pointee
-            RefKind::Shared,
+            Ty::new(TyKind::Adt(vtable_ref.clone())),
+            RefKind::Mut,
         ));
 
-        // Create method pointer type - placeholder function pointer type
-        let method_ptr_ty = Ty::new(TyKind::FnPtr(RegionBinder::empty((
-            call.args
-                .iter()
-                .map(|arg| match arg {
-                    Operand::Copy(place) | Operand::Move(place) => place.ty.clone(),
-                    Operand::Const(const_expr) => const_expr.ty.clone(),
-                })
-                .collect(),
-            call.dest.ty.clone(),
-        ))));
-
-        let vtable_place = self.locals.new_var(Some("vtable".to_string()), vtable_ty);
+        let vtable_place = self.locals.new_var(None, vtable_ty);
         // push the storage-live statements for the new locals
         self.statements.push(Statement {
             span: self.span,
@@ -153,7 +237,7 @@ impl<'a> DynTraitCallTransformer<'a> {
             comments_before: vec![],
         });
 
-        let method_ptr_place = self.locals.new_var(Some("method_ptr".to_string()), method_ptr_ty);
+        let method_ptr_place = self.locals.new_var(None, method_ptr_ty.clone());
         self.statements.push(Statement {
             span: self.span,
             kind: StatementKind::StorageLive(method_ptr_place.as_local().unwrap()),
@@ -192,7 +276,7 @@ impl<'a> DynTraitCallTransformer<'a> {
         // Create vtable dereference: *vtable
         let vtable_deref_place = Place {
             kind: PlaceKind::Projection(Box::new(vtable_place.clone()), ProjectionElem::Deref),
-            ty: Ty::mk_unit(), // Placeholder - should be the vtable struct type
+            ty: Ty::mk_unit(), // placeholder type
         };
 
         // Create method field projection: (*vtable).method_field
@@ -217,6 +301,41 @@ impl<'a> DynTraitCallTransformer<'a> {
         }
     }
 
+    /// The receiver type can be one of the following:
+    /// - `&[mut] dyn Trait`
+    /// - `*[mut] dyn Trait`
+    /// - `Box<dyn Trait>`
+    /// - `Rc<dyn Trait>`
+    /// - `Arc<dyn Trait>`
+    /// - `Pin<T>` where `T` is one of the above
+    fn unpack_dyn_trait_ty(&self, ty: &Ty) -> Result<Ty, Error> {
+        match ty.kind() {
+            TyKind::Ref(_, inner_ty, _) => self.unpack_dyn_trait_ty(inner_ty),
+            TyKind::RawPtr(inner_ty, _) => self.unpack_dyn_trait_ty(inner_ty),
+            TyKind::Adt(type_decl_ref) => {
+                let generics = &type_decl_ref.generics;
+                if !generics.types.is_empty() {
+                    let first_arg = generics.types.get(TypeVarId::new(0)).unwrap();
+                    self.unpack_dyn_trait_ty(first_arg)
+                } else {
+                    raise_error!(
+                        self.ctx,
+                        self.span,
+                        "Expected dyn trait type for dyn method calling receiver, found {}",
+                        ty.with_ctx(&self.ctx.into_fmt())
+                    );
+                }
+            }
+            TyKind::DynTrait(_) => Ok(ty.clone()),
+            _ => raise_error!(
+                self.ctx,
+                self.span,
+                "Expected dyn trait type for dyn method calling receiver, found {}",
+                ty.with_ctx(&self.ctx.into_fmt())
+            ),
+        }
+    }
+
     /// Transform a call to a trait method on a dyn trait object
     fn transform_dyn_trait_call(&mut self, call: &mut Call) -> Result<Option<()>, Error> {
         // 1. Detect if this call should be transformed
@@ -237,12 +356,16 @@ impl<'a> DynTraitCallTransformer<'a> {
                 return Ok(None);
             }
         };
+        let receiver_ty = dyn_trait_place.ty().clone();
+        let dyn_self_ty = self.unpack_dyn_trait_ty(&receiver_ty)?;
 
-        // 3. Create local variables for vtable and method pointer
-        let (vtable_place, method_ptr_place) = self.create_vtable_locals(call);
+        let vtable_ref = self.get_vtable_ref(&trait_ref, &dyn_self_ty)?;
 
-        // 4. Get the correct field index for the method
-        let field_id = self.get_method_field_index(&trait_ref, &method_name)?;
+        // 3. Get the correct field index for the method
+        let (field_id, field_ty) = self.get_method_field_info(&vtable_ref, &method_name)?;
+
+        // 4. Create local variables for vtable and method pointer
+        let (vtable_place, method_ptr_place) = self.create_vtable_locals(&vtable_ref, &field_ty);
 
         // Extract vtable pointer
         self.statements.push(self.generate_vtable_extraction(
@@ -251,11 +374,12 @@ impl<'a> DynTraitCallTransformer<'a> {
         ));
 
         // Extract method pointer from vtable
-        self.statements.push(self.generate_method_pointer_extraction(
-            &method_ptr_place,
-            &vtable_place,
-            field_id,
-        ));
+        self.statements
+            .push(self.generate_method_pointer_extraction(
+                &method_ptr_place,
+                &vtable_place,
+                field_id,
+            ));
 
         // 6. Transform the original call to use the function pointer
         call.func = FnOperand::Move(method_ptr_place);
