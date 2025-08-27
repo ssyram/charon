@@ -484,8 +484,8 @@ where
     let @5: i32; // anonymous local
     let @6: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)); // anonymous local
     let @7: &'_ (T); // anonymous local
-    let vtable@8: *const (); // local
-    let method_ptr@9: fn(&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), &'_ (T)) -> T; // local
+    let @8: *mut test_crate::Modifiable::{vtable}<missing(@Type1_0)>; // anonymous local
+    let @9: fn<'_0, '_1>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), &'_0_1 (T)) -> T; // anonymous local
 
     storage_live(x@2)
     storage_live(@3)
@@ -501,11 +501,11 @@ where
     @6 := &two-phase-mut *(x@2)
     storage_live(@7)
     @7 := &*(arg@1)
-    storage_live(vtable@8)
-    storage_live(method_ptr@9)
-    vtable@8 := ptr_metadata(move (@6))
-    method_ptr@9 := copy ((*(vtable@8)).3)
-    @0 := (move method_ptr@9)(move (@6), move (@7))
+    storage_live(@8)
+    storage_live(@9)
+    @8 := ptr_metadata(move (@6))
+    @9 := copy ((*(@8)).3)
+    @0 := (move @9)(move (@6), move (@7))
     storage_dead(@7)
     storage_dead(@6)
     storage_dead(@5)
@@ -817,19 +817,19 @@ fn use_lifetime_trait<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Life
     let @3: &'_ (i32); // anonymous local
     let @4: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // anonymous local
     let @5: &'_ (i32); // anonymous local
-    let vtable@6: *const (); // local
-    let method_ptr@7: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), &'_ (i32)) -> &'_ (i32); // local
+    let @6: *mut test_crate::LifetimeTrait::{vtable}<i32>; // anonymous local
+    let @7: fn<'a, '_1>(&'_0_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = missing(@Type3_0))), &'a (LifetimeTrait<(dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = missing(@Type4_0))>::Ty)) -> &'a (LifetimeTrait<(dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = missing(@Type4_0))>::Ty); // anonymous local
 
     storage_live(@3)
     storage_live(@4)
     @4 := &*(x@1)
     storage_live(@5)
     @5 := &*(y@2)
-    storage_live(vtable@6)
-    storage_live(method_ptr@7)
-    vtable@6 := ptr_metadata(move (@4))
-    method_ptr@7 := copy ((*(vtable@6)).3)
-    @3 := (move method_ptr@7)(move (@4), move (@5))
+    storage_live(@6)
+    storage_live(@7)
+    @6 := ptr_metadata(move (@4))
+    @7 := copy ((*(@6)).3)
+    @3 := (move @7)(move (@4), move (@5))
     @0 := &*(@3)
     storage_dead(@5)
     storage_dead(@4)
@@ -850,8 +850,8 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     let @7: &'_ (i64); // anonymous local
     let @8: &'_ (i64); // anonymous local
     let @9: i64; // anonymous local
-    let vtable@10: *const (); // local
-    let method_ptr@11: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_ (i32), &'_ (i64)); // local
+    let @10: *mut test_crate::Both32And64::{vtable}; // anonymous local
+    let @11: fn<'_0, '_1, '_2>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_0_1 (i32), &'_0_2 (i64)); // anonymous local
 
     storage_live(@2)
     storage_live(@3)
@@ -868,11 +868,11 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     @9 := const (200 : i64)
     @8 := &@9
     @7 := &*(@8)
-    storage_live(vtable@10)
-    storage_live(method_ptr@11)
-    vtable@10 := ptr_metadata(move (@3))
-    method_ptr@11 := copy ((*(vtable@10)).3)
-    @2 := (move method_ptr@11)(move (@3), move (@4), move (@7))
+    storage_live(@10)
+    storage_live(@11)
+    @10 := ptr_metadata(move (@3))
+    @11 := copy ((*(@10)).3)
+    @2 := (move @11)(move (@3), move (@4), move (@7))
     storage_dead(@7)
     storage_dead(@4)
     storage_dead(@3)
@@ -952,14 +952,14 @@ fn main()
     let @60: &'_ (i64); // anonymous local
     let @61: &'_ (i64); // anonymous local
     let @62: i64; // anonymous local
-    let vtable@63: *const (); // local
-    let method_ptr@64: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_))) -> bool; // local
-    let vtable@65: *const (); // local
-    let method_ptr@66: fn(&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, i32> + _dyn : '_)), &'_ (i32)) -> i32; // local
-    let vtable@67: *const (); // local
-    let method_ptr@68: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // local
-    let vtable@69: *const (); // local
-    let method_ptr@70: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_ (i32), &'_ (i64)); // local
+    let @63: *mut test_crate::Checkable::{vtable}<i32>; // anonymous local
+    let @64: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, missing(@Type3_0)> + _dyn : '_))) -> bool; // anonymous local
+    let @65: *mut test_crate::Modifiable::{vtable}<i32>; // anonymous local
+    let @66: fn<'_0, '_1>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, missing(@Type3_0)> + _dyn : '_)), &'_0_1 (missing(@Type1_0))) -> missing(@Type1_0); // anonymous local
+    let @67: *mut test_crate::NoParam::{vtable}; // anonymous local
+    let @68: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
+    let @69: *mut test_crate::Both32And64::{vtable}; // anonymous local
+    let @70: fn<'_0, '_1, '_2>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_0_1 (i32), &'_0_2 (i64)); // anonymous local
 
     storage_live(@21)
     storage_live(@22)
@@ -1003,12 +1003,12 @@ fn main()
     storage_live(@60)
     storage_live(@61)
     storage_live(@62)
-    storage_live(vtable@65)
-    storage_live(method_ptr@66)
-    storage_live(vtable@67)
-    storage_live(method_ptr@68)
-    storage_live(vtable@69)
-    storage_live(method_ptr@70)
+    storage_live(@65)
+    storage_live(@66)
+    storage_live(@67)
+    storage_live(@68)
+    storage_live(@69)
+    storage_live(@70)
     storage_live(x@1)
     storage_live(@2)
     storage_live(@3)
@@ -1023,11 +1023,11 @@ fn main()
     storage_live(@6)
     storage_live(@7)
     @7 := &*(x@1)
-    storage_live(vtable@63)
-    storage_live(method_ptr@64)
-    vtable@63 := ptr_metadata(move (@7))
-    method_ptr@64 := copy ((*(vtable@63)).3)
-    @6 := (move method_ptr@64)(move (@7))
+    storage_live(@63)
+    storage_live(@64)
+    @63 := ptr_metadata(move (@7))
+    @64 := copy ((*(@63)).3)
+    @6 := (move @64)(move (@7))
     if move (@6) {
     }
     else {
@@ -1090,11 +1090,11 @@ fn main()
         @28 := const (100 : i32)
         @27 := &mut @28
         @26 := &*(@27)
-        storage_live(vtable@65)
-        storage_live(method_ptr@66)
-        vtable@65 := ptr_metadata(move (@25))
-        method_ptr@66 := copy ((*(vtable@65)).3)
-        @24 := (move method_ptr@66)(move (@25), move (@26))
+        storage_live(@65)
+        storage_live(@66)
+        @65 := ptr_metadata(move (@25))
+        @66 := copy ((*(@65)).3)
+        @24 := (move @66)(move (@25), move (@26))
         storage_dead(@26)
         storage_dead(@25)
         @23 := &@24
@@ -1167,11 +1167,11 @@ fn main()
         storage_live(@49)
         storage_live(@50)
         @50 := &*(z@43)
-        storage_live(vtable@67)
-        storage_live(method_ptr@68)
-        vtable@67 := ptr_metadata(move (@50))
-        method_ptr@68 := copy ((*(vtable@67)).3)
-        @49 := (move method_ptr@68)(move (@50))
+        storage_live(@67)
+        storage_live(@68)
+        @67 := ptr_metadata(move (@50))
+        @68 := copy ((*(@67)).3)
+        @49 := (move @68)(move (@50))
         storage_dead(@50)
         storage_dead(@49)
         storage_live(a@51)
@@ -1199,11 +1199,11 @@ fn main()
         @62 := const (200 : i64)
         @61 := &@62
         @60 := &*(@61)
-        storage_live(vtable@69)
-        storage_live(method_ptr@70)
-        vtable@69 := ptr_metadata(move (@56))
-        method_ptr@70 := copy ((*(vtable@69)).3)
-        @55 := (move method_ptr@70)(move (@56), move (@57), move (@60))
+        storage_live(@69)
+        storage_live(@70)
+        @69 := ptr_metadata(move (@56))
+        @70 := copy ((*(@69)).3)
+        @55 := (move @70)(move (@56), move (@57), move (@60))
         storage_dead(@60)
         storage_dead(@57)
         storage_dead(@56)
