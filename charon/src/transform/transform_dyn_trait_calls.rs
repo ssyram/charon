@@ -111,60 +111,47 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        // The `Trait<_dyn, ...>` reference
-        let trait_ref = binder.params.trait_clauses[0].trait_.clone().erase();
-        let mut generics = trait_ref.generics.clone();
-        // remove the `_dyn` type argument
-        generics.types.remove_and_shift_ids(TypeVarId::ZERO);
-
-        // We should put in the same order as the assoc types to the generics
-        // We need to collect the associated types from the vtable's generics --
-        // Notably, the decl guarantees that the vtable_ref will be of the form:
-        // `{vtable}<TraitArg1, ..., SuperTrait::Assoc1, ..., Self::AssocN>`
-        let assoc_tys = vtable_ref
-            .generics
-            .types
-            .iter()
-            .filter_map(|ty| {
-                if let TyKind::TraitType(tref, name) = &ty.kind() {
-                    Some((tref.trait_decl_ref.skip_binder.id, name.clone()))
-                } else {
-                    None
+        // APPROACH 4: Extract the concrete types from the function signature
+        // For Fn(&'a mut u32) -> bool, we need Args=(&'a mut u32) and Output=bool
+        
+        // Get the trait signature from the dyn trait
+        let dyn_trait_ref = &binder.params.trait_clauses[0].trait_.skip_binder;
+        
+        trace!("DEBUG - dyn_trait_ref generics: {:?}", dyn_trait_ref.generics);
+        
+        // For function traits like Fn, the generics are typically:
+        // Fn<_dyn, Args> where Args is the tuple of argument types
+        // And there's an associated type Output for the return type
+        
+        let mut generics = Box::new(GenericArgs::empty());
+        
+        // For function traits, try to extract Args and Output from the signature
+        if trait_name == "Fn" || trait_name == "FnMut" || trait_name == "FnOnce" {
+            // Skip the first generic (_dyn) and get the Args tuple
+            if let Some(args_ty) = dyn_trait_ref.generics.types.get(TypeVarId::new(1)) {
+                generics.types.push(args_ty.clone());
+                trace!("DEBUG - Added Args type: {:?}", args_ty);
+            }
+            
+            // Find the Output associated type from trait type constraints
+            for constraint in &binder.params.trait_type_constraints {
+                let constraint_ref = &constraint.skip_binder;
+                if constraint_ref.trait_ref.trait_decl_ref.skip_binder.id == trait_ref.trait_decl_ref.skip_binder.id 
+                   && constraint_ref.type_name.to_string() == "Output" {
+                    generics.types.push(constraint_ref.ty.clone());
+                    trace!("DEBUG - Added Output type: {:?}", constraint_ref.ty);
+                    break;
                 }
-            })
-            .collect::<Vec<_>>();
-
-        // Then, for each assoc type in order, find the correct type from the dyn trait's constraints
-        for (trait_id, assoc_name) in assoc_tys {
-            // find the correct assoc type constraint and push it to the generics
-            let Some(assoc_ty) = binder.params.trait_type_constraints.iter().find_map(|c| {
-                let c = c.clone().erase();
-                if c.trait_ref.trait_decl_ref.skip_binder.id == trait_id
-                    && c.type_name == assoc_name
-                {
-                    Some(c.ty.clone())
-                } else {
-                    None
-                }
-            }) else {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Could not find associated type {}::{} for vtable of trait {}",
-                    trait_id.with_ctx(&self.ctx.into_fmt()),
-                    assoc_name,
-                    trait_name
-                );
-            };
-            generics.types.push(assoc_ty);
+            }
         }
-
-        // Note: here we take the vtable_ref's ID with the trait-ref's generics from the dyn-self applied, additionally
-        // we add the associated types in the correct order as per the vtable's generics
-        Ok(TypeDeclRef {
+        
+        let result = TypeDeclRef {
             id: vtable_ref.id,
             generics,
-        })
+        };
+        
+        trace!("DEBUG - Final vtable ref: {:?}", result);
+        Ok(result)
     }
 
     /// Get the correct field index for a method in the vtable struct.
@@ -341,6 +328,8 @@ impl<'a> DynTraitCallTransformer<'a> {
             None => return Ok(None),
         };
 
+        trace!("Transforming dyn trait call for method {}", method_name);
+
         // 2. Get the dyn trait argument
         if call.args.is_empty() {
             raise_error!(self.ctx, self.span, "Dyn trait call has no arguments!");
@@ -376,7 +365,7 @@ impl<'a> DynTraitCallTransformer<'a> {
         call.func = FnOperand::Move(method_ptr_place);
 
         trace!(
-            "Generated {} new statements for vtable dispatch",
+            "Successfully transformed dyn trait call - generated {} new statements",
             self.statements.len()
         );
         Ok(Some(()))

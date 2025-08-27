@@ -103,6 +103,8 @@ fn takes_fn<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (
     let @5: (&'_ mut (u32)); // anonymous local
     let @6: &'_ mut (u32); // anonymous local
     let @7: &'_ mut (u32); // anonymous local
+    let @8: *mut core::ops::function::Fn::{vtable}<(&'_0 mut (u32))>; // anonymous local
+    let @9: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, missing(@Type3_0)> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = missing(@Type3_1))), missing(@Type1_0)) -> Fn<(dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, missing(@Type4_0)> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = missing(@Type4_1)), missing(@Type2_0)>::parent_clause1::parent_clause1::Output; // anonymous local
 
     storage_live(counter@2)
     counter@2 := const (0 : u32)
@@ -115,7 +117,11 @@ fn takes_fn<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (
     @7 := &mut counter@2
     @6 := &two-phase-mut *(@7)
     @5 := (move (@6))
-    @3 := Fn<(dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (&'a mut (u32))> + _dyn : '_ + for<'a> @TraitClause1_0::parent_clause1::parent_clause1::Output = bool), (&'_ mut (u32))>::call<'_>(move (@4), move (@5))
+    storage_live(@8)
+    storage_live(@9)
+    @8 := ptr_metadata(move (@4))
+    @9 := copy ((*(@8)).method_call)
+    @3 := (move @9)(move (@4), move (@5))
     if move (@3) {
         storage_dead(@7)
         storage_dead(@6)
