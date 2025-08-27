@@ -25,8 +25,8 @@ pub mod normalize {
     pub mod expand_associated_types;
     pub mod filter_unreachable_blocks;
     pub mod monomorphize;
-    pub mod transform_dyn_trait_calls;
     pub mod skip_trait_refs_when_known;
+    pub mod transform_dyn_trait_calls;
 }
 
 /// Passes that undo some lowering done by rustc to recover an operation closer to what the user
