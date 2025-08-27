@@ -182,7 +182,7 @@ where
     parent_clause3 = Sized<()>
     type Output = ()
     fn call_once = {impl FnOnce<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}::call_once<F, T>[@TraitClause0, @TraitClause1]
-    non-dyn-compatible
+    vtable: {impl FnOnce<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}::{vtable}<F, T, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0, @TraitClause1]
 }
 
 // Full name: test_crate::{Foo<F>[@TraitClause0]}::method::{impl FnMut<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}
@@ -196,7 +196,7 @@ where
     parent_clause2 = Sized<(())>
     parent_clause3 = Tuple<(())>
     fn call_mut<'_0> = {impl FnMut<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}::call_mut<'_0_0, F, T>[@TraitClause0, @TraitClause1]
-    non-dyn-compatible
+    vtable: {impl FnMut<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}::{vtable}<F, T, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0, @TraitClause1]
 }
 
 // Full name: test_crate::{Foo<F>[@TraitClause0]}::method::{impl Fn<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}
@@ -210,7 +210,7 @@ where
     parent_clause2 = Sized<(())>
     parent_clause3 = Tuple<(())>
     fn call<'_0> = {impl Fn<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}::call<'_0_0, F, T>[@TraitClause0, @TraitClause1]
-    non-dyn-compatible
+    vtable: {impl Fn<(())> for closure<F, T>[@TraitClause0, @TraitClause1]}::{vtable}<F, T, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0, @TraitClause1]
 }
 
 

@@ -141,7 +141,7 @@ where
 {
     parent_clause0 = MetaSized<List<T>[@TraitClause0]>
     fn drop<'_0> = {impl Drop for List<T>[@TraitClause0]}::drop<'_0_0, T>[@TraitClause0]
-    non-dyn-compatible
+    vtable: {impl Drop for List<T>[@TraitClause0]}::{vtable}<T>[@TraitClause0]
 }
 
 // Full name: test_crate::One
@@ -256,7 +256,7 @@ where
 {
     parent_clause0 = MetaSized<IdType<T>[@TraitClause0]>
     fn drop<'_0> = {impl Drop for IdType<T>[@TraitClause0]}::drop<'_0_0, T>[@TraitClause0]
-    non-dyn-compatible
+    vtable: {impl Drop for IdType<T>[@TraitClause0]}::{vtable}<T>[@TraitClause0]
 }
 
 // Full name: test_crate::use_id_type

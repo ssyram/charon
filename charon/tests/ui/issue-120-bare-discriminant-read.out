@@ -47,7 +47,7 @@ where
 {
     parent_clause0 = MetaSized<Option<T>[@TraitClause0]>
     fn drop<'_0> = {impl Drop for Option<T>[@TraitClause0]}::drop<'_0_0, T>[@TraitClause0]
-    non-dyn-compatible
+    vtable: {impl Drop for Option<T>[@TraitClause0]}::{vtable}<T>[@TraitClause0]
 }
 
 // Full name: test_crate::discriminant_value

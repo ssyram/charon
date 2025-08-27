@@ -123,7 +123,7 @@ impl FnOnce<(u8)> for closure {
     parent_clause3 = Sized<u8>
     type Output = u8
     fn call_once = {impl FnOnce<(u8)> for closure}::call_once
-    non-dyn-compatible
+    vtable: {impl FnOnce<(u8)> for closure}::{vtable}<type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
 }
 
 // Full name: test_crate::main

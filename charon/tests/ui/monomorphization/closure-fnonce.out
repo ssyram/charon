@@ -159,7 +159,7 @@ impl FnOnce::<closure, (u8)> {
     parent_clause2 = Tuple::<(u8)>
     type Output = u8
     fn call_once = {impl FnOnce::<closure, (u8)>}::call_once
-    non-dyn-compatible
+    vtable: {impl FnOnce::<closure, (u8)>}::{vtable}
 }
 
 

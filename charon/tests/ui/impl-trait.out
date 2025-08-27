@@ -313,7 +313,7 @@ where
     parent_clause3 = Sized<WrapClone<&'_ (U)>[Sized<&'_ (U)>, {impl Clone for &'_0 (T)}<'_, U>]>
     type Output = WrapClone<&'_ (U)>[Sized<&'_ (U)>, {impl Clone for &'_0 (T)}<'_, U>]
     fn call_once = {impl FnOnce<(&'_ (U))> for closure<U>[@TraitClause0]}::call_once<'_0, U>[@TraitClause0]
-    non-dyn-compatible
+    vtable: {impl FnOnce<(&'_ (U))> for closure<U>[@TraitClause0]}::{vtable}<U, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>[@TraitClause0]
 }
 
 // Full name: test_crate::use_wrap

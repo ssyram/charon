@@ -154,6 +154,42 @@ error: Error during trait resolution: Found unsupported GAT `Item` when resolvin
 31 |     }
    |     ^
 
+error: Unexpected error: could not find the type variable <closure_kind>
+  --> tests/ui/generic-associated-types.rs:38:20
+   |
+38 |     for_each(iter, |item| sum += *item);
+   |                    ^^^^^^^^^^^^^^^^^^^
+
+error: Unexpected error: could not find the type variable <closure_signature>
+  --> tests/ui/generic-associated-types.rs:38:20
+   |
+38 |     for_each(iter, |item| sum += *item);
+   |                    ^^^^^^^^^^^^^^^^^^^
+
+error: Unexpected error: could not find the type variable <upvars>
+  --> tests/ui/generic-associated-types.rs:38:20
+   |
+38 |     for_each(iter, |item| sum += *item);
+   |                    ^^^^^^^^^^^^^^^^^^^
+
+error: Unexpected error: could not find the type variable <closure_kind>
+  --> tests/ui/generic-associated-types.rs:38:20
+   |
+38 |     for_each(iter, |item| sum += *item);
+   |                    ^^^^^^^^^^^^^^^^^^^
+
+error: Unexpected error: could not find the type variable <closure_signature>
+  --> tests/ui/generic-associated-types.rs:38:20
+   |
+38 |     for_each(iter, |item| sum += *item);
+   |                    ^^^^^^^^^^^^^^^^^^^
+
+error: Unexpected error: could not find the type variable <upvars>
+  --> tests/ui/generic-associated-types.rs:38:20
+   |
+38 |     for_each(iter, |item| sum += *item);
+   |                    ^^^^^^^^^^^^^^^^^^^
+
 error: Generic associated types are not supported
   --> tests/ui/generic-associated-types.rs:48:9
    |
@@ -214,4 +250,4 @@ error: Error during trait resolution: Found unsupported GAT `Type` when resolvin
 56 |     }
    |     ^
 
-ERROR Charon failed to translate this code (36 errors)
+ERROR Charon failed to translate this code (42 errors)

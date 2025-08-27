@@ -60,7 +60,7 @@ where
 {
     parent_clause0 = MetaSized<HashMap<S>[@TraitClause0]>
     fn drop<'_0> = {impl Drop for HashMap<S>[@TraitClause0]}::drop<'_0_0, S>[@TraitClause0]
-    non-dyn-compatible
+    vtable: {impl Drop for HashMap<S>[@TraitClause0]}::{vtable}<S>[@TraitClause0]
 }
 
 // Full name: test_crate::{HashMap<S>[@TraitClause0]}::get

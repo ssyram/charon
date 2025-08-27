@@ -500,9 +500,11 @@ impl BodyTransCtx<'_, '_, '_> {
                                 UnsizingMetadata::Length(len)
                             }
                             hax::UnsizingMetadata::VTablePtr(impl_expr) => {
+                                eprintln!("DEBUG: VTablePtr impl_expr.r#impl: {:?}", impl_expr.r#impl);
                                 let tref = self.translate_trait_impl_expr(span, impl_expr)?;
                                 match &impl_expr.r#impl {
                                     hax::ImplExprAtom::Concrete(tref) => {
+                                        eprintln!("DEBUG: Found concrete impl_expr for vtable: {:?}", tref);
                                         // Ensure the vtable type is translated.
                                         let _: GlobalDeclId = self.register_item(
                                             span,
