@@ -73,6 +73,10 @@ pub enum TransItemSourceKind {
     /// For technical reasons, it takes the `self_type` and `dyn_self_type`:
     /// the former is the type being implemented now while the latter is the `dyn Trait<...>` type.
     VTableMethod(Ty, Ty),
+    /// Shim function for the drop method in a vtable; converts from `*mut dyn Trait` to `*mut ConcreteType`
+    /// and forwards to the concrete type's drop implementation (or no-op for types without Drop).
+    /// Takes the `self_type` and `dyn_self_type` similar to VTableMethod.
+    VTableDropMethod(Ty, Ty),
 }
 
 /// The kind of a [`TransItemSourceKind::TraitImpl`].
@@ -283,7 +287,8 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                     | ClosureAsFnCast
                     | DropGlueMethod
                     | VTableInstanceInitializer(..)
-                    | VTableMethod(..) => AnyTransId::Fun(self.translated.fun_decls.reserve_slot()),
+                    | VTableMethod(..)
+                    | VTableDropMethod(..) => AnyTransId::Fun(self.translated.fun_decls.reserve_slot()),
                     InherentImpl | Module => return None,
                 };
                 // Add the id to the queue of declarations to translate
