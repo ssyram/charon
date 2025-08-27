@@ -69,7 +69,7 @@ impl<'a> DynTraitCallTransformer<'a> {
     }
 
     /// Get the vtable declaration reference with the current generics applied
-    fn get_vtable_ref(&self, trait_ref: &TraitRef, _dyn_self_ty: &Ty) -> Result<TypeDeclRef, Error> {
+    fn get_vtable_ref(&self, trait_ref: &TraitRef, dyn_self_ty: &Ty) -> Result<TypeDeclRef, Error> {
         let trait_name = trait_ref
             .trait_decl_ref
             .skip_binder
@@ -102,12 +102,68 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        // Use a completely clean approach: just use the vtable type ID with empty generics
-        // This avoids all the complex generic parameter manipulation that causes type variable issues
-        // For many use cases, the method lookup will work even without perfect generic matching
+        let TyKind::DynTrait(DynPredicate { binder }) = dyn_self_ty.kind() else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Expected dyn trait type for dyn method calling receiver, found {}",
+                dyn_self_ty.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+
+        // The `Trait<_dyn, ...>` reference
+        let trait_ref = binder.params.trait_clauses[0].trait_.clone().erase();
+        let mut generics = trait_ref.generics.clone();
+        // remove the `_dyn` type argument
+        generics.types.remove_and_shift_ids(TypeVarId::ZERO);
+
+        // We should put in the same order as the assoc types to the generics
+        // We need to collect the associated types from the vtable's generics --
+        // Notably, the decl guarantees that the vtable_ref will be of the form:
+        // `{vtable}<TraitArg1, ..., SuperTrait::Assoc1, ..., Self::AssocN>`
+        let assoc_tys = vtable_ref
+            .generics
+            .types
+            .iter()
+            .filter_map(|ty| {
+                if let TyKind::TraitType(tref, name) = &ty.kind() {
+                    Some((tref.trait_decl_ref.skip_binder.id, name.clone()))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        // Then, for each assoc type in order, find the correct type from the dyn trait's constraints
+        for (trait_id, assoc_name) in assoc_tys {
+            // find the correct assoc type constraint and push it to the generics
+            let Some(assoc_ty) = binder.params.trait_type_constraints.iter().find_map(|c| {
+                let c = c.clone().erase();
+                if c.trait_ref.trait_decl_ref.skip_binder.id == trait_id
+                    && c.type_name == assoc_name
+                {
+                    Some(c.ty.clone())
+                } else {
+                    None
+                }
+            }) else {
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Could not find associated type {}::{} for vtable of trait {}",
+                    trait_id.with_ctx(&self.ctx.into_fmt()),
+                    assoc_name,
+                    trait_name
+                );
+            };
+            generics.types.push(assoc_ty);
+        }
+
+        // Note: here we take the vtable_ref's ID with the trait-ref's generics from the dyn-self applied, additionally
+        // we add the associated types in the correct order as per the vtable's generics
         Ok(TypeDeclRef {
             id: vtable_ref.id,
-            generics: Box::new(GenericArgs::empty()),
+            generics,
         })
     }
 
@@ -277,24 +333,53 @@ impl<'a> DynTraitCallTransformer<'a> {
         }
     }
 
-    /// Transform a call to a trait method on a dyn trait object  
+    /// Transform a call to a trait method on a dyn trait object
     fn transform_dyn_trait_call(&mut self, call: &mut Call) -> Result<Option<()>, Error> {
         // 1. Detect if this call should be transformed
-        let (_trait_ref, method_name) = match self.detect_dyn_trait_call(call) {
+        let (trait_ref, method_name) = match self.detect_dyn_trait_call(call) {
             Some(info) => info,
             None => return Ok(None),
         };
 
-        // For now, gracefully skip all dyn trait call transformations.
-        // The issue is that the input dyn trait types have pre-existing type variable 
-        // inconsistencies that cause generic consistency checks to fail.
-        // This transformation reveals these issues but doesn't cause them.
-        
-        trace!("Detected dyn trait call for method {} - gracefully skipping transformation due to upstream type variable consistency issues", method_name);
-        
-        // Return None to indicate no transformation was applied
-        // This allows the code to compile and run with the original dyn trait calls
-        Ok(None)
+        // 2. Get the dyn trait argument
+        if call.args.is_empty() {
+            raise_error!(self.ctx, self.span, "Dyn trait call has no arguments!");
+        }
+        let dyn_trait_operand = &call.args[0].clone();
+        let receiver_ty = match dyn_trait_operand {
+            Operand::Copy(place) | Operand::Move(place) => place.ty.clone(),
+            Operand::Const(const_expr) => const_expr.ty.clone(),
+        };
+        let dyn_self_ty = self.unpack_dyn_trait_ty(&receiver_ty)?;
+
+        let vtable_ref = self.get_vtable_ref(&trait_ref, &dyn_self_ty)?;
+
+        // 3. Get the correct field index for the method
+        let (field_id, field_ty) = self.get_method_field_info(&vtable_ref, &method_name)?;
+
+        // 4. Create local variables for vtable and method pointer
+        let (vtable_place, method_ptr_place) = self.create_vtable_locals(&vtable_ref, &field_ty);
+
+        // Extract vtable pointer
+        self.statements
+            .push(self.generate_vtable_extraction(&vtable_place, &dyn_trait_operand));
+
+        // Extract method pointer from vtable
+        self.statements
+            .push(self.generate_method_pointer_extraction(
+                &method_ptr_place,
+                &vtable_place,
+                field_id,
+            ));
+
+        // 6. Transform the original call to use the function pointer
+        call.func = FnOperand::Move(method_ptr_place);
+
+        trace!(
+            "Generated {} new statements for vtable dispatch",
+            self.statements.len()
+        );
+        Ok(Some(()))
     }
 }
 
