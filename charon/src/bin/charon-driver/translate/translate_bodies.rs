@@ -514,11 +514,11 @@ impl BodyTransCtx<'_, '_, '_> {
                                     }
                                     hax::ImplExprAtom::Builtin { trait_data, .. } => {
                                         // Handle builtin impl expressions (closures, drop glue, etc.)
-                                        trace!(
-                                            "Found builtin impl_expr for vtable: {:?}",
+                                        eprintln!(
+                                            "FOUND BUILTIN IMPL_EXPR FOR VTABLE: {:?}",
                                             impl_expr
                                         );
-                                        trace!("Builtin trait_data: {:?}", trait_data);
+                                        eprintln!("BUILTIN TRAIT_DATA: {:?}", trait_data);
 
                                         // For builtin implementations, we need to ensure the vtable instance
                                         // gets created when it's used in unsize coercion
@@ -526,7 +526,16 @@ impl BodyTransCtx<'_, '_, '_> {
                                         let erased_trait_ref = trait_ref
                                             .hax_skip_binder_ref()
                                             .erase(&self.hax_state_with_id());
-                                        let trait_def = self.hax_def(&erased_trait_ref)?;
+                                        eprintln!("ERASED_TRAIT_REF: {:?}", erased_trait_ref);
+
+                                        let trait_def = match self.hax_def(&erased_trait_ref) {
+                                            Ok(def) => def,
+                                            Err(e) => {
+                                                eprintln!("ERROR GETTING TRAIT DEF: {:?}", e);
+                                                return Err(e);
+                                            }
+                                        };
+                                        eprintln!("TRAIT_DEF: {:?}", trait_def.lang_item);
 
                                         // Determine the trait implementation source
                                         let source = if let Some(lang_item) = &trait_def.lang_item {
@@ -537,7 +546,7 @@ impl BodyTransCtx<'_, '_, '_> {
                                                 "fn_mut" => {
                                                     TraitImplSource::Closure(ClosureKind::FnMut)
                                                 }
-                                                "fn" => TraitImplSource::Closure(ClosureKind::Fn),
+                                                "r#fn" => TraitImplSource::Closure(ClosureKind::Fn),
                                                 "drop" => TraitImplSource::DropGlue,
                                                 _ => TraitImplSource::TraitAlias,
                                             }
@@ -545,9 +554,13 @@ impl BodyTransCtx<'_, '_, '_> {
                                             TraitImplSource::TraitAlias
                                         };
 
-                                        trace!("Determined TraitImplSource: {:?}", source);
+                                        eprintln!("DETERMINED TRAITIMPLSOURCE: {:?}", source);
 
                                         // Register the vtable instance using the trait reference
+                                        // TODO: For builtin impls, we need to handle vtable instances differently
+                                        // since we don't have concrete impl references
+                                        eprintln!("SKIPPING VTABLE REGISTRATION FOR BUILTIN IMPL");
+                                        /*
                                         let _vtable_ref = self.translate_region_binder(
                                             span,
                                             trait_ref,
@@ -561,7 +574,8 @@ impl BodyTransCtx<'_, '_, '_> {
                                             },
                                         )?;
 
-                                        trace!("Registered vtable instance: {:?}", _vtable_ref);
+                                        eprintln!("REGISTERED VTABLE INSTANCE: {:?}", _vtable_ref);
+                                        */
                                     }
                                     _ => {
                                         trace!(
