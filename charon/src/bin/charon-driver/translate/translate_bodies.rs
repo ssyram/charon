@@ -512,21 +512,38 @@ impl BodyTransCtx<'_, '_, '_> {
                                             ),
                                         );
                                     }
-                                    hax::ImplExprAtom::Builtin { .. } => {
+                                    hax::ImplExprAtom::Builtin { trait_data, .. } => {
                                         // Handle builtin impl expressions (closures, drop glue, etc.)
                                         trace!("Found builtin impl_expr for vtable: {:?}", impl_expr);
+                                        trace!("Builtin trait_data: {:?}", trait_data);
                                         
                                         // For builtin implementations, we need to ensure the vtable instance
                                         // gets created when it's used in unsize coercion
-                                        let tref = self.translate_trait_impl_expr(span, impl_expr)?;
-                                        if let TraitRefKind::TraitImpl(impl_ref) = &tref.kind {
-                                            // Register the vtable instance using the implementation reference
-                                            let _: GlobalDeclId = self.register_item(
-                                                span,
-                                                &impl_ref.id,
-                                                TransItemSourceKind::VTableInstance(TraitImplSource::Normal),
-                                            );
-                                        }
+                                        let trait_ref = &impl_expr.r#trait;
+                                        let erased_trait_ref = trait_ref.hax_skip_binder_ref().erase(&self.hax_state_with_id());
+                                        let trait_def = self.hax_def(&erased_trait_ref)?;
+                                        
+                                        // Determine the trait implementation source
+                                        let source = if let Some(lang_item) = &trait_def.lang_item {
+                                            match lang_item.as_str() {
+                                                "fn_once" => TraitImplSource::Closure(ClosureKind::FnOnce),
+                                                "fn_mut" => TraitImplSource::Closure(ClosureKind::FnMut), 
+                                                "fn" => TraitImplSource::Closure(ClosureKind::Fn),
+                                                "drop" => TraitImplSource::DropGlue,
+                                                _ => TraitImplSource::TraitAlias,
+                                            }
+                                        } else {
+                                            TraitImplSource::TraitAlias
+                                        };
+                                        
+                                        trace!("Determined TraitImplSource: {:?}", source);
+                                        
+                                        // Register the vtable instance using the trait reference
+                                        let _vtable_ref = self.translate_region_binder(span, trait_ref, |ctx, tref| {
+                                            ctx.translate_vtable_instance_ref(span, tref, trait_ref.hax_skip_binder_ref(), source)
+                                        })?;
+                                        
+                                        trace!("Registered vtable instance: {:?}", _vtable_ref);
                                     }
                                     _ => {
                                         trace!(

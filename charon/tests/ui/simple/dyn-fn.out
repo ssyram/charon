@@ -80,6 +80,29 @@ pub trait Fn<Self, Args>
     vtable: core::ops::function::Fn::{vtable}<Args, Self::parent_clause1::parent_clause1::Output>
 }
 
+pub fn core::ops::function::Fn::{impl Fn<Args> for Self}::call<'_0, Self, Args>(@1: &'_0 (Self), @2: Args) -> {impl Fn<Args> for Self}<Self, Args>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]::parent_clause1::parent_clause1::Output
+where
+    [@TraitClause0]: MetaSized<Self>,
+    [@TraitClause1]: FnMut<Self, Args>,
+    [@TraitClause2]: Sized<Args>,
+    [@TraitClause3]: Tuple<Args>,
+
+// Full name: core::ops::function::Fn::{impl Fn<Args> for Self}
+impl<Self, Args> Fn<Args> for Self
+where
+    [@TraitClause0]: MetaSized<Self>,
+    [@TraitClause1]: FnMut<Self, Args>,
+    [@TraitClause2]: Sized<Args>,
+    [@TraitClause3]: Tuple<Args>,
+{
+    parent_clause0 = @TraitClause0
+    parent_clause1 = @TraitClause1
+    parent_clause2 = @TraitClause2
+    parent_clause3 = @TraitClause3
+    fn call<'_0> = core::ops::function::Fn::{impl Fn<Args> for Self}::call<'_0_0, Self, Args>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]
+    non-dyn-compatible
+}
+
 pub fn core::ops::function::Fn::call<'_0, Self, Args>(@1: &'_0 (Self), @2: Args) -> @TraitClause0::parent_clause1::parent_clause1::Output
 where
     [@TraitClause0]: Fn<Self, Args>,

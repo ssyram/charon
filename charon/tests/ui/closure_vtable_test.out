@@ -80,6 +80,29 @@ pub trait Fn<Self, Args>
     vtable: core::ops::function::Fn::{vtable}<Args, Self::parent_clause1::parent_clause1::Output>
 }
 
+pub fn core::ops::function::Fn::{impl Fn<Args> for Self}::call<'_0, Self, Args>(@1: &'_0 (Self), @2: Args) -> {impl Fn<Args> for Self}<Self, Args>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]::parent_clause1::parent_clause1::Output
+where
+    [@TraitClause0]: MetaSized<Self>,
+    [@TraitClause1]: FnMut<Self, Args>,
+    [@TraitClause2]: Sized<Args>,
+    [@TraitClause3]: Tuple<Args>,
+
+// Full name: core::ops::function::Fn::{impl Fn<Args> for Self}
+impl<Self, Args> Fn<Args> for Self
+where
+    [@TraitClause0]: MetaSized<Self>,
+    [@TraitClause1]: FnMut<Self, Args>,
+    [@TraitClause2]: Sized<Args>,
+    [@TraitClause3]: Tuple<Args>,
+{
+    parent_clause0 = @TraitClause0
+    parent_clause1 = @TraitClause1
+    parent_clause2 = @TraitClause2
+    parent_clause3 = @TraitClause3
+    fn call<'_0> = core::ops::function::Fn::{impl Fn<Args> for Self}::call<'_0_0, Self, Args>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]
+    non-dyn-compatible
+}
+
 pub fn core::ops::function::Fn::call<'_0, Self, Args>(@1: &'_0 (Self), @2: Args) -> @TraitClause0::parent_clause1::parent_clause1::Output
 where
     [@TraitClause0]: Fn<Self, Args>,
@@ -159,7 +182,7 @@ impl<'_0> FnOnce<(i32)> for closure<'_0> {
     parent_clause3 = Sized<i32>
     type Output = i32
     fn call_once = {impl FnOnce<(i32)> for closure<'_0>}::call_once<'_0>
-    vtable: {impl FnOnce<(i32)> for closure<'_0>}::{vtable}<type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl FnMut<(i32)> for closure<'_0>}
@@ -169,7 +192,7 @@ impl<'_0> FnMut<(i32)> for closure<'_0> {
     parent_clause2 = Sized<(i32)>
     parent_clause3 = Tuple<(i32)>
     fn call_mut<'_0> = {impl FnMut<(i32)> for closure<'_0>}::call_mut<'_0, '_0_0>
-    vtable: {impl FnMut<(i32)> for closure<'_0>}::{vtable}<type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main::{impl Fn<(i32)> for closure<'_0>}
@@ -179,7 +202,7 @@ impl<'_0> Fn<(i32)> for closure<'_0> {
     parent_clause2 = Sized<(i32)>
     parent_clause3 = Tuple<(i32)>
     fn call<'_0> = {impl Fn<(i32)> for closure<'_0>}::call<'_0, '_0_0>
-    vtable: {impl Fn<(i32)> for closure<'_0>}::{vtable}<type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>
+    non-dyn-compatible
 }
 
 // Full name: test_crate::main
