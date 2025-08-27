@@ -209,10 +209,14 @@ fn destruct<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _d
     let @0: String; // return
     let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)); // arg #1
     let @2: &'_ ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)); // anonymous local
+    let vtable@3: *const (); // local
+    let method_ptr@4: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_))) -> String; // local
 
     storage_live(@2)
     @2 := &*(x@1) with_metadata(copy (x@1.metadata))
-    @0 := {impl ToString for T}::to_string<'_, (dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)>[MetaSized<(dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)>, Display<(dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)>](move (@2))
+    vtable@3 := copy (@2.metadata)
+    method_ptr@4 := copy ((*(vtable@3)).method_fmt)
+    @0 := (move method_ptr@4)(move (@2))
     storage_dead(@2)
     return
 }

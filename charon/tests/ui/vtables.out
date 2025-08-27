@@ -489,6 +489,8 @@ where
     let @5: i32; // anonymous local
     let @6: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)); // anonymous local
     let @7: &'_ (T); // anonymous local
+    let vtable@8: *const (); // local
+    let method_ptr@9: fn(&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), &'_ (T)) -> T; // local
 
     storage_live(x@2)
     storage_live(@3)
@@ -504,7 +506,9 @@ where
     @6 := &two-phase-mut *(x@2) with_metadata(copy (x@2.metadata))
     storage_live(@7)
     @7 := &*(arg@1)
-    @0 := Modifiable<(dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_), T>::modify<'_, '_>(move (@6), move (@7))
+    vtable@8 := copy (@6.metadata)
+    method_ptr@9 := copy ((*(vtable@8)).3)
+    @0 := (move method_ptr@9)(move (@6), move (@7))
     storage_dead(@7)
     storage_dead(@6)
     storage_dead(@5)
@@ -839,13 +843,17 @@ fn use_lifetime_trait<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Life
     let @3: &'_ (i32); // anonymous local
     let @4: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // anonymous local
     let @5: &'_ (i32); // anonymous local
+    let vtable@6: *const (); // local
+    let method_ptr@7: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), &'_ (i32)) -> &'_ (i32); // local
 
     storage_live(@3)
     storage_live(@4)
     @4 := &*(x@1) with_metadata(copy (x@1.metadata))
     storage_live(@5)
     @5 := &*(y@2)
-    @3 := LifetimeTrait<(dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)>::lifetime_method<'_, '_>(move (@4), move (@5))
+    vtable@6 := copy (@4.metadata)
+    method_ptr@7 := copy ((*(vtable@6)).3)
+    @3 := (move method_ptr@7)(move (@4), move (@5))
     @0 := &*(@3)
     storage_dead(@5)
     storage_dead(@4)
@@ -866,6 +874,8 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     let @7: &'_ (i64); // anonymous local
     let @8: &'_ (i64); // anonymous local
     let @9: i64; // anonymous local
+    let vtable@10: *const (); // local
+    let method_ptr@11: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_ (i32), &'_ (i64)); // local
 
     @0 := ()
     storage_live(@2)
@@ -883,7 +893,9 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     @9 := const (200 : i64)
     @8 := &@9
     @7 := &*(@8)
-    @2 := Both32And64<(dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)>::both_operate<'_, '_, '_>(move (@3), move (@4), move (@7))
+    vtable@10 := copy (@3.metadata)
+    method_ptr@11 := copy ((*(vtable@10)).3)
+    @2 := (move method_ptr@11)(move (@3), move (@4), move (@7))
     storage_dead(@7)
     storage_dead(@4)
     storage_dead(@3)
@@ -985,6 +997,16 @@ fn main()
     let @83: &'_ (i32); // anonymous local
     let @84: &'_ (i32); // anonymous local
     let @85: Option<Arguments<'_>>[Sized<Arguments<'_>>]; // anonymous local
+    let vtable@86: *const (); // local
+    let method_ptr@87: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_))) -> bool; // local
+    let vtable@88: *const (); // local
+    let method_ptr@89: fn(&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, i32> + _dyn : '_)), &'_ (i32)) -> i32; // local
+    let vtable@90: *const (); // local
+    let method_ptr@91: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // local
+    let vtable@92: *const (); // local
+    let method_ptr@93: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_ (i32), &'_ (i64)); // local
+    let vtable@94: *const (); // local
+    let method_ptr@95: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), &'_ (i32)) -> &'_ (i32); // local
 
     @0 := ()
     storage_live(x@1)
@@ -1000,7 +1022,9 @@ fn main()
     storage_live(@5)
     storage_live(@6)
     @6 := &*(x@1) with_metadata(copy (x@1.metadata))
-    @5 := Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_), i32>::check<'_>(move (@6))
+    vtable@86 := copy (@6.metadata)
+    method_ptr@87 := copy ((*(vtable@86)).3)
+    @5 := (move method_ptr@87)(move (@6))
     if move (@5) {
     }
     else {
@@ -1059,7 +1083,9 @@ fn main()
         @25 := const (100 : i32)
         @24 := &mut @25
         @23 := &*(@24)
-        @21 := Modifiable<(dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, i32> + _dyn : '_), i32>::modify<'_, '_>(move (@22), move (@23))
+        vtable@88 := copy (@22.metadata)
+        method_ptr@89 := copy ((*(vtable@88)).3)
+        @21 := (move method_ptr@89)(move (@22), move (@23))
         storage_dead(@23)
         storage_dead(@22)
         @20 := &@21
@@ -1131,7 +1157,9 @@ fn main()
         storage_live(@46)
         storage_live(@47)
         @47 := &*(z@40) with_metadata(copy (z@40.metadata))
-        @46 := NoParam<(dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)>::dummy<'_>(move (@47))
+        vtable@90 := copy (@47.metadata)
+        method_ptr@91 := copy ((*(vtable@90)).3)
+        @46 := (move method_ptr@91)(move (@47))
         storage_dead(@47)
         storage_dead(@46)
         storage_live(a@48)
@@ -1159,7 +1187,9 @@ fn main()
         @59 := const (200 : i64)
         @58 := &@59
         @57 := &*(@58)
-        @52 := Both32And64<(dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)>::both_operate<'_, '_, '_>(move (@53), move (@54), move (@57))
+        vtable@92 := copy (@53.metadata)
+        method_ptr@93 := copy ((*(vtable@92)).3)
+        @52 := (move method_ptr@93)(move (@53), move (@54), move (@57))
         storage_dead(@57)
         storage_dead(@54)
         storage_dead(@53)
@@ -1192,7 +1222,9 @@ fn main()
         @71 := const (10 : i32)
         @70 := &@71
         @69 := &*(@70)
-        @66 := use_lifetime_trait<'_, '_>(move (@67), move (@69))
+        vtable@94 := copy (@67.metadata)
+        method_ptr@95 := copy ((*(vtable@94)).3)
+        @66 := (move method_ptr@95)(move (@67), move (@69))
         storage_dead(@69)
         storage_dead(@67)
         @65 := &*(@66)

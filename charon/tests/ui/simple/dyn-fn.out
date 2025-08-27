@@ -113,6 +113,8 @@ fn takes_fn<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (
     let @5: (&'_ mut (u32)); // anonymous local
     let @6: &'_ mut (u32); // anonymous local
     let @7: &'_ mut (u32); // anonymous local
+    let vtable@8: *const (); // local
+    let method_ptr@9: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (&'a mut (u32))> + _dyn : '_ + for<'a> @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)), (&'_ mut (u32))) -> bool; // local
 
     @0 := ()
     storage_live(counter@2)
@@ -126,7 +128,9 @@ fn takes_fn<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (
     @7 := &mut counter@2
     @6 := &two-phase-mut *(@7)
     @5 := (move (@6))
-    @3 := Fn<(dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (&'a mut (u32))> + _dyn : '_ + for<'a> @TraitClause1_0::parent_clause1::parent_clause1::Output = bool), (&'_ mut (u32))>::call<'_>(move (@4), move (@5))
+    vtable@8 := copy (@4.metadata)
+    method_ptr@9 := copy ((*(vtable@8)).method_call)
+    @3 := (move method_ptr@9)(move (@4), move (@5))
     if move (@3) {
         storage_dead(@7)
         storage_dead(@6)
@@ -235,6 +239,8 @@ fn gives_fn()
     let @2: &'_ (closure); // anonymous local
     let @3: &'_ (closure); // anonymous local
     let @4: closure; // anonymous local
+    let vtable@5: *const (); // local
+    let method_ptr@6: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (&'a mut (u32))> + _dyn : '_ + for<'a> @TraitClause1_0::parent_clause1::parent_clause1::Output = bool))); // local
 
     @0 := ()
     storage_live(@1)
@@ -246,7 +252,9 @@ fn gives_fn()
     @2 := &*(@3)
     @1 := unsize_cast<&'_ (closure), &'_ ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (&'a mut (u32))> + _dyn : '_ + for<'a> @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)), {impl Fn<(&'_ mut (u32))> for closure}<'_>>(move (@2))
     storage_dead(@2)
-    @0 := takes_fn<'_>(move (@1))
+    vtable@5 := copy (@1.metadata)
+    method_ptr@6 := copy ((*(vtable@5)).method_call)
+    @0 := (move method_ptr@6)(move (@1))
     storage_dead(@1)
     storage_dead(@4)
     storage_dead(@3)

@@ -25,6 +25,7 @@ pub mod normalize {
     pub mod expand_associated_types;
     pub mod filter_unreachable_blocks;
     pub mod monomorphize;
+    pub mod transform_dyn_trait_calls;
     pub mod skip_trait_refs_when_known;
 }
 
@@ -112,6 +113,9 @@ pub static INITIAL_CLEANUP_PASSES: &[Pass] = &[
 
 /// Body cleanup passes on the ullbc.
 pub static ULLBC_PASSES: &[Pass] = &[
+    // Transform dyn trait method calls to vtable function pointer calls
+    // This should be early to handle the calls before other transformations
+    UnstructuredBody(&normalize::transform_dyn_trait_calls::Transform),
     // Inline promoted consts into their parent bodies.
     UnstructuredBody(&simplify_output::inline_promoted_consts::Transform),
     // # Micro-pass: merge single-origin gotos into their parent. This drastically reduces the
