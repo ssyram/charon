@@ -154,11 +154,28 @@ impl ItemTransCtx<'_, '_> {
     /// handle associated types in vtables.
     pub fn trait_is_dyn_compatible(&mut self, def_id: &hax::DefId) -> Result<bool, Error> {
         let def = self.poly_hax_def(def_id)?;
-        Ok(match def.kind() {
+        
+        // Special handling for builtin closure traits which are always dyn-compatible
+        if let Ok(trait_def) = self.poly_hax_def(def_id) {
+            if let Some(lang_item) = &trait_def.lang_item {
+                match lang_item.as_str() {
+                    "r#fn" | "fn_mut" | "fn_once" => {
+                        trace!("Marking closure trait {} as dyn-compatible", lang_item);
+                        return Ok(true);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        
+        let result = match def.kind() {
             hax::FullDefKind::Trait { dyn_self, .. }
             | hax::FullDefKind::TraitAlias { dyn_self, .. } => dyn_self.is_some(),
             _ => false,
-        })
+        };
+        
+        trace!("trait_is_dyn_compatible for def_id {:?}: {}", def_id, result);
+        Ok(result)
     }
 
     /// Check whether this trait ref is of the form `Self: Trait<...>`.
