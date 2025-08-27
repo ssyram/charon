@@ -758,55 +758,14 @@ trait LifetimeTrait<Self>
     parent_clause0 : [@TraitClause0]: MetaSized<Self>
     parent_clause1 : [@TraitClause1]: Sized<Self::Ty>
     type Ty
-    fn lifetime_method<'a, '_1> = test_crate::LifetimeTrait::lifetime_method<'a, '_0_1, Self>[Self]
+    fn lifetime_method<'a, '_1> = lifetime_method<'a, '_0_1, Self>[Self]
     vtable: test_crate::LifetimeTrait::{vtable}<Self::Ty>
 }
 
-fn test_crate::LifetimeTrait::lifetime_method<'a, '_1, Self>(@1: &'_1 (Self), @2: &'a (@TraitClause0::Ty)) -> &'a (@TraitClause0::Ty)
+// Full name: test_crate::LifetimeTrait::lifetime_method
+fn lifetime_method<'a, '_1, Self>(@1: &'_1 (Self), @2: &'a (@TraitClause0::Ty)) -> &'a (@TraitClause0::Ty)
 where
     [@TraitClause0]: LifetimeTrait<Self>,
-
-// Full name: test_crate::{impl LifetimeTrait for i32}::lifetime_method
-fn {impl LifetimeTrait for i32}::lifetime_method<'a, '_1>(@1: &'_1 (i32), @2: &'a (i32)) -> &'a (i32)
-{
-    let @0: &'_ (i32); // return
-    let self@1: &'_ (i32); // arg #1
-    let arg@2: &'_ (i32); // arg #2
-    let @3: (); // anonymous local
-    let @4: bool; // anonymous local
-    let @5: i32; // anonymous local
-    let @6: i32; // anonymous local
-
-    storage_live(@3)
-    storage_live(@4)
-    storage_live(@5)
-    @5 := copy (*(self@1))
-    storage_live(@6)
-    @6 := copy (*(arg@2))
-    @4 := move (@5) > move (@6)
-    if move (@4) {
-    }
-    else {
-        storage_dead(@6)
-        storage_dead(@5)
-        panic(core::panicking::panic)
-    }
-    storage_dead(@6)
-    storage_dead(@5)
-    storage_dead(@4)
-    storage_dead(@3)
-    @0 := copy (arg@2)
-    return
-}
-
-// Full name: test_crate::{impl LifetimeTrait for i32}
-impl LifetimeTrait for i32 {
-    parent_clause0 = MetaSized<i32>
-    parent_clause1 = Sized<i32>
-    type Ty = i32
-    fn lifetime_method<'a, '_1> = {impl LifetimeTrait for i32}::lifetime_method<'a, '_0_1>
-    vtable: {impl LifetimeTrait for i32}::{vtable}
-}
 
 // Full name: test_crate::use_lifetime_trait
 fn use_lifetime_trait<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_1 + @TraitClause1_0::Ty = i32)), @2: &'a (i32)) -> &'a (i32)
