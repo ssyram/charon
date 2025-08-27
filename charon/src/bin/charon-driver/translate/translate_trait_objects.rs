@@ -928,6 +928,11 @@ impl ItemTransCtx<'_, '_> {
     }
 
     /// Compute the drop function for a vtable based on the concrete type.
+    /// 
+    /// Note: Drop function implementation is complex because vtables expect 
+    /// `fn(*mut dyn Trait)` but concrete drop functions use `fn(*mut ConcreteType)`.
+    /// We need drop shims similar to method shims, which may be better implemented
+    /// in the transform phase as suggested in the original problem statement.
     fn compute_drop_function(&mut self, _span: Span, self_ty: &Ty) -> Result<RawConstantExpr, Error> {
         // Look for a Drop trait implementation for this type
         for (_impl_id, impl_decl) in self.t_ctx.translated.trait_impls.iter_indexed() {
@@ -944,23 +949,15 @@ impl ItemTransCtx<'_, '_> {
                     // Check if the impl is for our self_ty
                     let impl_self_ty = &trait_ref.generics.types[0];
                     if impl_self_ty == self_ty {
-                        // Found a Drop impl for our type - try to get the drop method
-                        for (method_name, method_ref) in &impl_decl.methods {
-                            if method_name.0 == "drop" {
-                                // Create a function pointer to the drop method
-                                return Ok(RawConstantExpr::FnPtr(
-                                    method_ref.skip_binder.clone().into(),
-                                ));
-                            }
-                        }
+                        // TODO: Generate proper drop shim that converts from trait object to concrete type
+                        return Ok(RawConstantExpr::Opaque("drop shim not yet implemented".to_string()));
                     }
                 }
             }
         }
 
-        // If no Drop impl found, provide a no-op drop function
-        // This is okay for types that don't need drop (like most primitives)
-        Ok(RawConstantExpr::Opaque("no drop impl found".to_string()))
+        // If no Drop impl found, this type doesn't need custom drop (like primitives)
+        Ok(RawConstantExpr::Opaque("no drop impl needed".to_string()))
     }
 
     fn check_concretization_ty_match(
