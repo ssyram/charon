@@ -358,8 +358,8 @@ fn main()
     let @4: i32; // anonymous local
     let @5: (i32, i32); // anonymous local
     let @6: &'_ ((dyn exists<_dyn> [@TraitClause0]: Join<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Internal = i32 + @TraitClause1_0::parent_clause2::Right = i32 + @TraitClause1_0::parent_clause1::Left = i32)); // anonymous local
-    let @7: *mut test_crate::Join::{vtable}<i32, i32, i32, i32, i32>; // anonymous local
-    let @8: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Join<_dyn, missing(@Type3_0)> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Internal = missing(@Type3_1) + @TraitClause1_0::parent_clause1::parent_clause1::Internal = missing(@Type3_2) + @TraitClause1_0::parent_clause2::Right = missing(@Type3_3) + @TraitClause1_0::parent_clause1::Left = missing(@Type3_4)))) -> (Join<(dyn exists<_dyn> [@TraitClause0]: Join<_dyn, missing(@Type4_0)> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Internal = missing(@Type4_1) + @TraitClause1_0::parent_clause1::parent_clause1::Internal = missing(@Type4_2) + @TraitClause1_0::parent_clause2::Right = missing(@Type4_3) + @TraitClause1_0::parent_clause1::Left = missing(@Type4_4)), missing(@Type2_0)>::parent_clause1::Left, Join<(dyn exists<_dyn> [@TraitClause0]: Join<_dyn, missing(@Type4_0)> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Internal = missing(@Type4_1) + @TraitClause1_0::parent_clause1::parent_clause1::Internal = missing(@Type4_2) + @TraitClause1_0::parent_clause2::Right = missing(@Type4_3) + @TraitClause1_0::parent_clause1::Left = missing(@Type4_4)), missing(@Type2_0)>::parent_clause2::Right); // anonymous local
+    let @7: *const test_crate::Join::{vtable}<i32, i32, i32, i32, i32>; // anonymous local
+    let @8: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Join<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Internal = i32 + @TraitClause1_0::parent_clause2::Right = i32 + @TraitClause1_0::parent_clause1::Left = i32))) -> (i32, i32); // anonymous local
 
     @0 := ()
     storage_live(v@1)
