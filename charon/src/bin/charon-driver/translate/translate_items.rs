@@ -759,7 +759,12 @@ impl ItemTransCtx<'_, '_> {
             trait_decl_ref: RegionBinder::empty(implemented_trait.clone()),
         };
 
-        let vtable = self.translate_vtable_instance_ref(span, &trait_pred.trait_ref, def.this(), TraitImplSource::Normal)?;
+        let vtable = self.translate_vtable_instance_ref(
+            span,
+            &trait_pred.trait_ref,
+            def.this(),
+            TraitImplSource::Normal,
+        )?;
 
         // The trait refs which implement the parent clauses of the implemented trait decl.
         let parent_trait_refs = self.translate_trait_impl_exprs(span, &implied_impl_exprs)?;
@@ -1075,14 +1080,19 @@ impl ItemTransCtx<'_, '_> {
         }
 
         let generics = self.the_only_binder().params.clone();
-        
+
         // Generate vtable instance for builtin traits if we have the impl source
         let vtable = if let (Some(impl_source), Some(impl_ref)) = (impl_source, impl_ref) {
-            self.translate_vtable_instance_ref(span, &vimpl.trait_pred.trait_ref, impl_ref, impl_source)?
+            self.translate_vtable_instance_ref(
+                span,
+                &vimpl.trait_pred.trait_ref,
+                impl_ref,
+                impl_source,
+            )?
         } else {
             None
         };
-        
+
         Ok(TraitImpl {
             def_id,
             item_meta,

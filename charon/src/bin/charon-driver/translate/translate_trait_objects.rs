@@ -154,7 +154,7 @@ impl ItemTransCtx<'_, '_> {
     /// handle associated types in vtables.
     pub fn trait_is_dyn_compatible(&mut self, def_id: &hax::DefId) -> Result<bool, Error> {
         let def = self.poly_hax_def(def_id)?;
-        
+
         // Special handling for builtin closure traits which are always dyn-compatible
         if let Ok(trait_def) = self.poly_hax_def(def_id) {
             if let Some(lang_item) = &trait_def.lang_item {
@@ -167,14 +167,17 @@ impl ItemTransCtx<'_, '_> {
                 }
             }
         }
-        
+
         let result = match def.kind() {
             hax::FullDefKind::Trait { dyn_self, .. }
             | hax::FullDefKind::TraitAlias { dyn_self, .. } => dyn_self.is_some(),
             _ => false,
         };
-        
-        trace!("trait_is_dyn_compatible for def_id {:?}: {}", def_id, result);
+
+        trace!(
+            "trait_is_dyn_compatible for def_id {:?}: {}",
+            def_id, result
+        );
         Ok(result)
     }
 
@@ -480,8 +483,6 @@ impl ItemTransCtx<'_, '_> {
         Ok(Some(vtable_ref))
     }
 
-
-
     /// Local helper function to get the vtable struct reference and trait declaration reference
     fn get_vtable_instance_info<'a>(
         &mut self,
@@ -491,7 +492,15 @@ impl ItemTransCtx<'_, '_> {
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
         let implemented_trait = match (impl_def.kind(), impl_kind) {
             (hax::FullDefKind::TraitImpl { trait_pred, .. }, _) => &trait_pred.trait_ref,
-            (hax::FullDefKind::Closure { fn_once_impl, fn_mut_impl, fn_impl, .. }, TraitImplSource::Closure(closure_kind)) => {
+            (
+                hax::FullDefKind::Closure {
+                    fn_once_impl,
+                    fn_mut_impl,
+                    fn_impl,
+                    ..
+                },
+                TraitImplSource::Closure(closure_kind),
+            ) => {
                 // For closures, extract the trait reference from the appropriate virtual implementation
                 let vimpl = match closure_kind {
                     ClosureKind::FnOnce => fn_once_impl,
@@ -593,7 +602,12 @@ impl ItemTransCtx<'_, '_> {
                     TyKind::FnPtr(sig) => {
                         let regions = shim_ref.generics.regions;
                         // Add a bunch of erased regions to avoid the type mismatch.
-                        shim_ref.generics.regions = sig.regions.iter().map(|_| Region::Erased).chain(regions.into_iter()).collect();
+                        shim_ref.generics.regions = sig
+                            .regions
+                            .iter()
+                            .map(|_| Region::Erased)
+                            .chain(regions.into_iter())
+                            .collect();
                     }
                     _ => {
                         raise_error!(
@@ -605,11 +619,14 @@ impl ItemTransCtx<'_, '_> {
                 }
                 (RawConstantExpr::FnPtr(shim_ref), ty)
             }
-            hax::ImplAssocItemValue::DefaultedFn { .. } => (RawConstantExpr::Opaque(
-                "shim for default methods \
+            hax::ImplAssocItemValue::DefaultedFn { .. } => (
+                RawConstantExpr::Opaque(
+                    "shim for default methods \
                     aren't yet supported"
-                    .to_string(),
-            ), next_ty()),
+                        .to_string(),
+                ),
+                next_ty(),
+            ),
             _ => return Ok(()),
         };
 
@@ -659,7 +676,12 @@ impl ItemTransCtx<'_, '_> {
                 hax::ImplExprAtom::Concrete(impl_item) => {
                     let vtable_instance_ref = self
                         .translate_region_binder(span, &impl_expr.r#trait, |ctx, tref| {
-                            ctx.translate_vtable_instance_ref(span, tref, impl_item, TraitImplSource::Normal)
+                            ctx.translate_vtable_instance_ref(
+                                span,
+                                tref,
+                                impl_item,
+                                TraitImplSource::Normal,
+                            )
                         })?
                         .erase()
                         .expect("parent trait should be dyn compatible");
@@ -672,14 +694,16 @@ impl ItemTransCtx<'_, '_> {
                 hax::ImplExprAtom::Builtin { .. } => {
                     // Handle builtin impl expressions for supertraits
                     let trait_ref = &impl_expr.r#trait;
-                    let erased_trait_ref = trait_ref.hax_skip_binder_ref().erase(&self.hax_state_with_id());
+                    let erased_trait_ref = trait_ref
+                        .hax_skip_binder_ref()
+                        .erase(&self.hax_state_with_id());
                     let trait_def = self.hax_def(&erased_trait_ref)?;
-                    
+
                     // Determine the trait implementation source
                     let source = if let Some(lang_item) = &trait_def.lang_item {
                         match lang_item.as_str() {
                             "fn_once" => TraitImplSource::Closure(ClosureKind::FnOnce),
-                            "fn_mut" => TraitImplSource::Closure(ClosureKind::FnMut), 
+                            "fn_mut" => TraitImplSource::Closure(ClosureKind::FnMut),
                             "r#fn" => TraitImplSource::Closure(ClosureKind::Fn),
                             "drop" => TraitImplSource::DropGlue,
                             _ => TraitImplSource::TraitAlias,
@@ -687,10 +711,15 @@ impl ItemTransCtx<'_, '_> {
                     } else {
                         TraitImplSource::TraitAlias
                     };
-                    
+
                     let vtable_instance_ref = self
                         .translate_region_binder(span, &impl_expr.r#trait, |ctx, tref| {
-                            ctx.translate_vtable_instance_ref(span, tref, trait_ref.hax_skip_binder_ref(), source)
+                            ctx.translate_vtable_instance_ref(
+                                span,
+                                tref,
+                                trait_ref.hax_skip_binder_ref(),
+                                source,
+                            )
                         })?
                         .erase()
                         .expect("builtin trait should be dyn compatible");
@@ -778,9 +807,18 @@ impl ItemTransCtx<'_, '_> {
         };
 
         // TODO(dyn): provide values
-        mk_field(RawConstantExpr::Opaque("unknown size".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown align".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown drop".to_string()), next_ty());
+        mk_field(
+            RawConstantExpr::Opaque("unknown size".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("unknown align".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("unknown drop".to_string()),
+            next_ty(),
+        );
 
         for item in items {
             self.add_method_to_vtable_value(
@@ -794,7 +832,13 @@ impl ItemTransCtx<'_, '_> {
             )?;
         }
 
-        self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut next_ty, &mut mk_field)?;
+        self.add_supertraits_to_vtable_value(
+            span,
+            &trait_def,
+            impl_def,
+            &mut next_ty,
+            &mut mk_field,
+        )?;
 
         if field_ty_iter.next().is_some() {
             raise_error!(
@@ -918,7 +962,9 @@ impl ItemTransCtx<'_, '_> {
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;
                 Ok(body)
             }
-            TraitImplSource::Closure(_) | TraitImplSource::DropGlue | TraitImplSource::TraitAlias => {
+            TraitImplSource::Closure(_)
+            | TraitImplSource::DropGlue
+            | TraitImplSource::TraitAlias => {
                 // For virtual impls, try to generate the vtable init body the same way as normal impls
                 // This may need refinement based on the specific needs of each virtual impl type
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;

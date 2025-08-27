@@ -118,13 +118,8 @@ impl ItemTransCtx<'_, '_> {
         else {
             unreachable!()
         };
-        let mut timpl = self.translate_virtual_trait_impl(
-            impl_id, 
-            item_meta, 
-            drop_impl, 
-            None,
-            None,
-        )?;
+        let mut timpl =
+            self.translate_virtual_trait_impl(impl_id, item_meta, drop_impl, None, None)?;
 
         // Construct the method reference.
         let method_id = self.register_item(span, def.this(), TransItemSourceKind::DropGlueMethod);
