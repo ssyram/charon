@@ -616,7 +616,13 @@ impl ItemTransCtx<'_, '_> {
             ClosureKind::FnMut => fn_mut_impl.as_ref().unwrap(),
             ClosureKind::Fn => fn_impl.as_ref().unwrap(),
         };
-        let mut timpl = self.translate_virtual_trait_impl(def_id, item_meta, vimpl, None, None)?;
+        let mut timpl = self.translate_virtual_trait_impl(
+            def_id, 
+            item_meta, 
+            vimpl, 
+            TraitImplSource::Closure(target_kind),
+            def.this(),
+        )?;
 
         // Construct the `call_*` method reference.
         let call_fn_id = self.register_item(

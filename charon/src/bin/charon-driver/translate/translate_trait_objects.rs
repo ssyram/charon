@@ -446,6 +446,7 @@ impl ItemTransCtx<'_, '_> {
         span: Span,
         trait_ref: &hax::TraitRef,
         impl_ref: &hax::ItemRef,
+        source: TraitImplSource,
     ) -> Result<Option<GlobalDeclRef>, Error> {
         if !self.trait_is_dyn_compatible(&trait_ref.def_id)? {
             return Ok(None);
@@ -457,30 +458,12 @@ impl ItemTransCtx<'_, '_> {
         let vtable_ref: GlobalDeclRef = self.translate_item_no_enqueue(
             span,
             impl_ref,
-            TransItemSourceKind::VTableInstance(TraitImplSource::Normal),
+            TransItemSourceKind::VTableInstance(source),
         )?;
         Ok(Some(vtable_ref))
     }
 
-    pub fn translate_virtual_vtable_instance_ref(
-        &mut self,
-        span: Span,
-        trait_ref: &hax::TraitRef,
-        impl_ref: &hax::ItemRef,
-        impl_source: TraitImplSource,
-    ) -> Result<Option<GlobalDeclRef>, Error> {
-        if !self.trait_is_dyn_compatible(&trait_ref.def_id)? {
-            return Ok(None);
-        }
-        // Don't enqueue the vtable for translation by default. It will be enqueued if used in a
-        // `dyn Trait` coercion.
-        let vtable_ref: GlobalDeclRef = self.translate_item_no_enqueue(
-            span,
-            impl_ref,
-            TransItemSourceKind::VTableInstance(impl_source),
-        )?;
-        Ok(Some(vtable_ref))
-    }
+
 
     /// Local helper function to get the vtable struct reference and trait declaration reference
     fn get_vtable_instance_info<'a>(
@@ -650,7 +633,7 @@ impl ItemTransCtx<'_, '_> {
                 hax::ImplExprAtom::Concrete(impl_item) => {
                     let vtable_instance_ref = self
                         .translate_region_binder(span, &impl_expr.r#trait, |ctx, tref| {
-                            ctx.translate_vtable_instance_ref(span, tref, impl_item)
+                            ctx.translate_vtable_instance_ref(span, tref, impl_item, TraitImplSource::Normal)
                         })?
                         .erase()
                         .expect("parent trait should be dyn compatible");

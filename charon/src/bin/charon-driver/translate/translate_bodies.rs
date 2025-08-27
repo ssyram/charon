@@ -512,14 +512,56 @@ impl BodyTransCtx<'_, '_, '_> {
                                             ),
                                         );
                                     }
-                                    hax::ImplExprAtom::Builtin { .. } => {
+                                    hax::ImplExprAtom::Builtin { trait_data, .. } => {
                                         // Handle builtin impl expressions (closures, drop glue, etc.)
-                                        // For now, just trace that we're handling them without registering
-                                        // The vtable should be handled through other mechanisms
-                                        trace!(
-                                            "builtin impl_expr for vtable (not registering directly): {:?}",
-                                            impl_expr
-                                        );
+                                        // Extract the impl reference and register the vtable with correct source
+                                        if let TraitRefKind::TraitImpl(_impl_ref) = &tref.kind {
+                                            // Determine the correct source and ItemRef based on the builtin trait data
+                                            let registration_result = match trait_data {
+                                                hax::BuiltinTraitData::Drop(hax::DropData::Glue { ty, .. }) => {
+                                                    // For drop glue, extract the ADT item from the type
+                                                    if let hax::TyKind::Adt(item) = ty.kind() {
+                                                        Some((TraitImplSource::DropGlue, item))
+                                                    } else {
+                                                        // Skip registration for non-ADT types
+                                                        trace!("Skipping drop glue vtable registration for non-ADT type: {:?}", ty);
+                                                        None
+                                                    }
+                                                }
+                                                _ => {
+                                                    // For other builtin traits (closures, trait aliases), we need to determine the item ref
+                                                    // For closures, we need to extract from the first generic arg
+                                                    if let Some(hax::GenericArg::Type(closure_ty)) = impl_expr.r#trait
+                                                        .hax_skip_binder_ref()
+                                                        .generic_args
+                                                        .first()
+                                                        && let hax::TyKind::Closure(closure_args) = closure_ty.kind()
+                                                    {
+                                                        let trait_def = self.hax_def(impl_expr.r#trait.hax_skip_binder_ref())?;
+                                                        let source = match trait_def.lang_item.as_deref() {
+                                                            Some("fn") => TraitImplSource::Closure(ClosureKind::Fn),
+                                                            Some("fn_mut") => TraitImplSource::Closure(ClosureKind::FnMut),
+                                                            Some("fn_once") => TraitImplSource::Closure(ClosureKind::FnOnce),
+                                                            _ => TraitImplSource::TraitAlias,
+                                                        };
+                                                        Some((source, &closure_args.item))
+                                                    } else {
+                                                        // Trait alias case
+                                                        Some((TraitImplSource::TraitAlias, impl_expr.r#trait.hax_skip_binder_ref()))
+                                                    }
+                                                }
+                                            };
+                                            
+                                            // Register the vtable instance if we have the necessary info
+                                            if let Some((source, item_ref)) = registration_result {
+                                                let _: GlobalDeclId = self.register_item(
+                                                    span,
+                                                    item_ref,
+                                                    TransItemSourceKind::VTableInstance(source),
+                                                );
+                                            }
+                                        }
+                                        trace!("Registered builtin impl_expr for vtable: {:?}", impl_expr);
                                     }
                                     _ => {
                                         trace!(
