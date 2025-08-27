@@ -489,9 +489,18 @@ impl ItemTransCtx<'_, '_> {
         impl_def: &'a hax::FullDef,
         impl_kind: &TraitImplSource,
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
-        let implemented_trait = match impl_def.kind() {
-            hax::FullDefKind::TraitImpl { trait_pred, .. } => &trait_pred.trait_ref,
-            _ => unreachable!(),
+        let implemented_trait = match (impl_def.kind(), impl_kind) {
+            (hax::FullDefKind::TraitImpl { trait_pred, .. }, _) => &trait_pred.trait_ref,
+            (hax::FullDefKind::Closure { fn_once_impl, fn_mut_impl, fn_impl, .. }, TraitImplSource::Closure(closure_kind)) => {
+                // For closures, extract the trait reference from the appropriate virtual implementation
+                let vimpl = match closure_kind {
+                    ClosureKind::FnOnce => fn_once_impl,
+                    ClosureKind::FnMut => fn_mut_impl.as_ref().expect("FnMut impl should exist"),
+                    ClosureKind::Fn => fn_impl.as_ref().expect("Fn impl should exist"),
+                };
+                &vimpl.trait_pred.trait_ref
+            }
+            _ => unreachable!("Unsupported impl_def kind for vtable instance"),
         };
         let vtable_struct_ref = self
             .translate_vtable_struct_ref(span, implemented_trait)?

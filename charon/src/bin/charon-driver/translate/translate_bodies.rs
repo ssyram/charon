@@ -515,6 +515,18 @@ impl BodyTransCtx<'_, '_, '_> {
                                     hax::ImplExprAtom::Builtin { .. } => {
                                         // Handle builtin impl expressions (closures, drop glue, etc.)
                                         trace!("Found builtin impl_expr for vtable: {:?}", impl_expr);
+                                        
+                                        // For builtin implementations, we need to ensure the vtable instance
+                                        // gets created when it's used in unsize coercion
+                                        let tref = self.translate_trait_impl_expr(span, impl_expr)?;
+                                        if let TraitRefKind::TraitImpl(impl_ref) = &tref.kind {
+                                            // Register the vtable instance using the implementation reference
+                                            let _: GlobalDeclId = self.register_item(
+                                                span,
+                                                &impl_ref.id,
+                                                TransItemSourceKind::VTableInstance(TraitImplSource::Normal),
+                                            );
+                                        }
                                     }
                                     _ => {
                                         trace!(
