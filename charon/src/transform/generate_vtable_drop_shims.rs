@@ -12,7 +12,7 @@
 
 use crate::ast::*;
 use crate::transform::TransformCtx;
-use crate::ullbc_ast::{ExprBody as GExprBody, RawStatement, Statement, BlockData, Terminator, RawTerminator, BlockId};
+use crate::ullbc_ast::{ExprBody as GExprBody, RawStatement, Statement, BlockData, Terminator, RawTerminator};
 use super::ctx::TransformPass;
 use std::collections::HashMap;
 

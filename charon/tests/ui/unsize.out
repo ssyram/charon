@@ -159,6 +159,15 @@ impl Clone for String {
 // Full name: alloc::string::{impl Display for String}::fmt
 pub fn {impl Display for String}::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
 
+unsafe fn alloc::string::{impl Display for String}::{vtable}::drop_shim(@1: *mut !)
+{
+    let @0: (); // return
+    let dyn_self@1: *mut !; // arg #1
+
+    @0 := ()
+    return
+}
+
 // Full name: alloc::string::{impl Display for String}::fmt::{vtable_method}
 fn {vtable_method}<'_0, '_1, '_2>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
 {
@@ -181,7 +190,7 @@ fn {impl Display for String}::{vtable}() -> core::fmt::Display::{vtable}
 {
     let ret@0: core::fmt::Display::{vtable}; // return
 
-    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const (Opaque(no drop impl found)), method_fmt: const ({vtable_method}<'_, '_, '_>) }
+    ret@0 := core::fmt::Display::{vtable} { size: const (Opaque(unknown size)), align: const (Opaque(unknown align)), drop: const (@Fun21), method_fmt: const ({vtable_method}<'_, '_, '_>) }
     return
 }
 
