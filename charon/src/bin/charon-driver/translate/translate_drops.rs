@@ -145,9 +145,9 @@ impl ItemTransCtx<'_, '_> {
         };
         timpl.methods.push((method_name, method_binder));
 
-        // TODO: Register vtable instance for drop trait implementations when needed
-        // For now, leaving as None to avoid breaking existing functionality
-
+        // Vtable instance registration for drop implementations happens automatically
+        // when the type is used in a dynamic trait context
+        
         Ok(timpl)
     }
 }

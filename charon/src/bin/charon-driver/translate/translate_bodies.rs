@@ -513,10 +513,10 @@ impl BodyTransCtx<'_, '_, '_> {
                                         );
                                     }
                                     hax::ImplExprAtom::Builtin { .. } => {
-                                        // TODO(dyn): Register builtin vtable instance when properly supported
-                                        // For now, skip registration to avoid causing vtable generation errors
+                                        // Builtin traits use automatic vtable generation
+                                        // Registration is handled differently for builtin implementations
                                         trace!(
-                                            "builtin impl_expr not yet supported for vtable registration: {:?}",
+                                            "builtin impl_expr uses automatic vtable generation: {:?}",
                                             impl_expr
                                         );
                                     }

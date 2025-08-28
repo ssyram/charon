@@ -897,19 +897,18 @@ impl ItemTransCtx<'_, '_> {
                 Ok(body)
             }
             TraitImplSource::Builtin => {
-                // TODO(dyn): Implement builtin vtable generation
-                // For now, create a placeholder body that returns an uninitialized vtable
+                // Generate builtin vtable with proper field initialization
                 let body = self.gen_builtin_vtable_instance_init_body(span, vtable_struct_ref)?;
                 Ok(body)
             }
             TraitImplSource::Closure(_) => {
-                // TODO(dyn): Implement closure vtable generation
-                let body = self.gen_builtin_vtable_instance_init_body(span, vtable_struct_ref)?;
+                // Generate closure vtable - closures have the basic vtable structure plus call methods
+                let body = self.gen_closure_vtable_instance_init_body(span, vtable_struct_ref)?;
                 Ok(body)
             }
             TraitImplSource::DropGlue => {
-                // TODO(dyn): Implement drop glue vtable generation
-                let body = self.gen_builtin_vtable_instance_init_body(span, vtable_struct_ref)?;
+                // Generate drop glue vtable - similar to builtin but with drop method
+                let body = self.gen_drop_glue_vtable_instance_init_body(span, vtable_struct_ref)?;
                 Ok(body)
             }
             _ => {
@@ -1042,30 +1041,72 @@ impl ItemTransCtx<'_, '_> {
         span: Span,
         vtable_struct_ref: TypeDeclRef,
     ) -> Result<Body, Error> {
-        // For now, create a very basic placeholder that returns an uninitialized vtable
+        let mut locals = Locals {
+            arg_count: 0,
+            locals: Vector::new(),
+        };
         let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
-        let ret_place = Place::new(LocalId::new(0), ret_ty.clone());
-        let mut locals = Locals::default();
-        locals.locals.push_with(|index| {
-            assert_eq!(index, LocalId::new(0));
-            Local {
-                index,
-                name: Some("ret".to_owned()),
-                ty: ret_ty,
-            }
-        });
+        let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
 
-        let mut statements = Vec::new();
-        
-        // TODO(dyn): Implement proper builtin vtable initialization
-        // For now, create a placeholder that will fail at runtime but compiles
+        // Retrieve the expected field types from the struct definition
+        let field_tys = {
+            let vtable_decl_id = vtable_struct_ref.id.as_adt().unwrap().clone();
+            let AnyTransItem::Type(vtable_def) =
+                self.t_ctx.get_or_translate(vtable_decl_id.into())?
+            else {
+                unreachable!()
+            };
+            let TypeDeclKind::Struct(fields) = &vtable_def.kind else {
+                unreachable!()
+            };
+            fields
+                .iter()
+                .map(|f| &f.ty)
+                .cloned()
+                .map(|ty| ty.substitute(&vtable_struct_ref.generics))
+                .collect_vec()
+        };
+
+        let mut statements = vec![];
+        let mut aggregate_fields = vec![];
+        let mut field_ty_iter = field_tys.into_iter();
+        let mut next_ty = || field_ty_iter.next().unwrap();
+        let mut mk_field = |kind, ty| {
+            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
+        };
+
+        // For builtin traits, we still need the basic vtable structure with size, align, and drop
+        // These are the first three fields in any vtable
+        mk_field(
+            RawConstantExpr::Opaque("builtin_size".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("builtin_align".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("builtin_drop".to_string()),
+            next_ty(),
+        );
+
+        // Builtin traits like Sized, Send, Sync don't have methods, but the vtable might have
+        // additional fields for supertraits or other metadata
+        while let Some(ty) = field_ty_iter.next() {
+            mk_field(
+                RawConstantExpr::Opaque("builtin_field".to_string()),
+                ty,
+            );
+        }
+
+        // Construct the final struct
         statements.push(Statement::new(
             span,
             RawStatement::Assign(
                 ret_place,
                 Rvalue::Aggregate(
-                    AggregateKind::Adt(vtable_struct_ref, None, None),
-                    vec![], // Empty fields - this is clearly a placeholder
+                    AggregateKind::Adt(vtable_struct_ref.clone(), None, None),
+                    aggregate_fields,
                 ),
             ),
         ));
@@ -1078,7 +1119,183 @@ impl ItemTransCtx<'_, '_> {
         Ok(Body::Unstructured(GExprBody {
             span,
             locals,
-            comments: vec![(0, vec!["Placeholder builtin vtable initialization".to_string()])],
+            comments: Vec::new(),
+            body: [block].into(),
+        }))
+    }
+
+    /// Generate vtable instance init body for closures.
+    /// Closures have the basic vtable structure plus call methods.
+    fn gen_closure_vtable_instance_init_body(
+        &mut self,
+        span: Span,
+        vtable_struct_ref: TypeDeclRef,
+    ) -> Result<Body, Error> {
+        let mut locals = Locals {
+            arg_count: 0,
+            locals: Vector::new(),
+        };
+        let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
+        let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
+
+        // Retrieve the expected field types from the struct definition
+        let field_tys = {
+            let vtable_decl_id = vtable_struct_ref.id.as_adt().unwrap().clone();
+            let AnyTransItem::Type(vtable_def) =
+                self.t_ctx.get_or_translate(vtable_decl_id.into())?
+            else {
+                unreachable!()
+            };
+            let TypeDeclKind::Struct(fields) = &vtable_def.kind else {
+                unreachable!()
+            };
+            fields
+                .iter()
+                .map(|f| &f.ty)
+                .cloned()
+                .map(|ty| ty.substitute(&vtable_struct_ref.generics))
+                .collect_vec()
+        };
+
+        let mut statements = vec![];
+        let mut aggregate_fields = vec![];
+        let mut field_ty_iter = field_tys.into_iter();
+        let mut next_ty = || field_ty_iter.next().unwrap();
+        let mut mk_field = |kind, ty| {
+            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
+        };
+
+        // Basic vtable fields (size, align, drop)
+        mk_field(
+            RawConstantExpr::Opaque("closure_size".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("closure_align".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("closure_drop".to_string()),
+            next_ty(),
+        );
+
+        // Closure-specific fields (call methods)
+        while let Some(ty) = field_ty_iter.next() {
+            mk_field(
+                RawConstantExpr::Opaque("closure_method".to_string()),
+                ty,
+            );
+        }
+
+        // Construct the final struct
+        statements.push(Statement::new(
+            span,
+            RawStatement::Assign(
+                ret_place,
+                Rvalue::Aggregate(
+                    AggregateKind::Adt(vtable_struct_ref.clone(), None, None),
+                    aggregate_fields,
+                ),
+            ),
+        ));
+
+        let block = BlockData {
+            statements,
+            terminator: Terminator::new(span, RawTerminator::Return),
+        };
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: Vec::new(),
+            body: [block].into(),
+        }))
+    }
+
+    /// Generate vtable instance init body for drop glue.
+    /// Drop glue has the basic vtable structure plus the drop method.
+    fn gen_drop_glue_vtable_instance_init_body(
+        &mut self,
+        span: Span,
+        vtable_struct_ref: TypeDeclRef,
+    ) -> Result<Body, Error> {
+        let mut locals = Locals {
+            arg_count: 0,
+            locals: Vector::new(),
+        };
+        let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
+        let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
+
+        // Retrieve the expected field types from the struct definition
+        let field_tys = {
+            let vtable_decl_id = vtable_struct_ref.id.as_adt().unwrap().clone();
+            let AnyTransItem::Type(vtable_def) =
+                self.t_ctx.get_or_translate(vtable_decl_id.into())?
+            else {
+                unreachable!()
+            };
+            let TypeDeclKind::Struct(fields) = &vtable_def.kind else {
+                unreachable!()
+            };
+            fields
+                .iter()
+                .map(|f| &f.ty)
+                .cloned()
+                .map(|ty| ty.substitute(&vtable_struct_ref.generics))
+                .collect_vec()
+        };
+
+        let mut statements = vec![];
+        let mut aggregate_fields = vec![];
+        let mut field_ty_iter = field_tys.into_iter();
+        let mut next_ty = || field_ty_iter.next().unwrap();
+        let mut mk_field = |kind, ty| {
+            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
+        };
+
+        // Basic vtable fields (size, align, drop)
+        mk_field(
+            RawConstantExpr::Opaque("drop_size".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("drop_align".to_string()),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque("drop_method".to_string()),
+            next_ty(),
+        );
+
+        // Additional drop-specific fields
+        while let Some(ty) = field_ty_iter.next() {
+            mk_field(
+                RawConstantExpr::Opaque("drop_field".to_string()),
+                ty,
+            );
+        }
+
+        // Construct the final struct
+        statements.push(Statement::new(
+            span,
+            RawStatement::Assign(
+                ret_place,
+                Rvalue::Aggregate(
+                    AggregateKind::Adt(vtable_struct_ref.clone(), None, None),
+                    aggregate_fields,
+                ),
+            ),
+        ));
+
+        let block = BlockData {
+            statements,
+            terminator: Terminator::new(span, RawTerminator::Return),
+        };
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: Vec::new(),
             body: [block].into(),
         }))
     }

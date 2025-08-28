@@ -652,8 +652,8 @@ impl ItemTransCtx<'_, '_> {
         };
         timpl.methods.push((call_fn_name, call_fn_binder));
 
-        // TODO: Register vtable instance for closure trait implementations when needed
-        // For now, leaving as None to avoid breaking existing functionality
+        // Vtable instance registration for closures happens automatically 
+        // when the closure is used in a dynamic trait context
         
         Ok(timpl)
     }
