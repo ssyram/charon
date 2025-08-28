@@ -27,12 +27,9 @@ impl TransformPass for Transform {
         ctx.for_each_fun_decl(|ctx, decl| {
             if let ItemKind::VTableInstance { impl_ref } = &decl.kind {
                 if let Ok(body) = &mut decl.body {
-                    let mut computer = VtableMetadataComputer::new(
-                        ctx,
-                        impl_ref,
-                        decl.item_meta.span,
-                    );
-                    
+                    let mut computer =
+                        VtableMetadataComputer::new(ctx, impl_ref, decl.item_meta.span);
+
                     match computer.compute_vtable_metadata_for_function(body) {
                         Ok(_) => {
                             trace!(
@@ -69,7 +66,11 @@ struct VtableMetadataComputer<'a> {
 
 impl<'a> VtableMetadataComputer<'a> {
     fn new(ctx: &'a mut TransformCtx, impl_ref: &'a TraitImplRef, span: Span) -> Self {
-        Self { ctx, impl_ref, span }
+        Self {
+            ctx,
+            impl_ref,
+            span,
+        }
     }
 
     /// Compute vtable metadata for a specific vtable instance initializer function
@@ -97,7 +98,7 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(())
     }
 
-    /// Check if a type ID represents a vtable struct by getting the correct vtable def-id 
+    /// Check if a type ID represents a vtable struct by getting the correct vtable def-id
     /// from the impl-ref: impl-ref → def-id of implemented trait → get definition of the trait → get the vtable-ref → get the type-def-id of target vtable
     fn is_vtable_struct(&self, type_id: &TypeId) -> Result<bool, Error> {
         let TypeId::Adt(type_decl_id) = type_id else {
@@ -187,7 +188,7 @@ impl<'a> VtableMetadataComputer<'a> {
     fn generate_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
         // Analyze what kind of drop functionality this type has
         let drop_case = self.analyze_drop_case(concrete_ty)?;
-        
+
         match drop_case {
             DropCase::Found(fun_ref) => {
                 // Case 1: Drop function found - generate shim that calls it
@@ -212,19 +213,22 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Create a drop shim that calls the actual drop function (Case 1)
-    fn create_drop_shim_with_call(&mut self, fun_ref: &FunDeclRef, concrete_ty: &Ty) -> Result<Operand, Error> {
-        // Generate a shim that will call the actual drop function
+    fn create_drop_shim_with_call(
+        &mut self,
+        fun_ref: &FunDeclRef,
+        concrete_ty: &Ty,
+    ) -> Result<Operand, Error> {
+        // For now, generate a meaningful function name that indicates this will call the drop function
         // TODO: Generate actual function body that calls the drop function
-        // For now, create a structured function reference that indicates the call intent
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
         
-        // Create a more structured representation that shows this will be a function call
+        let shim_name = format!("vtable_drop_shim_call_{}_{}", 
+            fun_ref.id.index(), 
+            self.type_to_string(concrete_ty));
+        
+        // Create a structured representation that shows this will be a function call
         let shim_const = ConstantExpr {
-            value: RawConstantExpr::Opaque(format!(
-                "drop_shim_calls_fn_{:?}_for_{}",
-                fun_ref.id,
-                self.type_to_string(concrete_ty)
-            )),
+            value: RawConstantExpr::Opaque(shim_name),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
@@ -232,16 +236,14 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create an empty drop shim for types that don't need drop (Case 2)  
     fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        // Generate a shim with empty function body
         // TODO: Generate actual function body that just returns
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
         
+        let shim_name = format!("vtable_drop_shim_empty_{}", self.type_to_string(concrete_ty));
+        
         // Create a structured representation that shows this will be an empty function
         let shim_const = ConstantExpr {
-            value: RawConstantExpr::Opaque(format!(
-                "drop_shim_empty_returns_for_{}",
-                self.type_to_string(concrete_ty)
-            )),
+            value: RawConstantExpr::Opaque(shim_name),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
@@ -249,17 +251,17 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create a panic drop shim for missing drop functions (Case 3)
     fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
-        // Generate a shim with panic statement  
         // TODO: Generate actual function body with panic statement
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
         
+        let shim_name = format!("vtable_drop_shim_panic_{}__{}",
+            self.type_to_string(concrete_ty),
+            msg.replace(' ', "_").replace(':', "_")
+        );
+        
         // Create a structured representation that shows this will be a panic function
         let shim_const = ConstantExpr {
-            value: RawConstantExpr::Opaque(format!(
-                "drop_shim_panics_with_msg_{}__for_{}",
-                msg.replace(' ', "_").replace(':', "_"),
-                self.type_to_string(concrete_ty)
-            )),
+            value: RawConstantExpr::Opaque(shim_name),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
@@ -290,7 +292,9 @@ impl<'a> VtableMetadataComputer<'a> {
             }
             None => {
                 let opaque_const = ConstantExpr {
-                    value: RawConstantExpr::Opaque("size not available due to generics".to_string()),
+                    value: RawConstantExpr::Opaque(
+                        "size not available due to generics".to_string(),
+                    ),
                     ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
                 };
                 Ok(Operand::Const(Box::new(opaque_const)))
@@ -323,7 +327,9 @@ impl<'a> VtableMetadataComputer<'a> {
             }
             None => {
                 let opaque_const = ConstantExpr {
-                    value: RawConstantExpr::Opaque("align not available due to generics".to_string()),
+                    value: RawConstantExpr::Opaque(
+                        "align not available due to generics".to_string(),
+                    ),
                     ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
                 };
                 Ok(Operand::Const(Box::new(opaque_const)))
@@ -341,14 +347,16 @@ impl<'a> VtableMetadataComputer<'a> {
                     for trait_impl in self.ctx.translated.trait_impls.iter() {
                         // Check if this is a drop implementation for our type
                         let trait_decl_ref = &trait_impl.impl_trait;
-                        
+
                         // Check if this implements the Drop trait
                         if self.is_drop_trait(&trait_decl_ref.id) {
                             // Check if the self type matches our concrete type
                             if let Some(self_ty) = self.get_impl_self_type(trait_impl) {
                                 if self.types_match(concrete_ty, &self_ty) {
                                     // Found drop implementation - create function reference
-                                    if let Some(drop_method) = trait_impl.methods.iter().find(|(name, _)| name.0 == "drop") {
+                                    if let Some(drop_method) =
+                                        trait_impl.methods.iter().find(|(name, _)| name.0 == "drop")
+                                    {
                                         let fun_ref = drop_method.1.skip_binder.clone();
                                         return Ok(DropCase::Found(fun_ref));
                                     }
@@ -356,10 +364,13 @@ impl<'a> VtableMetadataComputer<'a> {
                             }
                         }
                     }
-                    
+
                     // No drop implementation found - check if one is needed
                     if self.type_needs_drop(concrete_ty) {
-                        Ok(DropCase::NotTranslated(format!("Drop implementation for {:?} not found or not translated", concrete_ty)))
+                        Ok(DropCase::NotTranslated(format!(
+                            "Drop implementation for {:?} not found or not translated",
+                            concrete_ty
+                        )))
                     } else {
                         Ok(DropCase::NotNeeded)
                     }
@@ -367,10 +378,10 @@ impl<'a> VtableMetadataComputer<'a> {
                     Ok(DropCase::NotNeeded)
                 }
             }
-            
+
             // For literal types like i32, no drop is needed
             TyKind::Literal(_) => Ok(DropCase::NotNeeded),
-            
+
             // For other types, conservatively assume no drop is needed for now
             _ => Ok(DropCase::NotNeeded),
         }
@@ -404,15 +415,11 @@ impl<'a> VtableMetadataComputer<'a> {
     fn types_match(&self, ty1: &Ty, ty2: &Ty) -> bool {
         match (ty1.kind(), ty2.kind()) {
             // ADT types - match by ID
-            (TyKind::Adt(ref1), TyKind::Adt(ref2)) => {
-                ref1.id == ref2.id
-            }
+            (TyKind::Adt(ref1), TyKind::Adt(ref2)) => ref1.id == ref2.id,
             // Literal types - exact match
-            (TyKind::Literal(lit1), TyKind::Literal(lit2)) => {
-                lit1 == lit2
-            }
+            (TyKind::Literal(lit1), TyKind::Literal(lit2)) => lit1 == lit2,
             // For other types, use structural equality
-            _ => ty1 == ty2
+            _ => ty1 == ty2,
         }
     }
 
@@ -546,7 +553,7 @@ impl<'a> VtableMetadataComputer<'a> {
             },
             TyKind::Adt(type_decl_ref) => {
                 format!("adt_{:?}", type_decl_ref.id)
-            },
+            }
             _ => format!("{:?}", ty).chars().take(50).collect(),
         }
     }
