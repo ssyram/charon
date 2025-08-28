@@ -520,8 +520,52 @@ impl BodyTransCtx<'_, '_, '_> {
                                         );
                                         eprintln!("BUILTIN TRAIT_DATA: {:?}", trait_data);
 
-                                        // For builtin implementations, we need to ensure the vtable instance
-                                        // gets created when it's used in unsize coercion
+                                        // For closures, extract the closure information from the operand
+                                        // Check if the operand is a closure
+                                        let op_ty = match hax_operand {
+                                            hax::Operand::Move(p) | hax::Operand::Copy(p) => p.ty.kind(),
+                                            hax::Operand::Constant(c) => c.ty.kind(),
+                                        };
+                                        
+                                        if let hax::TyKind::Closure(closure) = op_ty {
+                                            eprintln!("FOUND CLOSURE IN UNSIZE CAST: {:?}", closure);
+                                            
+                                            // Get the closure trait reference from impl_expr
+                                            let trait_ref = &impl_expr.r#trait;
+                                            let erased_trait_ref = trait_ref
+                                                .hax_skip_binder_ref()
+                                                .erase(&self.hax_state_with_id());
+                                            
+                                            if let Ok(trait_def) = self.hax_def(&erased_trait_ref) {
+                                                // Determine the trait implementation source based on lang_item
+                                                if let Some(lang_item) = &trait_def.lang_item {
+                                                    let source = match lang_item.as_str() {
+                                                        "fn_once" => TraitImplSource::Closure(ClosureKind::FnOnce),
+                                                        "fn_mut" => TraitImplSource::Closure(ClosureKind::FnMut),
+                                                        "r#fn" => TraitImplSource::Closure(ClosureKind::Fn),
+                                                        _ => {
+                                                            eprintln!("UNKNOWN CLOSURE LANG ITEM: {}", lang_item);
+                                                            TraitImplSource::TraitAlias
+                                                        }
+                                                    };
+                                                    
+                                                    // Get the closure definition using the item reference
+                                                    if let Ok(closure_def) = self.hax_def(&closure.item) {
+                                                        eprintln!("GOT CLOSURE DEF: {:?}", closure_def.this());
+                                                        
+                                                        // Register the vtable instance for this closure trait implementation
+                                                        let _vtable_ref: GlobalDeclId = self.register_item(
+                                                            span,
+                                                            closure_def.this(),
+                                                            TransItemSourceKind::VTableInstance(source),
+                                                        );
+                                                        eprintln!("REGISTERED CLOSURE VTABLE INSTANCE: {:?} for source: {:?}", _vtable_ref, source);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        // Original fallback logic
                                         let trait_ref = &impl_expr.r#trait;
                                         let erased_trait_ref = trait_ref
                                             .hax_skip_binder_ref()
@@ -557,25 +601,10 @@ impl BodyTransCtx<'_, '_, '_> {
                                         eprintln!("DETERMINED TRAITIMPLSOURCE: {:?}", source);
 
                                         // Register the vtable instance using the trait reference
-                                        // TODO: For builtin impls, we need to handle vtable instances differently
-                                        // since we don't have concrete impl references
-                                        eprintln!("SKIPPING VTABLE REGISTRATION FOR BUILTIN IMPL");
-                                        /*
-                                        let _vtable_ref = self.translate_region_binder(
-                                            span,
-                                            trait_ref,
-                                            |ctx, tref| {
-                                                ctx.translate_vtable_instance_ref(
-                                                    span,
-                                                    tref,
-                                                    trait_ref.hax_skip_binder_ref(),
-                                                    source,
-                                                )
-                                            },
-                                        )?;
-
-                                        eprintln!("REGISTERED VTABLE INSTANCE: {:?}", _vtable_ref);
-                                        */
+                                        // For builtin impls (closures), we can't get the implementation reference
+                                        // directly since they're compiler-generated. Instead, we need to determine
+                                        // the correct vtable instance based on the context.
+                                        eprintln!("BUILTIN IMPL - would register vtable for source: {:?}", source);
                                     }
                                     _ => {
                                         trace!(
