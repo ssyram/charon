@@ -164,7 +164,7 @@ fn vtable_drop_shim_call_20_adt_Adt(2)(@1: *mut ())
     let ret@0: (); // return
     let self@1: *mut (); // arg #1
 
-    ret@0 := {impl Drop for String}::drop<missing('_0_0)>(copy (self@1))
+    ret@0 := {impl Drop for String}::drop<'_>(copy (self@1))
     ret@0 := ()
     return
 }

@@ -223,7 +223,7 @@ impl<'a> VtableMetadataComputer<'a> {
             self.type_to_string(concrete_ty));
         
         // Create actual function that calls the drop function
-        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
+        let drop_fn_type = self.create_drop_fn_type();
         let shim_id = self.create_drop_shim_function(&shim_name, fun_ref.clone(), DropShimKind::CallDrop)?;
         
         // Return function reference as operand
@@ -242,7 +242,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let shim_name = format!("vtable_drop_shim_empty_{}", self.type_to_string(concrete_ty));
         
         // Create actual function that just returns
-        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
+        let drop_fn_type = self.create_drop_fn_type();
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
@@ -265,7 +265,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let shim_name = format!("vtable_drop_shim_panic_{}", self.type_to_string(concrete_ty));
         
         // Create actual function that panics
-        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
+        let drop_fn_type = self.create_drop_fn_type();
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
@@ -574,11 +574,12 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Create the function pointer type for a drop function: `fn(*mut dyn Trait)`
-    fn create_drop_fn_type(&self, concrete_ty: &Ty) -> Ty {
-        // TODO: Create the correct dyn trait type based on the concrete type
-        // For now, use a placeholder
-        let mut_ptr_ty = TyKind::RawPtr(concrete_ty.clone(), RefKind::Mut).into_ty();
+    /// Create the function pointer type for a drop function: `fn(*mut ())`
+    /// TODO: This should be `fn(&mut dyn Trait)` but for now we'll use a simpler approach
+    fn create_drop_fn_type(&self) -> Ty {
+        // For now, use `*mut ()` as the parameter type
+        // This maintains compatibility while we work on the proper DynTrait implementation
+        let mut_ptr_ty = TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty();
         let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
         TyKind::FnPtr(fn_sig).into_ty()
     }
@@ -632,7 +633,15 @@ impl<'a> VtableMetadataComputer<'a> {
                 let mut blocks = Vector::new();
                 
                 let call = Call {
-                    func: FnOperand::Regular(drop_fn_ref.into()),
+                    func: FnOperand::Regular(FnPtr::from(FunDeclRef {
+                        id: drop_fn_ref.id,
+                        generics: Box::new(GenericArgs {
+                            regions: Vector::from_iter(vec![Region::Erased]),
+                            types: Vector::new(),
+                            const_generics: Vector::new(),
+                            trait_refs: Vector::new(),
+                        }),
+                    })),
                     args: vec![Operand::Copy(Place::new(LocalId::new(1), self_ty.clone()))],
                     dest: Place::new(LocalId::new(0), Ty::mk_unit()),
                 };
