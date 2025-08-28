@@ -13,7 +13,7 @@ where
 {
   size: usize,
   align: usize,
-  drop: fn(*mut (dyn exists<_dyn> [@TraitClause0]: Any<_dyn> + _dyn : '_)),
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Any<_dyn> + _dyn : '_))),
   method_type_id: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Any<_dyn> + _dyn : '_))) -> TypeId,
   super_trait_0: &'static (core::marker::MetaSized::{vtable}),
 }
