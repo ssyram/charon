@@ -248,29 +248,35 @@ fn compute_drop_operand(
     let drop_case = analyze_drop_case(ctx, concrete_ty)?;
     
     match drop_case {
-        DropCase::Found(_fun_ref) => {
-            // Case 1: Drop function found - create opaque placeholder for now with better message
-            // TODO: Generate proper shim function that relays to target via Concretize cast
+        DropCase::Found(fun_ref) => {
+            // Case 1: Drop function found - try to generate a proper function reference
+            // For now, create an improved placeholder but at least identify the found function
             let opaque_const = ConstantExpr {
                 value: RawConstantExpr::Opaque(format!(
-                    "drop shim for {} with drop function found (relay not yet implemented)",
-                    type_to_string(concrete_ty)
+                    "drop shim for {} with drop function {:?} found (relay not yet implemented)",
+                    type_to_string(concrete_ty),
+                    fun_ref.func
                 )),
                 ty: create_drop_fn_type(concrete_ty),
             };
             Ok(Operand::Const(Box::new(opaque_const)))
         }
         DropCase::NotNeeded => {
-            // Case 2: No drop function needed - create opaque placeholder with clear message
-            // TODO: Generate proper shim function that does nothing and returns
-            let opaque_const = ConstantExpr {
-                value: RawConstantExpr::Opaque(format!(
-                    "drop shim for {} with no drop needed (noop not yet implemented)",
-                    type_to_string(concrete_ty)
-                )),
-                ty: create_drop_fn_type(concrete_ty),
-            };
-            Ok(Operand::Const(Box::new(opaque_const)))
+            // Case 2: No drop function needed - try to create a minimal noop reference
+            // Instead of opaque, try to create a reference to a simple function that does nothing
+            if let Ok(noop_operand) = create_noop_drop_operand(ctx, concrete_ty, span) {
+                Ok(noop_operand)
+            } else {
+                // Fallback to opaque if we can't create the noop
+                let opaque_const = ConstantExpr {
+                    value: RawConstantExpr::Opaque(format!(
+                        "drop shim for {} with no drop needed (noop not yet implemented)",
+                        type_to_string(concrete_ty)
+                    )),
+                    ty: create_drop_fn_type(concrete_ty),
+                };
+                Ok(Operand::Const(Box::new(opaque_const)))
+            }
         }
         DropCase::NotTranslated(msg) => {
             // Case 3: Drop function not translated - register error and create opaque
@@ -293,6 +299,17 @@ fn compute_drop_operand(
             Ok(Operand::Const(Box::new(opaque_const)))
         }
     }
+}
+
+/// Try to create a noop drop operand for types that don't need drop
+fn create_noop_drop_operand(
+    ctx: &mut TransformCtx,
+    concrete_ty: &Ty,
+    span: Span,
+) -> Result<Operand, Error> {
+    // For types that don't need drop, try to create a simple function that does nothing
+    // This is a simplified approach - just return an error for now to fall back to opaque
+    Err("Noop drop function generation not yet implemented".into())
 }
 
 /// Get the size of a type from its layout information
@@ -410,7 +427,7 @@ fn analyze_drop_case(ctx: &TransformCtx, concrete_ty: &Ty) -> Result<DropCase, E
                     let trait_ref = &trait_impl.impl_trait;
                     
                     // Check if this implements the Drop trait
-                    if is_drop_trait(&trait_ref.id) {
+                    if is_drop_trait(ctx, &trait_ref.id) {
                         // Check if the self type matches our concrete type
                         if let Some(self_ty) = get_impl_self_type(ctx, trait_impl) {
                             if types_match(concrete_ty, &self_ty) {
@@ -444,25 +461,43 @@ fn analyze_drop_case(ctx: &TransformCtx, concrete_ty: &Ty) -> Result<DropCase, E
 }
 
 /// Check if a trait declaration is the Drop trait
-fn is_drop_trait(_trait_decl_id: &TraitDeclId) -> bool {
-    // Look up the trait declaration and check if it's the Drop trait
-    // For simplicity, assume trait IDs with specific patterns indicate Drop
-    // This is a conservative approach - could be improved with better trait resolution
-    false // Placeholder for now - need to implement proper Drop trait detection
+fn is_drop_trait(ctx: &TransformCtx, trait_decl_id: &TraitDeclId) -> bool {
+    // Look up the trait declaration and check if it has the "drop" lang_item
+    if let Some(trait_decl) = ctx.translated.trait_decls.get(*trait_decl_id) {
+        if let Some(ref lang_item) = trait_decl.item_meta.lang_item {
+            return lang_item == "drop";
+        }
+    }
+    false
 }
 
 /// Get the self type from a trait implementation
 fn get_impl_self_type(_ctx: &TransformCtx, trait_impl: &TraitImpl) -> Option<Ty> {
-    // Extract the self type from the trait implementation
-    // This is usually the first type in the generic arguments of the implemented trait
-    let type_var_id = TypeVarId::new(0);
-    trait_impl.impl_trait.generics.types.get(type_var_id).cloned()
+    // For Drop implementations, the Self type is typically found in the implemented trait's generics
+    // The Drop trait is `Drop<Self>` so the first generic argument is the Self type
+    if let Some(first_generic) = trait_impl.impl_trait.generics.types.get(TypeVarId::new(0)) {
+        Some(first_generic.clone())
+    } else {
+        // If no generic types, try to extract from the trait implementation structure
+        // This is a fallback - the actual self type might be encoded elsewhere
+        None
+    }
 }
 
 /// Check if two types match for the purpose of drop implementation lookup
 fn types_match(ty1: &Ty, ty2: &Ty) -> bool {
-    // Simple structural comparison - could be more sophisticated
-    ty1 == ty2
+    match (ty1.kind(), ty2.kind()) {
+        // ADT types - match by ID
+        (TyKind::Adt(ref1), TyKind::Adt(ref2)) => {
+            ref1.id == ref2.id
+        }
+        // Literal types - exact match
+        (TyKind::Literal(lit1), TyKind::Literal(lit2)) => {
+            lit1 == lit2
+        }
+        // For other types, use structural equality
+        _ => ty1 == ty2
+    }
 }
 
 /// Check if a type needs drop (conservative approach)
