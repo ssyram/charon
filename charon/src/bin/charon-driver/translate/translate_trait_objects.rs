@@ -586,10 +586,27 @@ impl ItemTransCtx<'_, '_> {
             TransItemSourceKind::VTableInstanceInitializer(*impl_kind),
         );
 
+        // For closures, use minimal generics without synthetic type variables
+        let generics = match impl_kind {
+            TraitImplSource::Closure(_) => {
+                // For closures, create generics with only regions, no type variables
+                GenericParams {
+                    regions: self.into_generics().regions,
+                    types: Vector::new(),
+                    const_generics: Vector::new(),
+                    trait_clauses: Vector::new(),
+                    regions_outlive: Vec::new(),
+                    types_outlive: Vec::new(),
+                    trait_type_constraints: Vector::new(),
+                }
+            }
+            _ => self.into_generics(),
+        };
+
         Ok(GlobalDecl {
             def_id: global_id,
             item_meta,
-            generics: self.into_generics(),
+            generics,
             kind: ItemKind::VTableInstance { impl_ref },
             // it should be static to have its own address
             global_kind: GlobalKind::Static,
@@ -1014,9 +1031,24 @@ impl ItemTransCtx<'_, '_> {
         );
 
         // Signature: `() -> VTable`.
+        let generics = match impl_kind {
+            TraitImplSource::Closure(_) => {
+                // For closures, create generics with only regions, no type variables
+                GenericParams {
+                    regions: self.the_only_binder().params.regions.clone(),
+                    types: Vector::new(),
+                    const_generics: Vector::new(),
+                    trait_clauses: Vector::new(),
+                    regions_outlive: Vec::new(),
+                    types_outlive: Vec::new(),
+                    trait_type_constraints: Vector::new(),
+                }
+            }
+            _ => self.the_only_binder().params.clone(),
+        };
         let sig = FunSig {
             is_unsafe: false,
-            generics: self.the_only_binder().params.clone(),
+            generics,
             inputs: vec![],
             output: Ty::new(TyKind::Adt(vtable_struct_ref.clone())),
         };
