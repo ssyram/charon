@@ -543,7 +543,39 @@ impl ItemTransCtx<'_, '_> {
         impl_kind: &TraitImplSource,
     ) -> Result<GlobalDecl, Error> {
         let span = item_meta.span;
-        self.translate_def_generics(span, impl_def)?;
+        
+        // For closure vtable instances, we need special handling of generics
+        // because closures have synthetic type variables that can't be resolved normally
+        match impl_kind {
+            TraitImplSource::Closure(_) => {
+                // For closures, we use the closure's own generics (regions only)
+                // and don't try to resolve synthetic type variables
+                assert!(self.binding_levels.len() == 0);
+                self.binding_levels.push(BindingLevel::new(true));
+                // Only push the closure's region generics, skip synthetic type variables
+                if let hax::FullDefKind::Closure { args, .. } = impl_def.kind() {
+                    // Add the lifetime generics coming from the by-ref upvars.
+                    args.upvar_tys.iter().for_each(|ty| {
+                        if matches!(
+                            ty.kind(),
+                            hax::TyKind::Ref(
+                                hax::Region {
+                                    kind: hax::RegionKind::ReErased
+                                },
+                                ..
+                            )
+                        ) {
+                            let _region_var = self.innermost_binder_mut().push_upvar_region();
+                        }
+                    });
+                }
+                self.innermost_binder_mut().params.check_consistency();
+            }
+            _ => {
+                // For normal trait implementations, use the standard generic translation
+                self.translate_def_generics(span, impl_def)?;
+            }
+        }
 
         let (impl_ref, _, vtable_struct_ref) =
             self.get_vtable_instance_info(span, impl_def, impl_kind)?;
@@ -939,7 +971,39 @@ impl ItemTransCtx<'_, '_> {
         impl_kind: &TraitImplSource,
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
-        self.translate_def_generics(span, impl_def)?;
+        
+        // For closure vtable instances, we need special handling of generics
+        // because closures have synthetic type variables that can't be resolved normally
+        match impl_kind {
+            TraitImplSource::Closure(_) => {
+                // For closures, we use the closure's own generics (regions only)
+                // and don't try to resolve synthetic type variables
+                assert!(self.binding_levels.len() == 0);
+                self.binding_levels.push(BindingLevel::new(true));
+                // Only push the closure's region generics, skip synthetic type variables
+                if let hax::FullDefKind::Closure { args, .. } = impl_def.kind() {
+                    // Add the lifetime generics coming from the by-ref upvars.
+                    args.upvar_tys.iter().for_each(|ty| {
+                        if matches!(
+                            ty.kind(),
+                            hax::TyKind::Ref(
+                                hax::Region {
+                                    kind: hax::RegionKind::ReErased
+                                },
+                                ..
+                            )
+                        ) {
+                            let _region_var = self.innermost_binder_mut().push_upvar_region();
+                        }
+                    });
+                }
+                self.innermost_binder_mut().params.check_consistency();
+            }
+            _ => {
+                // For normal trait implementations, use the standard generic translation
+                self.translate_def_generics(span, impl_def)?;
+            }
+        }
 
         let (impl_ref, _, vtable_struct_ref) =
             self.get_vtable_instance_info(span, impl_def, impl_kind)?;
