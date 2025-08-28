@@ -655,26 +655,15 @@ impl<'a> VtableMetadataComputer<'a> {
         // Get the generics from the trait impl - drop shims should have the same generics
         let generics = self.get_trait_impl_generics()?;
         
-        // Get the proper drop function type and extract the parameter type  
-        let drop_fn_type = self.create_drop_fn_type()?;
-        
-        let self_ty = if let TyKind::FnPtr(fn_sig) = drop_fn_type.kind() {
-            if let Some(first_param) = fn_sig.skip_binder.0.get(0) {
-                first_param.clone()
-            } else {
-                // Fallback if no parameters
-                TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty()
-            }
-        } else {
-            // Fallback if not a function pointer
-            TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty()
-        };
+        // Create the dyn trait type for the parameter
+        // For the drop shim, we need *mut (dyn Trait<...>)
+        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
 
         // Create function signature with proper generics
         let signature = FunSig {
             is_unsafe: false,
             generics,
-            inputs: vec![self_ty.clone()],
+            inputs: vec![dyn_trait_param_ty.clone()],
             output: Ty::mk_unit(),
         };
 
@@ -693,7 +682,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let self_local = Local {
             index: LocalId::new(1), 
             name: Some("self".to_string()),
-            ty: self_ty.clone(),
+            ty: dyn_trait_param_ty.clone(),
         };
 
         let _ = locals.locals.push_with(|_| ret_local);
@@ -746,8 +735,8 @@ impl<'a> VtableMetadataComputer<'a> {
                     content: RawStatement::Assign(
                         Place::new(concrete_local_id, concrete_ref_ty.clone()),
                         Rvalue::UnaryOp(
-                            UnOp::Cast(CastKind::Concretize(self_ty.clone(), concrete_ref_ty.clone())),
-                            Operand::Move(Place::new(LocalId::new(1), self_ty.clone()))
+                            UnOp::Cast(CastKind::Concretize(dyn_trait_param_ty.clone(), concrete_ref_ty.clone())),
+                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone()))
                         )
                     ),
                     comments_before: vec![],
@@ -869,6 +858,38 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         Ok(trait_impl.generics.clone())
+    }
+
+    /// Create the dyn trait parameter type for drop shim functions
+    /// This should be *mut (dyn Trait<...>) to match the expected vtable contract
+    fn create_dyn_trait_param_type(&self) -> Result<Ty, Error> {
+        // Extract the dyn trait type from the vtable definition using the existing method
+        let drop_fn_type = self.create_drop_fn_type()?;
+        
+        // Check if we can extract the parameter type from the vtable drop function signature
+        if let TyKind::FnPtr(fn_sig) = drop_fn_type.kind() {
+            if let Some(first_param) = fn_sig.skip_binder.0.get(0) {
+                // The vtable has the drop function type, but we need to convert it to raw pointer
+                // if it's a reference type
+                match first_param.kind() {
+                    TyKind::Ref(_, inner_ty, RefKind::Mut) => {
+                        // Convert &mut (dyn Trait) to *mut (dyn Trait)
+                        return Ok(TyKind::RawPtr(inner_ty.clone(), RefKind::Mut).into_ty());
+                    }
+                    TyKind::RawPtr(_, _) => {
+                        // Already a raw pointer, use as-is
+                        return Ok(first_param.clone());
+                    }
+                    _ => {
+                        // Some other type - wrap it in a raw pointer
+                        return Ok(TyKind::RawPtr(first_param.clone(), RefKind::Mut).into_ty());
+                    }
+                }
+            }
+        }
+        
+        // Fallback: create a basic *mut () type
+        Ok(TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty())
     }
 
     /// Create the generic arguments to be used when calling the drop function
