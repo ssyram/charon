@@ -513,14 +513,11 @@ impl BodyTransCtx<'_, '_, '_> {
                                         );
                                     }
                                     hax::ImplExprAtom::Builtin { .. } => {
-                                        // Register builtin vtable instance
-                                        let trait_ref = impl_expr.r#trait.hax_skip_binder_ref();
-                                        let _: GlobalDeclId = self.register_item(
-                                            span,
-                                            trait_ref,
-                                            TransItemSourceKind::VTableInstance(
-                                                TraitImplSource::Builtin,
-                                            ),
+                                        // TODO(dyn): Register builtin vtable instance when properly supported
+                                        // For now, skip registration to avoid causing vtable generation errors
+                                        trace!(
+                                            "builtin impl_expr not yet supported for vtable registration: {:?}",
+                                            impl_expr
                                         );
                                     }
                                     _ => {
