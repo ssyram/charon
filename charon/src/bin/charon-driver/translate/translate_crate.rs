@@ -87,6 +87,8 @@ pub enum TraitImplSource {
     /// A fictitious `impl Drop for T` that contains the drop glue code for the given ADT. The
     /// `DefId` is that of the ADT.
     DropGlue,
+    /// A builtin or auto trait implementation computed by the compiler.
+    Builtin,
 }
 
 impl TransItemSource {

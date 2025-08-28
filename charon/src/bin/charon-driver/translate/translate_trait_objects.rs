@@ -469,9 +469,23 @@ impl ItemTransCtx<'_, '_> {
         impl_def: &'a hax::FullDef,
         impl_kind: &TraitImplSource,
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
-        let implemented_trait = match impl_def.kind() {
-            hax::FullDefKind::TraitImpl { trait_pred, .. } => &trait_pred.trait_ref,
-            _ => unreachable!(),
+        let implemented_trait = match (impl_def.kind(), impl_kind) {
+            (hax::FullDefKind::TraitImpl { trait_pred, .. }, _) => &trait_pred.trait_ref,
+            (hax::FullDefKind::Closure { fn_once_impl, .. }, TraitImplSource::Closure(_)) => {
+                &fn_once_impl.trait_pred.trait_ref
+            }
+            (hax::FullDefKind::Adt { drop_impl, .. }, TraitImplSource::DropGlue) => {
+                &drop_impl.trait_pred.trait_ref  
+            }
+            _ => {
+                raise_error!(
+                    self,
+                    span,
+                    "Unsupported combination of impl_def kind {:?} and impl_kind {:?}",
+                    impl_def.kind(),
+                    impl_kind
+                );
+            }
         };
         let vtable_struct_ref = self
             .translate_vtable_struct_ref(span, implemented_trait)?
@@ -882,6 +896,22 @@ impl ItemTransCtx<'_, '_> {
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;
                 Ok(body)
             }
+            TraitImplSource::Builtin => {
+                // TODO(dyn): Implement builtin vtable generation
+                // For now, create a placeholder body that returns an uninitialized vtable
+                let body = self.gen_builtin_vtable_instance_init_body(span, vtable_struct_ref)?;
+                Ok(body)
+            }
+            TraitImplSource::Closure(_) => {
+                // TODO(dyn): Implement closure vtable generation
+                let body = self.gen_builtin_vtable_instance_init_body(span, vtable_struct_ref)?;
+                Ok(body)
+            }
+            TraitImplSource::DropGlue => {
+                // TODO(dyn): Implement drop glue vtable generation
+                let body = self.gen_builtin_vtable_instance_init_body(span, vtable_struct_ref)?;
+                Ok(body)
+            }
             _ => {
                 raise_error!(
                     self,
@@ -1002,6 +1032,54 @@ impl ItemTransCtx<'_, '_> {
             locals,
             comments: Vec::new(),
             body: blocks,
+        }))
+    }
+
+    /// Generate a placeholder vtable instance init body for builtin traits.
+    /// This is a framework implementation that will be expanded later.
+    fn gen_builtin_vtable_instance_init_body(
+        &mut self,
+        span: Span,
+        vtable_struct_ref: TypeDeclRef,
+    ) -> Result<Body, Error> {
+        // For now, create a very basic placeholder that returns an uninitialized vtable
+        let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
+        let ret_place = Place::new(LocalId::new(0), ret_ty.clone());
+        let mut locals = Locals::default();
+        locals.locals.push_with(|index| {
+            assert_eq!(index, LocalId::new(0));
+            Local {
+                index,
+                name: Some("ret".to_owned()),
+                ty: ret_ty,
+            }
+        });
+
+        let mut statements = Vec::new();
+        
+        // TODO(dyn): Implement proper builtin vtable initialization
+        // For now, create a placeholder that will fail at runtime but compiles
+        statements.push(Statement::new(
+            span,
+            RawStatement::Assign(
+                ret_place,
+                Rvalue::Aggregate(
+                    AggregateKind::Adt(vtable_struct_ref, None, None),
+                    vec![], // Empty fields - this is clearly a placeholder
+                ),
+            ),
+        ));
+
+        let block = BlockData {
+            statements,
+            terminator: Terminator::new(span, RawTerminator::Return),
+        };
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: vec![(0, vec!["Placeholder builtin vtable initialization".to_string()])],
+            body: [block].into(),
         }))
     }
 

@@ -512,7 +512,17 @@ impl BodyTransCtx<'_, '_, '_> {
                                             ),
                                         );
                                     }
-                                    // TODO(dyn): more ways of registering vtable instance?
+                                    hax::ImplExprAtom::Builtin { .. } => {
+                                        // Register builtin vtable instance
+                                        let trait_ref = impl_expr.r#trait.hax_skip_binder_ref();
+                                        let _: GlobalDeclId = self.register_item(
+                                            span,
+                                            trait_ref,
+                                            TransItemSourceKind::VTableInstance(
+                                                TraitImplSource::Builtin,
+                                            ),
+                                        );
+                                    }
                                     _ => {
                                         trace!(
                                             "impl_expr not triggering registering vtable: {:?}",

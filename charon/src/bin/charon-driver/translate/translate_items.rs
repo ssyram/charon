@@ -119,6 +119,11 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                         bt_ctx.translate_closure_trait_impl(id, item_meta, &def, kind)?
                     }
                     TraitImplSource::DropGlue => bt_ctx.translate_drop_impl(id, item_meta, &def)?,
+                    TraitImplSource::Builtin => {
+                        // TODO(dyn): Implement builtin trait impl translation
+                        // For now, fallback to normal trait impl translation
+                        bt_ctx.translate_trait_impl(id, item_meta, &def)?
+                    }
                 };
                 self.translated.trait_impls.set_slot(id, trait_impl);
             }
