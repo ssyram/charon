@@ -652,7 +652,10 @@ impl<'a> VtableMetadataComputer<'a> {
         kind: DropShimKind,
         concrete_ty: &Ty,
     ) -> Result<FunDeclId, Error> {
-        // Get the proper drop function type and extract the parameter type
+        // Get the generics from the trait impl - drop shims should have the same generics
+        let generics = self.get_trait_impl_generics()?;
+        
+        // Get the proper drop function type and extract the parameter type  
         let drop_fn_type = self.create_drop_fn_type()?;
         
         let self_ty = if let TyKind::FnPtr(fn_sig) = drop_fn_type.kind() {
@@ -667,10 +670,10 @@ impl<'a> VtableMetadataComputer<'a> {
             TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty()
         };
 
-        // Create function signature
+        // Create function signature with proper generics
         let signature = FunSig {
             is_unsafe: false,
-            generics: GenericParams::empty(),
+            generics,
             inputs: vec![self_ty.clone()],
             output: Ty::mk_unit(),
         };
@@ -753,12 +756,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 let call = Call {
                     func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                         id: drop_fn_ref.id,
-                        generics: Box::new(GenericArgs {
-                            regions: Vector::from_iter(vec![Region::Erased]),
-                            types: Vector::new(),
-                            const_generics: Vector::new(),
-                            trait_refs: Vector::new(),
-                        }),
+                        generics: Box::new(self.create_drop_function_generics()?),
                     })),
                     args: vec![Operand::Move(Place::new(concrete_local_id, concrete_ref_ty))],
                     dest: Place::new(LocalId::new(0), Ty::mk_unit()),
@@ -857,6 +855,47 @@ impl<'a> VtableMetadataComputer<'a> {
         });
 
         Ok(shim_id)
+    }
+
+    /// Get the generics from the trait impl that should be used for drop shim functions
+    fn get_trait_impl_generics(&self) -> Result<GenericParams, Error> {
+        let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Trait impl not found: {}",
+                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+
+        Ok(trait_impl.generics.clone())
+    }
+
+    /// Create the generic arguments to be used when calling the drop function
+    /// This should match the generics from the concrete type being dropped
+    fn create_drop_function_generics(&self) -> Result<GenericArgs, Error> {
+        let Some(_trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Trait impl not found: {}",
+                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+
+        // For drop functions, we need to provide:
+        // 1. Erased region for the lifetime parameter (the mutable reference lifetime)  
+        // 2. No type parameters (drop functions are usually monomorphic in the type)
+        // 3. No const generics
+        // 4. No trait refs
+        let drop_generics = GenericArgs {
+            regions: Vector::from_iter(vec![Region::Erased]),
+            types: Vector::new(),
+            const_generics: Vector::new(),
+            trait_refs: Vector::new(),
+        };
+
+        Ok(drop_generics)
     }
 }
 
