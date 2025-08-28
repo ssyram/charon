@@ -218,17 +218,20 @@ impl<'a> VtableMetadataComputer<'a> {
         fun_ref: &FunDeclRef,
         concrete_ty: &Ty,
     ) -> Result<Operand, Error> {
-        // For now, generate a meaningful function name that indicates this will call the drop function
-        // TODO: Generate actual function body that calls the drop function
-        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
-        
         let shim_name = format!("vtable_drop_shim_call_{}_{}", 
             fun_ref.id.index(), 
             self.type_to_string(concrete_ty));
         
-        // Create a structured representation that shows this will be a function call
+        // Create actual function that calls the drop function
+        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
+        let shim_id = self.create_drop_shim_function(&shim_name, fun_ref.clone(), DropShimKind::CallDrop)?;
+        
+        // Return function reference as operand
         let shim_const = ConstantExpr {
-            value: RawConstantExpr::Opaque(shim_name),
+            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
+                id: shim_id,
+                generics: Box::new(GenericArgs::empty()),
+            })),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
@@ -236,14 +239,22 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create an empty drop shim for types that don't need drop (Case 2)  
     fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        // TODO: Generate actual function body that just returns
-        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
-        
         let shim_name = format!("vtable_drop_shim_empty_{}", self.type_to_string(concrete_ty));
         
-        // Create a structured representation that shows this will be an empty function
+        // Create actual function that just returns
+        let drop_fn_type = self.create_drop_fn_type(concrete_ty);
+        let dummy_fn_ref = FunDeclRef {
+            id: FunDeclId::new(0), // Dummy ID that won't be used
+            generics: Box::new(GenericArgs::empty()),
+        };
+        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Empty)?;
+        
+        // Return function reference as operand  
         let shim_const = ConstantExpr {
-            value: RawConstantExpr::Opaque(shim_name),
+            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
+                id: shim_id,
+                generics: Box::new(GenericArgs::empty()),
+            })),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
@@ -251,17 +262,22 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create a panic drop shim for missing drop functions (Case 3)
     fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
-        // TODO: Generate actual function body with panic statement
+        let shim_name = format!("vtable_drop_shim_panic_{}", self.type_to_string(concrete_ty));
+        
+        // Create actual function that panics
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
+        let dummy_fn_ref = FunDeclRef {
+            id: FunDeclId::new(0), // Dummy ID that won't be used
+            generics: Box::new(GenericArgs::empty()),
+        };
+        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Panic(msg.to_string()))?;
         
-        let shim_name = format!("vtable_drop_shim_panic_{}__{}",
-            self.type_to_string(concrete_ty),
-            msg.replace(' ', "_").replace(':', "_")
-        );
-        
-        // Create a structured representation that shows this will be a panic function
+        // Return function reference as operand
         let shim_const = ConstantExpr {
-            value: RawConstantExpr::Opaque(shim_name),
+            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
+                id: shim_id,
+                generics: Box::new(GenericArgs::empty()),
+            })),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
@@ -566,6 +582,166 @@ impl<'a> VtableMetadataComputer<'a> {
         let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
         TyKind::FnPtr(fn_sig).into_ty()
     }
+
+    /// Different kinds of drop shims we need to generate
+    fn create_drop_shim_function(
+        &mut self,
+        name: &str,
+        drop_fn_ref: FunDeclRef,
+        kind: DropShimKind,
+    ) -> Result<FunDeclId, Error> {
+        // Create a self parameter type (mutable pointer to trait object)
+        let self_ty = TyKind::RawPtr(
+            Ty::mk_unit(), // Placeholder - should be proper trait object type
+            RefKind::Mut
+        ).into_ty();
+
+        // Create function signature
+        let signature = FunSig {
+            is_unsafe: false,
+            generics: GenericParams::empty(),
+            inputs: vec![self_ty.clone()],
+            output: Ty::mk_unit(),
+        };
+
+        // Create locals for the function
+        let mut locals = Locals::default();
+        locals.arg_count = 1; // One argument: &mut self
+
+        // Return value (unit)  
+        let ret_local = Local {
+            index: LocalId::new(0),
+            name: Some("ret".to_string()),
+            ty: Ty::mk_unit(),
+        };
+
+        // Self parameter
+        let self_local = Local {
+            index: LocalId::new(1), 
+            name: Some("self".to_string()),
+            ty: self_ty.clone(),
+        };
+
+        let _ = locals.locals.push_with(|_| ret_local);
+        let _ = locals.locals.push_with(|_| self_local);
+
+        // Create function body based on the kind
+        let body = match kind {
+            DropShimKind::CallDrop => {
+                // Generate a call to the drop function
+                let mut blocks = Vector::new();
+                
+                let call = Call {
+                    func: FnOperand::Regular(drop_fn_ref.into()),
+                    args: vec![Operand::Copy(Place::new(LocalId::new(1), self_ty.clone()))],
+                    dest: Place::new(LocalId::new(0), Ty::mk_unit()),
+                };
+
+                let terminator = Terminator {
+                    span: self.span,
+                    content: RawTerminator::Call {
+                        call,
+                        target: BlockId::new(1),
+                        on_unwind: BlockId::new(1), // Same as target for simplicity
+                    },
+                    comments_before: vec![],
+                };
+
+                let _ = blocks.push_with(|_| BlockData {
+                    statements: vec![],
+                    terminator,
+                });
+
+                let _ = blocks.push_with(|_| BlockData {
+                    statements: vec![],
+                    terminator: Terminator {
+                        span: self.span,
+                        content: RawTerminator::Return,
+                        comments_before: vec![],
+                    },
+                });
+
+                Body::Unstructured(ExprBody {
+                    span: self.span,
+                    locals: locals.clone(),
+                    comments: vec![],
+                    body: blocks,
+                })
+            }
+            DropShimKind::Empty => {
+                // Generate an empty function that just returns
+                let mut blocks = Vector::new();
+                let _ = blocks.push_with(|_| BlockData {
+                    statements: vec![],
+                    terminator: Terminator {
+                        span: self.span,
+                        content: RawTerminator::Return,
+                        comments_before: vec![],
+                    },
+                });
+
+                Body::Unstructured(ExprBody {
+                    span: self.span,
+                    locals: locals.clone(),
+                    comments: vec![],
+                    body: blocks,
+                })
+            }
+            DropShimKind::Panic(msg) => {
+                // Generate a function that panics
+                let mut blocks = Vector::new();
+                let _ = blocks.push_with(|_| BlockData {
+                    statements: vec![],
+                    terminator: Terminator {
+                        span: self.span,
+                        content: RawTerminator::Abort(AbortKind::Panic(None)),
+                        comments_before: vec![format!("Panic: {}", msg)],
+                    },
+                });
+
+                Body::Unstructured(ExprBody {
+                    span: self.span,
+                    locals: locals.clone(), 
+                    comments: vec![],
+                    body: blocks,
+                })
+            }
+        };
+
+        // Create item meta
+        let item_meta = ItemMeta {
+            span: self.span,
+            name: Name::from_path(&[name]),
+            source_text: None,
+            attr_info: AttrInfo::default(),
+            is_local: true,
+            opacity: ItemOpacity::Opaque, // Mark as opaque since it's a generated shim
+            lang_item: None,
+        };
+
+        // Create and add function declaration  
+        let shim_id = self.ctx.translated.fun_decls.push_with(|id| FunDecl {
+            def_id: id,
+            item_meta,
+            signature,
+            kind: ItemKind::TopLevel,
+            is_global_initializer: None,
+            body: Ok(body),
+        });
+
+        Ok(shim_id)
+    }
+}
+
+/// Different kinds of drop shims we need to generate
+#[derive(Debug, Clone)]
+enum DropShimKind {
+    /// Call the actual drop function
+    CallDrop,
+    /// Empty function (no drop needed)
+    Empty,
+    /// Panic function (drop not translated)
+    Panic(String),
 }
 
 /// Represents the three cases for drop function resolution

@@ -159,6 +159,16 @@ impl Clone for String {
 // Full name: alloc::string::{impl Display for String}::fmt
 pub fn {impl Display for String}::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
 
+fn vtable_drop_shim_call_20_adt_Adt(2)(@1: *mut ())
+{
+    let ret@0: (); // return
+    let self@1: *mut (); // arg #1
+
+    ret@0 := {impl Drop for String}::drop<missing('_0_0)>(copy (self@1))
+    ret@0 := ()
+    return
+}
+
 // Full name: alloc::string::{impl Display for String}::fmt::{vtable_method}
 fn {vtable_method}<'_0, '_1, '_2>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
 {
@@ -181,7 +191,7 @@ fn {impl Display for String}::{vtable}() -> core::fmt::Display::{vtable}
 {
     let ret@0: core::fmt::Display::{vtable}; // return
 
-    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const (Opaque(vtable_drop_shim_call_20_adt_Adt(2))), method_fmt: const ({vtable_method}<'_, '_, '_>) }
+    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const (@Fun21), method_fmt: const ({vtable_method}<'_, '_, '_>) }
     return
 }
 

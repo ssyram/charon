@@ -87,6 +87,15 @@ where
     return
 }
 
+fn vtable_drop_shim_empty_i32(@1: *mut ())
+{
+    let ret@0: (); // return
+    let self@1: *mut (); // arg #1
+
+    ret@0 := ()
+    return
+}
+
 // Full name: test_crate::{impl Modifiable<T> for i32}::modify::{vtable_method}
 fn {vtable_method}<'_0, '_1, T>(@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), @2: &'_1 (T)) -> T
 where
@@ -115,7 +124,7 @@ where
 {
     let ret@0: test_crate::Modifiable::{vtable}<T>; // return
 
-    ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (Opaque(vtable_drop_shim_empty_i32)), method_modify: const ({vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun9), method_modify: const ({vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
     return
 }
 
