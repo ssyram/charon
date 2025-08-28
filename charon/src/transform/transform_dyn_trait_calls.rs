@@ -68,12 +68,15 @@ impl<'a> DynTraitCallTransformer<'a> {
         }
     }
 
-    /// Get the vtable declaration reference with the current generics applied
-    /// The key difficulty involves matching the associated types in the vtable's generics
-    /// We will need to extract the associated types from the `dyn_self`'s binder
-    /// 
-    /// Rustc guarantees that the values of all associated types are specified in a `dyn Trait` type
+    /// Get the vtable declaration reference with current generics applied.
+    /// Matches associated types from the vtable's generics with the dyn trait's constraints.
+    ///
+    /// Rustc guarantees all associated types are specified in a `dyn Trait` type.
     fn get_vtable_ref(&self, trait_ref: &TraitRef, dyn_self_ty: &Ty) -> Result<TypeDeclRef, Error> {
+        // Get vtable_ref's ID with trait-ref's generics from dyn-self applied.
+        // Add associated types in correct order following the vtable's generics.
+
+        // 0. Prepare trait name for debug/error messages
         let trait_name = trait_ref
             .trait_decl_ref
             .skip_binder
@@ -81,7 +84,9 @@ impl<'a> DynTraitCallTransformer<'a> {
             .with_ctx(&self.ctx.into_fmt())
             .to_string();
 
-        // Try to find the trait declaration
+        // 1. Get vtable ref from trait declaration
+        //    Provides: 1) final return ID, 2) correct order of associated types
+        // Firstly, get the trait declaration for the vtable ref it stores.
         let Some(trait_decl) = self
             .ctx
             .translated
@@ -96,7 +101,8 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        // Get the vtable type out from its vtable
+        // Get vtable ref from definition for correct ID.
+        // Generics in vtable ref are placeholders but provide correct order of the associated types.
         let Some(vtable_ref) = &trait_decl.vtable else {
             raise_error!(
                 self.ctx,
@@ -106,6 +112,8 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
+        // 2. Get correct generics for vtable ref from `dyn_self_ty`
+        //    The binder contains all target generics info.
         let TyKind::DynTrait(DynPredicate { binder }) = dyn_self_ty.kind() else {
             raise_error!(
                 self.ctx,
@@ -115,22 +123,26 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        // The `Trait<_dyn, ...>` reference
+        // 3. Prepare "basic part" of generics from trait ref (without associated types)
+        // The trait ref `dyn Trait<_dyn, Arg1, ..., ArgN>`, no associated types.
+        // First trait clause is the target one for vtable, guaranteed by `DynPredicate`.
         let trait_ref = binder.params.trait_clauses[0].trait_.clone().erase();
+        // Type vars (except `_dyn`) are one level deeper, move out after removing `_dyn`.
         trace!(
             "Getting vtable ref with trait-decl-ref {}.",
             trait_ref.with_ctx(&self.ctx.into_fmt())
         );
         let mut generics = trait_ref.generics.clone();
-        // remove the `_dyn` type argument
+        // Remove the first `_dyn` type argument
         generics.types.remove_and_shift_ids(TypeVarId::ZERO);
-        // Move out of the predicate binder itself from binding `_dyn`
+        // Move out of predicate binder for `_dyn`
         generics = generics.move_from_under_binder().unwrap();
 
-        // We should put in the same order as the assoc types to the generics
-        // We need to collect the associated types from the vtable's generics --
-        // Notably, the decl guarantees that the vtable_ref will be of the form:
+        // 4. Prepare associated types part in same order as vtable's generics
+        // Utilise the vtable ref form:
         // `{vtable}<TraitArg1, ..., SuperTrait::Assoc1, ..., Self::AssocN>`
+        //
+        // Use trait ID + assoc name (`Trait::AssocTy`) to uniquely identify
         let assoc_tys = vtable_ref
             .generics
             .types
@@ -144,15 +156,16 @@ impl<'a> DynTraitCallTransformer<'a> {
             })
             .collect::<Vec<_>>();
 
-        // Then, for each assoc type in order, find the correct type from the dyn trait's constraints
+        // Find correct type argument from dyn trait's constraints for each assoc type.
         for (trait_id, assoc_name) in assoc_tys {
-            // find the correct assoc type constraint and push it to the generics
+            // Find it
             let Some(assoc_ty) = binder.params.trait_type_constraints.iter().find_map(|c| {
                 let c = c.clone().erase();
                 if c.trait_ref.trait_decl_ref.skip_binder.id == trait_id
                     && c.type_name == assoc_name
                 {
-                    Some(c.ty.clone())
+                    // Move potentially bounded type out of `_dyn` binder
+                    Some(c.ty.clone().move_from_under_binder().unwrap())
                 } else {
                     None
                 }
@@ -160,17 +173,18 @@ impl<'a> DynTraitCallTransformer<'a> {
                 raise_error!(
                     self.ctx,
                     self.span,
-                    "Could not find associated type {}::{} for vtable of trait {}",
+                    "Could not find associated type {}::{} for vtable of trait {} in dyn Trait type: {}",
                     trait_id.with_ctx(&self.ctx.into_fmt()),
                     assoc_name,
-                    trait_name
+                    trait_name,
+                    dyn_self_ty.with_ctx(&self.ctx.into_fmt())
                 );
             };
+            // Push it
             generics.types.push(assoc_ty);
         }
 
-        // Note: here we take the vtable_ref's ID with the trait-ref's generics from the dyn-self applied
-        // Additionally, we add the associated types in the correct order following the vtable's generics
+        // 5. Return vtable ref's ID with correct generics
         Ok(TypeDeclRef {
             id: vtable_ref.id,
             generics,
@@ -178,7 +192,7 @@ impl<'a> DynTraitCallTransformer<'a> {
     }
 
     /// Get the correct field index for a method in the vtable struct.
-    fn get_method_field_info(
+    fn get_method_field_id(
         &self,
         vtable_ref: &TypeDeclRef,
         method_name: &TraitItemName,
@@ -315,10 +329,10 @@ impl<'a> DynTraitCallTransformer<'a> {
     /// - `Rc<dyn Trait>`
     /// - `Arc<dyn Trait>`
     /// - `Pin<T>` where `T` is one of the above
-    /// 
+    ///
     /// See: https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
     /// for more details.
-    /// 
+    ///
     /// This function gets the internal `dyn Trait` out
     fn unpack_dyn_trait_ty(&self, ty: &Ty) -> Result<Ty, Error> {
         match ty.kind() {
@@ -372,8 +386,8 @@ impl<'a> DynTraitCallTransformer<'a> {
 
         let vtable_ref = self.get_vtable_ref(&trait_ref, &dyn_self_ty)?;
 
-        // 3. Get the correct field index for the method
-        let field_id = self.get_method_field_info(&vtable_ref, &method_name)?;
+        // 3. Get the correct field index & type for the method
+        let field_id = self.get_method_field_id(&vtable_ref, &method_name)?;
         let field_ty = self.fun_ty_from_call(call)?;
 
         // 4. Create local variables for vtable and method pointer
