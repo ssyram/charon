@@ -213,30 +213,33 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create a drop shim that calls the actual drop function (Case 1)
     fn create_drop_shim_with_call(&mut self, fun_ref: &FunDeclRef, concrete_ty: &Ty) -> Result<Operand, Error> {
-        // For now, create a function reference until we implement proper shim generation
+        // Generate a shim that will call the actual drop function
         // TODO: Generate actual function body that calls the drop function
+        // For now, create a structured function reference that indicates the call intent
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
         
-        // Create a placeholder function reference
+        // Create a more structured representation that shows this will be a function call
         let shim_const = ConstantExpr {
             value: RawConstantExpr::Opaque(format!(
-                "drop_shim_call_{:?}",
-                fun_ref.id
+                "drop_shim_calls_fn_{:?}_for_{}",
+                fun_ref.id,
+                self.type_to_string(concrete_ty)
             )),
             ty: drop_fn_type,
         };
         Ok(Operand::Const(Box::new(shim_const)))
     }
 
-    /// Create an empty drop shim for types that don't need drop (Case 2)
+    /// Create an empty drop shim for types that don't need drop (Case 2)  
     fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        // For types that don't need drop, generate an empty function
+        // Generate a shim with empty function body
         // TODO: Generate actual function body that just returns
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
         
+        // Create a structured representation that shows this will be an empty function
         let shim_const = ConstantExpr {
             value: RawConstantExpr::Opaque(format!(
-                "drop_shim_empty_{}",
+                "drop_shim_empty_returns_for_{}",
                 self.type_to_string(concrete_ty)
             )),
             ty: drop_fn_type,
@@ -246,15 +249,16 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create a panic drop shim for missing drop functions (Case 3)
     fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
-        // Generate a function that panics with the error message
+        // Generate a shim with panic statement  
         // TODO: Generate actual function body with panic statement
         let drop_fn_type = self.create_drop_fn_type(concrete_ty);
         
+        // Create a structured representation that shows this will be a panic function
         let shim_const = ConstantExpr {
             value: RawConstantExpr::Opaque(format!(
-                "drop_shim_panic_{}: {}",
-                self.type_to_string(concrete_ty),
-                msg
+                "drop_shim_panics_with_msg_{}__for_{}",
+                msg.replace(' ', "_").replace(':', "_"),
+                self.type_to_string(concrete_ty)
             )),
             ty: drop_fn_type,
         };
