@@ -240,17 +240,59 @@ fn compute_align_operand(
 
 /// Compute the drop operand for the vtable
 fn compute_drop_operand(
-    _ctx: &mut TransformCtx,
+    ctx: &mut TransformCtx,
     concrete_ty: &Ty,
-    _span: Span,
+    span: Span,
 ) -> Result<Operand, Error> {
-    // For now, generate a placeholder shim function
-    // TODO: Implement the three cases for drop function resolution
-    let opaque_const = ConstantExpr {
-        value: RawConstantExpr::Opaque("drop shim not yet implemented".to_string()),
-        ty: create_drop_fn_type(concrete_ty),
-    };
-    Ok(Operand::Const(Box::new(opaque_const)))
+    // Analyze what kind of drop functionality this type has
+    let drop_case = analyze_drop_case(ctx, concrete_ty)?;
+    
+    match drop_case {
+        DropCase::Found(_fun_ref) => {
+            // Case 1: Drop function found - create opaque placeholder for now with better message
+            // TODO: Generate proper shim function that relays to target via Concretize cast
+            let opaque_const = ConstantExpr {
+                value: RawConstantExpr::Opaque(format!(
+                    "drop shim for {} with drop function found (relay not yet implemented)",
+                    type_to_string(concrete_ty)
+                )),
+                ty: create_drop_fn_type(concrete_ty),
+            };
+            Ok(Operand::Const(Box::new(opaque_const)))
+        }
+        DropCase::NotNeeded => {
+            // Case 2: No drop function needed - create opaque placeholder with clear message
+            // TODO: Generate proper shim function that does nothing and returns
+            let opaque_const = ConstantExpr {
+                value: RawConstantExpr::Opaque(format!(
+                    "drop shim for {} with no drop needed (noop not yet implemented)",
+                    type_to_string(concrete_ty)
+                )),
+                ty: create_drop_fn_type(concrete_ty),
+            };
+            Ok(Operand::Const(Box::new(opaque_const)))
+        }
+        DropCase::NotTranslated(msg) => {
+            // Case 3: Drop function not translated - register error and create opaque
+            register_error!(
+                ctx,
+                span,
+                "Drop function for type {} not found or not translated: {}",
+                type_to_string(concrete_ty),
+                msg
+            );
+            
+            let opaque_const = ConstantExpr {
+                value: RawConstantExpr::Opaque(format!(
+                    "drop shim for {} error: {}",
+                    type_to_string(concrete_ty),
+                    msg
+                )),
+                ty: create_drop_fn_type(concrete_ty),
+            };
+            Ok(Operand::Const(Box::new(opaque_const)))
+        }
+    }
 }
 
 /// Get the size of a type from its layout information
@@ -342,6 +384,125 @@ fn get_uint_size(ctx: &TransformCtx, uint_ty: UIntTy) -> u128 {
         UIntTy::U32 => 4,
         UIntTy::U64 => 8,
         UIntTy::U128 => 16,
+    }
+}
+
+/// Represents the three cases for drop function resolution
+#[derive(Debug)]
+enum DropCase {
+    /// Case 1: Drop function found - contains the function reference
+    Found(FunDeclRef),
+    /// Case 2: No drop function needed (e.g., i32)
+    NotNeeded,
+    /// Case 3: Drop function not translated - contains error message
+    NotTranslated(String),
+}
+
+/// Analyze what kind of drop case applies to the given concrete type
+fn analyze_drop_case(ctx: &TransformCtx, concrete_ty: &Ty) -> Result<DropCase, Error> {
+    match concrete_ty.kind() {
+        // For ADT types, check if there's a drop implementation
+        TyKind::Adt(type_decl_ref) => {
+            if let TypeId::Adt(type_decl_id) = &type_decl_ref.id {
+                // Look for drop implementations for this type
+                for trait_impl in ctx.translated.trait_impls.iter() {
+                    // Check if this is a drop implementation for our type
+                    let trait_ref = &trait_impl.impl_trait;
+                    
+                    // Check if this implements the Drop trait
+                    if is_drop_trait(&trait_ref.id) {
+                        // Check if the self type matches our concrete type
+                        if let Some(self_ty) = get_impl_self_type(ctx, trait_impl) {
+                            if types_match(concrete_ty, &self_ty) {
+                                // Found drop implementation - create function reference
+                                if let Some(drop_method) = trait_impl.methods.iter().find(|(name, _)| name.0 == "drop") {
+                                    let fun_ref = drop_method.1.skip_binder.clone();
+                                    return Ok(DropCase::Found(fun_ref));
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // No drop implementation found - check if one is needed
+                if type_needs_drop(ctx, concrete_ty) {
+                    Ok(DropCase::NotTranslated(format!("Drop implementation for {:?} not found or not translated", concrete_ty)))
+                } else {
+                    Ok(DropCase::NotNeeded)
+                }
+            } else {
+                Ok(DropCase::NotNeeded)
+            }
+        }
+        
+        // For literal types like i32, no drop is needed
+        TyKind::Literal(_) => Ok(DropCase::NotNeeded),
+        
+        // For other types, conservatively assume no drop is needed for now
+        _ => Ok(DropCase::NotNeeded),
+    }
+}
+
+/// Check if a trait declaration is the Drop trait
+fn is_drop_trait(_trait_decl_id: &TraitDeclId) -> bool {
+    // Look up the trait declaration and check if it's the Drop trait
+    // For simplicity, assume trait IDs with specific patterns indicate Drop
+    // This is a conservative approach - could be improved with better trait resolution
+    false // Placeholder for now - need to implement proper Drop trait detection
+}
+
+/// Get the self type from a trait implementation
+fn get_impl_self_type(_ctx: &TransformCtx, trait_impl: &TraitImpl) -> Option<Ty> {
+    // Extract the self type from the trait implementation
+    // This is usually the first type in the generic arguments of the implemented trait
+    let type_var_id = TypeVarId::new(0);
+    trait_impl.impl_trait.generics.types.get(type_var_id).cloned()
+}
+
+/// Check if two types match for the purpose of drop implementation lookup
+fn types_match(ty1: &Ty, ty2: &Ty) -> bool {
+    // Simple structural comparison - could be more sophisticated
+    ty1 == ty2
+}
+
+/// Check if a type needs drop (conservative approach)
+fn type_needs_drop(ctx: &TransformCtx, concrete_ty: &Ty) -> bool {
+    match concrete_ty.kind() {
+        // Literal types never need drop
+        TyKind::Literal(_) => false,
+        // ADT types might need drop - check for non-trivial destructors
+        TyKind::Adt(type_decl_ref) => {
+            if let TypeId::Adt(type_decl_id) = &type_decl_ref.id {
+                if let Some(_type_decl) = ctx.translated.type_decls.get(*type_decl_id) {
+                    // For now, conservatively assume ADTs don't need drop unless explicitly implemented
+                    // This avoids false positives for simple types like structs with only Copy fields
+                    false
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+        // Other types conservatively assumed not to need drop
+        _ => false,
+    }
+}
+
+/// Convert a type to a string representation for display purposes
+fn type_to_string(ty: &Ty) -> String {
+    match ty.kind() {
+        TyKind::Literal(lit_ty) => match lit_ty {
+            LiteralTy::Bool => "bool".to_string(),
+            LiteralTy::Char => "char".to_string(),
+            LiteralTy::Int(int_ty) => format!("{:?}", int_ty).to_lowercase(),
+            LiteralTy::UInt(uint_ty) => format!("{:?}", uint_ty).to_lowercase(),
+            LiteralTy::Float(float_ty) => format!("{:?}", float_ty).to_lowercase(),
+        },
+        TyKind::Adt(type_decl_ref) => {
+            format!("adt_{:?}", type_decl_ref.id)
+        },
+        _ => format!("{:?}", ty).chars().take(50).collect(),
     }
 }
 
