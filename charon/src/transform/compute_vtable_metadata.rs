@@ -218,13 +218,13 @@ impl<'a> VtableMetadataComputer<'a> {
         fun_ref: &FunDeclRef,
         concrete_ty: &Ty,
     ) -> Result<Operand, Error> {
-        let shim_name = format!("vtable_drop_shim_call_{}_{}", 
+        let shim_name = format!("{{vtable_drop_shim_call_{}_{}}}",  
             fun_ref.id.index(), 
             self.type_to_string(concrete_ty));
         
         // Create actual function that calls the drop function
-        let drop_fn_type = self.create_drop_fn_type();
-        let shim_id = self.create_drop_shim_function(&shim_name, fun_ref.clone(), DropShimKind::CallDrop)?;
+        let drop_fn_type = self.create_drop_fn_type()?;
+        let shim_id = self.create_drop_shim_function(&shim_name, fun_ref.clone(), DropShimKind::CallDrop, concrete_ty)?;
         
         // Return function reference as operand
         let shim_const = ConstantExpr {
@@ -239,15 +239,15 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create an empty drop shim for types that don't need drop (Case 2)  
     fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        let shim_name = format!("vtable_drop_shim_empty_{}", self.type_to_string(concrete_ty));
+        let shim_name = format!("{{vtable_drop_shim_empty_{}}}", self.type_to_string(concrete_ty));
         
         // Create actual function that just returns
-        let drop_fn_type = self.create_drop_fn_type();
+        let drop_fn_type = self.create_drop_fn_type()?;
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
         };
-        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Empty)?;
+        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Empty, concrete_ty)?;
         
         // Return function reference as operand  
         let shim_const = ConstantExpr {
@@ -262,15 +262,15 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create a panic drop shim for missing drop functions (Case 3)
     fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
-        let shim_name = format!("vtable_drop_shim_panic_{}", self.type_to_string(concrete_ty));
+        let shim_name = format!("{{vtable_drop_shim_panic_{}}}", self.type_to_string(concrete_ty));
         
         // Create actual function that panics
-        let drop_fn_type = self.create_drop_fn_type();
+        let drop_fn_type = self.create_drop_fn_type()?;
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
         };
-        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Panic(msg.to_string()))?;
+        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Panic(msg.to_string()), concrete_ty)?;
         
         // Return function reference as operand
         let shim_const = ConstantExpr {
@@ -574,14 +574,74 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Create the function pointer type for a drop function: `fn(*mut ())`
-    /// TODO: This should be `fn(&mut dyn Trait)` but for now we'll use a simpler approach
-    fn create_drop_fn_type(&self) -> Ty {
-        // For now, use `*mut ()` as the parameter type
-        // This maintains compatibility while we work on the proper DynTrait implementation
-        let mut_ptr_ty = TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty();
-        let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
-        TyKind::FnPtr(fn_sig).into_ty()
+    /// Create the function pointer type for a drop function by extracting it from the vtable struct
+    fn create_drop_fn_type(&self) -> Result<Ty, Error> {
+        // Get the trait being implemented
+        let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Trait impl not found: {}",
+                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+        
+        let trait_decl_ref = &trait_impl.impl_trait;
+        let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_decl_ref.id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Trait declaration not found: {}",
+                trait_decl_ref.id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+        
+        // Get the vtable ref from the trait definition
+        let Some(vtable_ref) = &trait_decl.vtable else {
+            // Fallback to simple type if no vtable
+            let mut_ptr_ty = TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty();
+            let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
+            return Ok(TyKind::FnPtr(fn_sig).into_ty());
+        };
+        
+        // Get the vtable struct type declaration
+        let TypeId::Adt(vtable_type_id) = &vtable_ref.id else {
+            // Fallback to simple type if not an ADT
+            let mut_ptr_ty = TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty();
+            let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
+            return Ok(TyKind::FnPtr(fn_sig).into_ty());
+        };
+        
+        let Some(vtable_type_decl) = self.ctx.translated.type_decls.get(*vtable_type_id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Vtable type declaration not found: {}",
+                vtable_type_id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+        
+        // Extract the drop field type from the vtable struct
+        let TypeDeclKind::Struct(fields) = &vtable_type_decl.kind else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Expected vtable to be a struct, got: {:?}",
+                vtable_type_decl.kind
+            );
+        };
+        
+        // Find the drop field (should be the third field: size, align, drop, ...)
+        if fields.iter().count() < 3 {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Expected vtable struct to have at least 3 fields (size, align, drop)"
+            );
+        }
+        
+        // Return the type of the drop field
+        Ok(fields[FieldId::new(2)].ty.clone())
     }
 
     /// Different kinds of drop shims we need to generate
@@ -590,12 +650,22 @@ impl<'a> VtableMetadataComputer<'a> {
         name: &str,
         drop_fn_ref: FunDeclRef,
         kind: DropShimKind,
+        concrete_ty: &Ty,
     ) -> Result<FunDeclId, Error> {
-        // Create a self parameter type (mutable pointer to trait object)
-        let self_ty = TyKind::RawPtr(
-            Ty::mk_unit(), // Placeholder - should be proper trait object type
-            RefKind::Mut
-        ).into_ty();
+        // Get the proper drop function type and extract the parameter type
+        let drop_fn_type = self.create_drop_fn_type()?;
+        
+        let self_ty = if let TyKind::FnPtr(fn_sig) = drop_fn_type.kind() {
+            if let Some(first_param) = fn_sig.skip_binder.0.get(0) {
+                first_param.clone()
+            } else {
+                // Fallback if no parameters
+                TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty()
+            }
+        } else {
+            // Fallback if not a function pointer
+            TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty()
+        };
 
         // Create function signature
         let signature = FunSig {
@@ -616,7 +686,7 @@ impl<'a> VtableMetadataComputer<'a> {
             ty: Ty::mk_unit(),
         };
 
-        // Self parameter
+        // Self parameter (dyn trait object pointer)
         let self_local = Local {
             index: LocalId::new(1), 
             name: Some("self".to_string()),
@@ -625,12 +695,60 @@ impl<'a> VtableMetadataComputer<'a> {
 
         let _ = locals.locals.push_with(|_| ret_local);
         let _ = locals.locals.push_with(|_| self_local);
+        
+        // For CallDrop case, add a local for the concretized concrete type
+        let mut concrete_local_id = None;
+        if matches!(kind, DropShimKind::CallDrop) {
+            // Create the concrete type (mutable reference to the concrete type)
+            let concrete_ref_ty = TyKind::Ref(
+                Region::Erased,
+                concrete_ty.clone(),
+                RefKind::Mut
+            ).into_ty();
+            
+            let concrete_local = Local {
+                index: LocalId::new(2),
+                name: Some("concrete".to_string()),
+                ty: concrete_ref_ty,
+            };
+            
+            concrete_local_id = Some(locals.locals.push_with(|_| concrete_local));
+            locals.arg_count = 1; // Still only one argument
+        }
 
         // Create function body based on the kind
         let body = match kind {
             DropShimKind::CallDrop => {
-                // Generate a call to the drop function
+                // Generate a call to the drop function with Concretize cast
                 let mut blocks = Vector::new();
+                
+                // Create the concretize cast statement
+                let Some(concrete_local_id) = concrete_local_id else {
+                    raise_error!(
+                        self.ctx,
+                        self.span,
+                        "Expected concrete local to be created for CallDrop case"
+                    );
+                };
+                
+                // Get the concrete type for the concretize cast
+                let concrete_ref_ty = TyKind::Ref(
+                    Region::Erased,
+                    concrete_ty.clone(),
+                    RefKind::Mut
+                ).into_ty();
+                
+                let concretize_stmt = Statement {
+                    span: self.span,
+                    content: RawStatement::Assign(
+                        Place::new(concrete_local_id, concrete_ref_ty.clone()),
+                        Rvalue::UnaryOp(
+                            UnOp::Cast(CastKind::Concretize(self_ty.clone(), concrete_ref_ty.clone())),
+                            Operand::Move(Place::new(LocalId::new(1), self_ty.clone()))
+                        )
+                    ),
+                    comments_before: vec![],
+                };
                 
                 let call = Call {
                     func: FnOperand::Regular(FnPtr::from(FunDeclRef {
@@ -642,7 +760,7 @@ impl<'a> VtableMetadataComputer<'a> {
                             trait_refs: Vector::new(),
                         }),
                     })),
-                    args: vec![Operand::Copy(Place::new(LocalId::new(1), self_ty.clone()))],
+                    args: vec![Operand::Move(Place::new(concrete_local_id, concrete_ref_ty))],
                     dest: Place::new(LocalId::new(0), Ty::mk_unit()),
                 };
 
@@ -657,7 +775,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 };
 
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
+                    statements: vec![concretize_stmt],
                     terminator,
                 });
 
