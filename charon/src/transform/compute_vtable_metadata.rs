@@ -255,7 +255,7 @@ fn compute_drop_operand(
                 value: RawConstantExpr::Opaque(format!(
                     "drop shim for {} with drop function {:?} found (relay not yet implemented)",
                     type_to_string(concrete_ty),
-                    fun_ref.func
+                    fun_ref.id
                 )),
                 ty: create_drop_fn_type(concrete_ty),
             };
@@ -303,13 +303,22 @@ fn compute_drop_operand(
 
 /// Try to create a noop drop operand for types that don't need drop
 fn create_noop_drop_operand(
-    ctx: &mut TransformCtx,
+    _ctx: &mut TransformCtx,
     concrete_ty: &Ty,
-    span: Span,
+    _span: Span,
 ) -> Result<Operand, Error> {
-    // For types that don't need drop, try to create a simple function that does nothing
-    // This is a simplified approach - just return an error for now to fall back to opaque
-    Err("Noop drop function generation not yet implemented".into())
+    // For types that don't need drop, we can represent this with a zero value
+    // This represents the concept of "no drop function needed"
+    
+    let drop_fn_type = create_drop_fn_type(concrete_ty);
+    
+    // Create a zero/null-equivalent scalar value for the pointer
+    let zero_const = ConstantExpr {
+        value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::Usize, 0))),
+        ty: drop_fn_type,
+    };
+    
+    Ok(Operand::Const(Box::new(zero_const)))
 }
 
 /// Get the size of a type from its layout information
