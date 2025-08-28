@@ -181,7 +181,7 @@ fn {impl Display for String}::{vtable}() -> core::fmt::Display::{vtable}
 {
     let ret@0: core::fmt::Display::{vtable}; // return
 
-    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const (Opaque(drop shim for adt_Adt(2) with drop function 20 found (relay not yet implemented))), method_fmt: const ({vtable_method}<'_, '_, '_>) }
+    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const (Opaque(drop_shim_calls_fn_20_for_adt_Adt(2))), method_fmt: const ({vtable_method}<'_, '_, '_>) }
     return
 }
 
