@@ -230,7 +230,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let shim_const = ConstantExpr {
             value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
                 id: shim_id,
-                generics: Box::new(GenericArgs::empty()),
+                generics: Box::new(self.create_drop_shim_function_generics()?),
             })),
             ty: drop_fn_type,
         };
@@ -253,7 +253,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let shim_const = ConstantExpr {
             value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
                 id: shim_id,
-                generics: Box::new(GenericArgs::empty()),
+                generics: Box::new(self.create_drop_shim_function_generics()?),
             })),
             ty: drop_fn_type,
         };
@@ -276,7 +276,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let shim_const = ConstantExpr {
             value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
                 id: shim_id,
-                generics: Box::new(GenericArgs::empty()),
+                generics: Box::new(self.create_drop_shim_function_generics()?),
             })),
             ty: drop_fn_type,
         };
@@ -917,6 +917,59 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         Ok(drop_generics)
+    }
+
+    /// Create the generic arguments for referencing the drop shim function itself
+    /// This should include all the generics that the drop shim function was defined with
+    fn create_drop_shim_function_generics(&self) -> Result<GenericArgs, Error> {
+        let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Trait impl not found: {}",
+                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+
+        // The drop shim function should be called with the same generics as the trait impl
+        // Convert the trait impl's generic parameters to generic arguments
+        let mut regions = Vector::new();
+        let mut types = Vector::new();
+        let mut const_generics = Vector::new();
+        let mut trait_refs = Vector::new();
+
+        // Add regions - use erased regions
+        for _ in 0..trait_impl.generics.regions.iter().count() {
+            regions.push(Region::Erased);
+        }
+
+        // Add types - use the types from impl_ref generics
+        for type_id in trait_impl.generics.types.all_indices() {
+            types.push(TyKind::TypeVar(DeBruijnVar::Bound(DeBruijnId::ZERO, type_id)).into_ty());
+        }
+
+        // Add const generics - use the const generics from impl_ref generics
+        for const_id in trait_impl.generics.const_generics.all_indices() {
+            const_generics.push(ConstGeneric::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, const_id)));
+        }
+
+        // Add trait refs - use the trait refs from impl_ref generics  
+        for trait_clause_id in trait_impl.generics.trait_clauses.all_indices() {
+            trait_refs.push(TraitRef {
+                kind: TraitRefKind::Clause(DeBruijnVar::Bound(DeBruijnId::ZERO, trait_clause_id)),
+                trait_decl_ref: RegionBinder::empty(TraitDeclRef {
+                    id: TraitDeclId::new(0), // This should be filled properly
+                    generics: Box::new(GenericArgs::empty()),
+                }),
+            });
+        }
+
+        Ok(GenericArgs {
+            regions,
+            types,
+            const_generics,
+            trait_refs,
+        })
     }
 }
 
