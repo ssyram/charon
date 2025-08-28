@@ -88,8 +88,12 @@ note: the error occurred when translating `core::marker::MetaSized::<type_error(
   |
 7 |     x.to_string()
   |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2624:1
+
+thread 'rustc' panicked at /Users/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10:
+index out of bounds: the len is 0 but the index is 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: Thread panicked when extracting item `alloc::string::{impl#23}`.
+ --> /rustc/library/alloc/src/string.rs:2623:1
 
 note: the error occurred when translating `alloc::string::{impl core::fmt::Display::<alloc::string::String>}::{vtable}`, which is (transitively) used at the following location(s):
   --> tests/ui/monomorphization/dyn-trait.rs:12:27
