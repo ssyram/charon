@@ -842,7 +842,7 @@ impl<'a> VtableMetadataComputer<'a> {
             source_text: None,
             attr_info: AttrInfo::default(),
             is_local: true,
-            opacity: ItemOpacity::Opaque, // Mark as opaque since it's a generated shim
+            opacity: ItemOpacity::Transparent, // Mark as transparent so the name shows up
             lang_item: None,
         };
 
