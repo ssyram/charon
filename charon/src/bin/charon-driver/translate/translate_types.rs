@@ -367,7 +367,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         use crate::translate::translate_crate::TransItemSourceKind;
         
         // Register the drop implementation for Box
-        let _drop_impl_id: TraitImplId = self.register_item(
+        let _drop_impl_id: TraitImplId = self.register_item_no_enqueue(
             span,
             item,
             TransItemSourceKind::TraitImpl(TraitImplSource::DropGlue),
@@ -784,7 +784,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 // We check drop_glue to see if there's an actual implementation
                 if drop_glue.is_some() {
                     // Register the drop implementation
-                    let drop_impl_id = self.register_item(
+                    let drop_impl_id = self.register_item_no_enqueue(
                         span,
                         def.this(),
                         TransItemSourceKind::TraitImpl(TraitImplSource::DropGlue),
