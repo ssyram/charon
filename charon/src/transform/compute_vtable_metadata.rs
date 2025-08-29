@@ -22,8 +22,9 @@ struct VtableMetadataComputer<'a> {
     ctx: &'a mut TransformCtx,
     impl_ref: &'a TraitImplRef,
     span: Span,
-    /// The extracted dyn trait type from the drop field
-    dyn_trait_type: Option<Ty>,
+    /// The `&'_ mut dyn Trait<...>` type extracted from the drop field
+    /// Notably, its lifetime is erased, which should be re-filled in the shim functions
+    drop_receiver: Option<Ty>
 }
 
 impl<'a> VtableMetadataComputer<'a> {
@@ -32,7 +33,7 @@ impl<'a> VtableMetadataComputer<'a> {
             ctx,
             impl_ref,
             span,
-            dyn_trait_type: None,
+            drop_receiver: None,
         }
     }
 
@@ -79,9 +80,10 @@ impl<'a> VtableMetadataComputer<'a> {
                 "Expected at least 3 fields in vtable (size, align, drop)"
             );
         }
-
-        // Extract the dyn trait type from the drop field before overwriting it
-        self.extract_dyn_trait_type_from_drop_field(&fields[2])?;
+        self.drop_receiver = match fields[2].ty().kind() {
+            TyKind::FnPtr(binded_sig) => Some(binded_sig.clone().erase().0[0].clone()),
+            _ => unreachable!()
+        };
 
         // Get the concrete type from the impl
         let concrete_ty = self.get_concrete_type_from_impl()?;
@@ -145,62 +147,62 @@ impl<'a> VtableMetadataComputer<'a> {
     // VTABLE DETECTION AND TYPE EXTRACTION
     // ========================================
 
-    /// Extract the dyn trait type from the drop field operand
-    /// This captures the correct `&mut dyn Trait<...>` type for use in drop shim functions
-    fn extract_dyn_trait_type_from_drop_field(&mut self, drop_field: &Operand) -> Result<(), Error> {
-        match drop_field {
-            Operand::Const(const_expr) => {
-                // For function pointer constants, extract the parameter type from the function signature
-                match &const_expr.value {
-                    RawConstantExpr::FnPtr(fn_ptr) => {
-                        // Get the function signature type
-                        if let TyKind::FnPtr(sig) = const_expr.ty.kind() {
-                            let (inputs, _output) = &sig.skip_binder;
-                            if let Some(param_ty) = inputs.first() {
-                                self.dyn_trait_type = Some(param_ty.clone());
-                                trace!(
-                                    "Extracted dyn trait type from drop field: {}",
-                                    param_ty.with_ctx(&self.ctx.into_fmt())
-                                );
-                                return Ok(());
-                            }
-                        }
-                    }
-                    RawConstantExpr::Opaque(_) => {
-                        // The drop field is opaque, we need to reconstruct the dyn trait type
-                        // Fall back to the function type signature
-                        if let TyKind::FnPtr(sig) = const_expr.ty.kind() {
-                            let (inputs, _output) = &sig.skip_binder;
-                            if let Some(param_ty) = inputs.first() {
-                                self.dyn_trait_type = Some(param_ty.clone());
-                                trace!(
-                                    "Extracted dyn trait type from opaque drop field type: {}",
-                                    param_ty.with_ctx(&self.ctx.into_fmt())
-                                );
-                                return Ok(());
-                            }
-                        }
-                    }
-                    _ => {
-                        // Other constant expressions don't contain the type we need
-                    }
-                }
-            }
-            Operand::Copy(place) | Operand::Move(place) => {
-                // For place operands, extract the type directly
-                self.dyn_trait_type = Some(place.ty.clone());
-                trace!(
-                    "Extracted dyn trait type from place: {}",
-                    place.ty.with_ctx(&self.ctx.into_fmt())
-                );
-                return Ok(());
-            }
-        }
+    // /// Extract the dyn trait type from the drop field operand
+    // /// This captures the correct `&mut dyn Trait<...>` type for use in drop shim functions
+    // fn extract_dyn_trait_type_from_drop_field(&mut self, drop_field: &Operand) -> Result<(), Error> {
+    //     match drop_field {
+    //         Operand::Const(const_expr) => {
+    //             // For function pointer constants, extract the parameter type from the function signature
+    //             match &const_expr.value {
+    //                 RawConstantExpr::FnPtr(fn_ptr) => {
+    //                     // Get the function signature type
+    //                     if let TyKind::FnPtr(sig) = const_expr.ty.kind() {
+    //                         let (inputs, _output) = &sig.skip_binder;
+    //                         if let Some(param_ty) = inputs.first() {
+    //                             self.drop_receiver = param_ty.clone();
+    //                             trace!(
+    //                                 "Extracted dyn trait type from drop field: {}",
+    //                                 param_ty.with_ctx(&self.ctx.into_fmt())
+    //                             );
+    //                             return Ok(());
+    //                         }
+    //                     }
+    //                 }
+    //                 RawConstantExpr::Opaque(_) => {
+    //                     // The drop field is opaque, we need to reconstruct the dyn trait type
+    //                     // Fall back to the function type signature
+    //                     if let TyKind::FnPtr(sig) = const_expr.ty.kind() {
+    //                         let (inputs, _output) = &sig.skip_binder;
+    //                         if let Some(param_ty) = inputs.first() {
+    //                             self.dyn_trait_type = Some(param_ty.clone());
+    //                             trace!(
+    //                                 "Extracted dyn trait type from opaque drop field type: {}",
+    //                                 param_ty.with_ctx(&self.ctx.into_fmt())
+    //                             );
+    //                             return Ok(());
+    //                         }
+    //                     }
+    //                 }
+    //                 _ => {
+    //                     // Other constant expressions don't contain the type we need
+    //                 }
+    //             }
+    //         }
+    //         Operand::Copy(place) | Operand::Move(place) => {
+    //             // For place operands, extract the type directly
+    //             self.dyn_trait_type = Some(place.ty.clone());
+    //             trace!(
+    //                 "Extracted dyn trait type from place: {}",
+    //                 place.ty.with_ctx(&self.ctx.into_fmt())
+    //             );
+    //             return Ok(());
+    //         }
+    //     }
 
-        // If we couldn't extract the type, that's okay - we'll fall back to a simple approach
-        trace!("Could not extract dyn trait type from drop field, will use fallback");
-        Ok(())
-    }
+    //     // If we couldn't extract the type, that's okay - we'll fall back to a simple approach
+    //     trace!("Could not extract dyn trait type from drop field, will use fallback");
+    //     Ok(())
+    // }
 
     /// Check if a type ID represents a vtable struct by getting the correct vtable def-id
     /// from the impl-ref: impl-ref → def-id of implemented trait → get definition of the trait → get the vtable-ref → get the type-def-id of target vtable
@@ -289,7 +291,7 @@ impl<'a> VtableMetadataComputer<'a> {
             }
             DropCase::Unknown(msg) => {
                 // Case 4: Unknown case - create opaque operand with the message
-                let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+                let dyn_trait_param_ty = self.get_drop_receiver()?;
                 let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
                 let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
 
@@ -323,7 +325,7 @@ impl<'a> VtableMetadataComputer<'a> {
         )?;
 
         // Create a simple function type that matches our drop shim function
-        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let dyn_trait_param_ty = self.get_drop_receiver()?;
         let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
         let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
 
@@ -358,7 +360,7 @@ impl<'a> VtableMetadataComputer<'a> {
         )?;
 
         // Create a simple function type that matches our drop shim function
-        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let dyn_trait_param_ty = self.get_drop_receiver()?;
         let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
         let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
 
@@ -393,7 +395,7 @@ impl<'a> VtableMetadataComputer<'a> {
         )?;
 
         // Create a simple function type that matches our drop shim function
-        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let dyn_trait_param_ty = self.get_drop_receiver()?;
         let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
         let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
 
@@ -539,7 +541,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
         // Create the dyn trait type for the parameter
         // For the drop shim, we need *mut (dyn Trait<...>)
-        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let dyn_trait_param_ty = self.get_drop_receiver()?;
 
         // Create function signature with proper generics
         let signature = FunSig {
@@ -744,19 +746,11 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create the dyn trait parameter type for drop shim functions
     /// This should be &mut (dyn Trait<...>) to match the expected vtable contract
-    fn create_dyn_trait_param_type(&self) -> Result<Ty, Error> {
-        // Use the extracted dyn trait type if available
-        if let Some(ref dyn_ty) = self.dyn_trait_type {
-            trace!(
-                "Using extracted dyn trait type: {}",
-                dyn_ty.with_ctx(&self.ctx.into_fmt())
-            );
-            return Ok(dyn_ty.clone());
+    fn get_drop_receiver(&self) -> Result<Ty, Error> {
+        match self.drop_receiver {
+            Some(ref ty) => Ok(ty.clone()),
+            None => raise_error!(self.ctx, self.span, "Uninitialized drop receiver!")
         }
-
-        // Fall back to constructing a simplified dyn trait type
-        trace!("No extracted dyn trait type available, using fallback");
-        Ok(TyKind::Ref(Region::Erased, Ty::mk_unit(), RefKind::Mut).into_ty())
     }
 
     /// Create the generic arguments to be used when calling the drop function
