@@ -492,11 +492,7 @@ impl<'a> VtableMetadataComputer<'a> {
         // First check if the type needs drop at all
         match concrete_ty.needs_drop(&self.ctx.translated) {
             Ok(false) => return Ok(DropCase::NotNeeded),
-<<<<<<< Updated upstream
-            Ok(true) => { } // Continue to analyze the specific drop case
-=======
-            Ok(true) => {} // Continue to check for drop implementation
->>>>>>> Stashed changes
+            Ok(true) => {}  // Continue to check for drop implementation
             Err(reason) => return Ok(DropCase::Unknown(reason)),
         }
 
@@ -540,17 +536,6 @@ impl<'a> VtableMetadataComputer<'a> {
             }
 
             TyKind::Literal(_) => Ok(DropCase::NotNeeded),
-<<<<<<< Updated upstream
-            TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(DropCase::NotNeeded), // References and raw pointers don't need drop
-            
-            TyKind::TraitType(..) |
-            TyKind::DynTrait(..) |
-            TyKind::FnPtr(..) |
-            TyKind::FnDef(..) |
-            TyKind::Never |
-            TyKind::TypeVar(..) |
-            TyKind::Error(..) => Ok(DropCase::Unknown(format!("Unknown Drop for type: {}", self.type_to_string(concrete_ty)))),
-=======
 
             TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(DropCase::NotNeeded), // References and raw pointers don't need drop
 
@@ -564,7 +549,6 @@ impl<'a> VtableMetadataComputer<'a> {
                 "Unknown Drop for type: {}",
                 self.type_to_string(concrete_ty)
             ))),
->>>>>>> Stashed changes
         }
     }
 
