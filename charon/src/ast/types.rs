@@ -766,6 +766,11 @@ impl Ty {
     pub fn with_kind_mut<R>(&mut self, f: impl FnOnce(&mut TyKind) -> R) -> R {
         self.0.with_inner_mut(f)
     }
+
+    /// Returns `usize` type.
+    pub fn mk_usize() -> Ty {
+        Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)))
+    }
 }
 
 impl<'s, V: Visit<'s, TyKind>> Drive<'s, V> for Ty {

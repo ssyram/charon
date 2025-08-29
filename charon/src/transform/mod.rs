@@ -1,5 +1,6 @@
 pub mod check_generics;
 pub mod compute_short_names;
+pub mod compute_vtable_metadata;
 pub mod ctx;
 pub mod duplicate_defaulted_methods;
 pub mod duplicate_return;
@@ -80,6 +81,8 @@ pub static ULLBC_PASSES: &[Pass] = &[
     // Transform dyn trait method calls to vtable function pointer calls
     // This should be early to handle the calls before other transformations
     UnstructuredBody(&transform_dyn_trait_calls::Transform),
+    // Compute vtable metadata (size, align, drop) - should be early to have complete vtables
+    NonBody(&compute_vtable_metadata::Transform),
     // Inline promoted consts into their parent bodies.
     UnstructuredBody(&inline_promoted_consts::Transform),
     // # Micro-pass: merge single-origin gotos into their parent. This drastically reduces the

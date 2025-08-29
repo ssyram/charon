@@ -335,8 +335,8 @@ and trait_ref_to_string (env : 'a fmt_env) (tr : trait_ref) : string =
       "dyn(" ^ trait ^ ")"
   | UnknownTrait msg -> "UNKNOWN(" ^ msg ^ ")"
 
-and trait_instance_id_to_string (env : 'a fmt_env)
-    (id : trait_instance_id) : string =
+and trait_instance_id_to_string (env : 'a fmt_env) (id : trait_instance_id) :
+    string =
   match id with
   | Self -> "Self"
   | TraitImpl impl_ref -> trait_impl_ref_to_string env impl_ref

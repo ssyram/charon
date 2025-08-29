@@ -124,7 +124,7 @@ note: the error occurred when translating `core::marker::MetaSized::<type_error(
 7 |     x.to_string()
   |     -------------
 
-thread 'rustc' panicked at /Users/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10:
+thread 'rustc' panicked at /home/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10:
 index out of bounds: the len is 0 but the index is 0
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 error: Thread panicked when extracting item `alloc::string::{impl#23}`.
