@@ -604,7 +604,10 @@ impl Ty {
             TyKind::Adt(type_decl_ref) => match type_decl_ref.id {
                 TypeId::Adt(type_decl_id) => {
                     let type_decl = translated.type_decls.get(type_decl_id).ok_or_else(|| {
-                        format!("Type declaration for {} not found", type_decl_id)
+                        format!(
+                            "Type declaration for {} not found",
+                            type_decl_id.with_ctx(&translated.into_fmt())
+                        )
                     })?;
                     Ok(type_decl.drop_glue.is_some())
                 }
@@ -620,14 +623,14 @@ impl Ty {
                 }
                 TypeId::Builtin(builtin_ty) => match builtin_ty {
                     BuiltinTy::Box => Ok(true), // Box always needs drop
-                    BuiltinTy::Array | BuiltinTy::Slice => {
+                    BuiltinTy::Array => {
                         let element_ty = &type_decl_ref.generics.types[0];
                         element_ty.needs_drop(translated)
                     }
-                    BuiltinTy::Str => Ok(false), // str does not need drop
+                    BuiltinTy::Str | BuiltinTy::Slice => Ok(false), // str & [T] does not need drop
                 },
             },
-            TyKind::DynTrait(..) => Ok(true), // `dyn Trait` is assumed to always need drop
+            TyKind::DynTrait(..) => Ok(false),
             TyKind::Literal(..) => Ok(false), // Literal types do not need drop
             TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(false), // References and raw pointers do not need drop
             TyKind::FnPtr(..) => Ok(false),                    // Function pointers do not need drop
