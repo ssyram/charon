@@ -476,9 +476,40 @@ impl ItemTransCtx<'_, '_> {
         impl_def: &'a hax::FullDef,
         impl_kind: &TraitImplSource,
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
-        let implemented_trait = match impl_def.kind() {
-            hax::FullDefKind::TraitImpl { trait_pred, .. } => &trait_pred.trait_ref,
-            tref => raise_error!(self, span, "TODO: handle this case {tref:?}"),
+        let implemented_trait = match (impl_def.kind(), impl_kind) {
+            (hax::FullDefKind::TraitImpl { trait_pred, .. }, _) => &trait_pred.trait_ref,
+            (
+                hax::FullDefKind::Closure {
+                    fn_once_impl,
+                    fn_mut_impl,
+                    fn_impl,
+                    ..
+                },
+                TraitImplSource::Closure(closure_kind),
+            ) => {
+                use charon_lib::ullbc_ast::ClosureKind;
+                let virtual_impl = match closure_kind {
+                    ClosureKind::FnOnce => fn_once_impl,
+                    ClosureKind::FnMut => fn_mut_impl.as_ref().ok_or_else(|| {
+                        Error {
+                            span,
+                            msg: "Missing FnMut impl for closure".to_string(),
+                        }
+                    })?,
+                    ClosureKind::Fn => fn_impl.as_ref().ok_or_else(|| {
+                        Error {
+                            span,
+                            msg: "Missing Fn impl for closure".to_string(),
+                        }
+                    })?,
+                };
+                &virtual_impl.trait_pred.trait_ref
+            }
+            (def_kind, impl_kind) => raise_error!(
+                self,
+                span,
+                "TODO: handle this case {def_kind:?} with impl_kind {impl_kind:?}"
+            ),
         };
         let vtable_struct_ref = self
             .translate_vtable_struct_ref(span, implemented_trait)?
@@ -888,6 +919,12 @@ impl ItemTransCtx<'_, '_> {
             TraitImplSource::Normal => {
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;
                 Ok(body)
+            }
+            TraitImplSource::Closure(_) => {
+                // For closures, we need to generate a vtable body that's compatible with closure trait impls
+                // For now, generate an opaque body since the actual vtable structure would be complex
+                // TODO: Implement proper closure vtable generation
+                Err(charon_lib::ullbc_ast::Opaque)
             }
             _ => {
                 raise_error!(
