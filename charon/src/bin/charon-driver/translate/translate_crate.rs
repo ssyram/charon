@@ -483,7 +483,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         span: Span,
         item: &hax::ItemRef,
     ) -> Result<TypeDeclRef, Error> {
-        match self.recognize_builtin_type(item)? {
+        match self.recognize_builtin_type(span, item)? {
             Some(id) => {
                 let generics =
                     self.translate_generic_args(span, &item.generic_args, &item.impl_exprs)?;
