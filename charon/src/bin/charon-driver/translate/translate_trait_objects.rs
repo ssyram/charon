@@ -301,17 +301,17 @@ impl ItemTransCtx<'_, '_> {
         // Field: `drop: fn<'0>(&'0 mut Self)` -- `Self` is just a placeholder, will be dynified below.
         mk_field("drop".into(), {
             let self_ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
-            let self_ptr = TyKind::Ref(Region::Var(DeBruijnVar::new_at_zero(RegionId::ZERO)), self_ty.move_under_binder(), RefKind::Mut).into_ty();
+            let self_ptr = TyKind::Ref(
+                Region::Var(DeBruijnVar::new_at_zero(RegionId::ZERO)),
+                self_ty.move_under_binder(),
+                RefKind::Mut,
+            )
+            .into_ty();
             let mut regions = Vector::new();
-            regions.push_with(|index| {
-                RegionVar { index, name: None }
-            });
+            regions.push_with(|index| RegionVar { index, name: None });
             Ty::new(TyKind::FnPtr(RegionBinder {
                 regions,
-                skip_binder: (
-                    [self_ptr].into(),
-                    Ty::mk_unit(),
-                )
+                skip_binder: ([self_ptr].into(), Ty::mk_unit()),
             }))
         });
 

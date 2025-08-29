@@ -1,6 +1,8 @@
 //! This file groups everything which is linked to implementations about [crate::types]
 use crate::ast::*;
+use crate::formatter::IntoFormatter;
 use crate::ids::Vector;
+use crate::pretty::FmtWithCtx;
 use derive_generic_visitor::*;
 use std::collections::HashSet;
 use std::convert::Infallible;
@@ -594,6 +596,166 @@ impl Ty {
         match self.as_tuple() {
             Some(tys) => tys.is_empty(),
             None => false,
+        }
+    }
+
+    /// Returns either the layout of this type, or a string with the reason why we couldn't compute it.
+    pub fn layout(&self, translated: &TranslatedCrate) -> Result<Layout, String> {
+        match self.kind() {
+            TyKind::Adt(type_decl_ref) => {
+                match &type_decl_ref.id {
+                    TypeId::Adt(type_decl_id) => {
+                        let type_decl =
+                            translated.type_decls.get(*type_decl_id).ok_or_else(|| {
+                                format!(
+                                    "Type declaration for {} not found",
+                                    type_decl_id.with_ctx(&translated.into_fmt())
+                                )
+                            })?;
+                        let layout = type_decl
+                            .layout
+                            .as_ref()
+                            .ok_or("Layout not available for ADT")?;
+                        Ok(layout.clone())
+                    }
+                    TypeId::Tuple => {
+                        // Get the tuple element types from generics
+                        let element_types = &type_decl_ref.generics.types;
+                        // Compute layout for tuple elements
+                        let mut total_size: Option<u64> = Some(0);
+                        let mut max_align: Option<u64> = Some(1);
+                        let mut is_uninhabited = false;
+
+                        for element_ty in element_types.iter() {
+                            let element_layout = element_ty.layout(translated)?;
+                            if element_layout.uninhabited {
+                                is_uninhabited = true;
+                            }
+
+                            match (
+                                total_size,
+                                element_layout.size,
+                                element_layout.align,
+                                max_align,
+                            ) {
+                                (
+                                    Some(current_size),
+                                    Some(elem_size),
+                                    Some(elem_align),
+                                    Some(current_max_align),
+                                ) => {
+                                    // Apply alignment padding
+                                    let aligned_size =
+                                        (current_size + elem_align - 1) / elem_align * elem_align;
+                                    total_size = Some(aligned_size + elem_size);
+                                    max_align = Some(current_max_align.max(elem_align));
+                                }
+                                _ => {
+                                    // If any size or alignment is None, the final result is None
+                                    total_size = None;
+                                    max_align = None;
+                                }
+                            }
+                        }
+
+                        if is_uninhabited {
+                            // If any element is uninhabited, the whole tuple is uninhabited
+                            return Ok(Layout {
+                                size: Some(0),
+                                align: max_align.or(Some(1)), // Ensure at least 1-byte alignment
+                                uninhabited: true,
+                                variant_layouts: Vector::new(),
+                                discriminant_layout: None,
+                            });
+                        }
+
+                        // Final padding to struct alignment
+                        let final_size = match (total_size, max_align) {
+                            (Some(size), Some(align)) => Some((size + align - 1) / align * align),
+                            _ => None,
+                        };
+
+                        Ok(Layout {
+                            size: final_size,
+                            align: max_align,
+                            uninhabited: is_uninhabited,
+                            variant_layouts: Vector::new(),
+                            discriminant_layout: None,
+                        })
+                    }
+                    TypeId::Builtin(builtin_ty) => {
+                        match builtin_ty {
+                            BuiltinTy::Box => Err("TODO: handle Box with ptr-metadata".to_string()),
+                            BuiltinTy::Array => {
+                                // Array layout: element_type repeated const_generics[0] times
+                                let element_ty = &type_decl_ref.generics.types[0];
+                                let element_layout = element_ty.layout(translated)?;
+
+                                if element_layout.uninhabited {
+                                    return Ok(Layout {
+                                        size: Some(0),
+                                        align: element_layout.align,
+                                        uninhabited: true,
+                                        variant_layouts: Vector::new(),
+                                        discriminant_layout: None,
+                                    });
+                                }
+
+                                let cg = type_decl_ref
+                                    .generics
+                                    .const_generics
+                                    .get(ConstGenericVarId::ZERO)
+                                    .unwrap();
+                                let ConstGeneric::Value(Literal::Scalar(scalar)) = cg else {
+                                    return Err(format!(
+                                        "No instant available const generic value or wrong format value: {}",
+                                        cg.with_ctx(&translated.into_fmt())
+                                    ));
+                                };
+                                let len = scalar.as_uint().or_else(|e| {
+                                    Err(format!("Failed to get array length: {:?}", e))
+                                })?;
+
+                                let element_size = element_layout.size;
+                                let align = element_layout.align;
+
+                                let size = element_size.map(|s| s * (len as u64));
+
+                                Ok(Layout {
+                                    size,
+                                    align,
+                                    uninhabited: false,
+                                    variant_layouts: Vector::new(),
+                                    discriminant_layout: None,
+                                })
+                            }
+                            BuiltinTy::Slice | BuiltinTy::Str => {
+                                Err("DST does not have layout".to_string())
+                            }
+                        }
+                    }
+                }
+            }
+            TyKind::Literal(lit_ty) => {
+                // For literal types, create a simple scalar layout
+                let size =
+                    lit_ty.target_size(translated.target_information.target_pointer_size) as u64;
+                Ok(Layout {
+                    size: Some(size),
+                    align: Some(size), // Scalar types are self-aligned
+                    uninhabited: false,
+                    variant_layouts: Vector::new(),
+                    discriminant_layout: None,
+                })
+            }
+            TyKind::RawPtr(_, _) | TyKind::Ref(_, _, _) => {
+                Err("TODO: handle pointer/reference with ptr-metadata".to_string())
+            }
+            TyKind::TypeVar(_) => Err("No layout due to generic".to_string()),
+            _ => Err(format!(
+                "Don't know how to compute layout for type {}",
+                self.with_ctx(&translated.into_fmt())
+            )),
         }
     }
 

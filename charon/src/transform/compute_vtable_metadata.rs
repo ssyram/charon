@@ -8,53 +8,13 @@
 //! 3. Generate proper drop shim functions for the drop field
 //! 4. Replace the opaque placeholders with the actual values
 
+use either::Either::{self};
+
 use super::ctx::TransformPass;
 use crate::{
     ast::ScalarValue, errors::Error, formatter::IntoFormatter, pretty::FmtWithCtx, raise_error,
     register_error, transform::TransformCtx, ullbc_ast::*,
 };
-
-pub struct Transform;
-
-impl TransformPass for Transform {
-    fn transform_ctx(&self, ctx: &mut TransformCtx) {
-        trace!(
-            "ComputeVtableMetadata: Processing {} vtable instances",
-            count_vtable_instances(ctx)
-        );
-
-        // Process vtable instance initializer functions
-        ctx.for_each_fun_decl(|ctx, decl| {
-            if let ItemKind::VTableInstance { impl_ref } = &decl.kind {
-                if let Ok(body) = &mut decl.body {
-                    let mut computer =
-                        VtableMetadataComputer::new(ctx, impl_ref, decl.item_meta.span);
-
-                    match computer.compute_vtable_metadata_for_function(body) {
-                        Ok(_) => {
-                            trace!(
-                                "Successfully computed vtable metadata for {}",
-                                decl.def_id.with_ctx(&ctx.into_fmt())
-                            );
-                        }
-                        Err(e) => {
-                            register_error!(
-                                ctx,
-                                decl.item_meta.span,
-                                "Failed to compute vtable metadata: {:?}",
-                                e
-                            );
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    fn name(&self) -> &str {
-        "ComputeVtableMetadata"
-    }
-}
 
 /// Vtable metadata computer that holds common state and provides methods
 /// for computing size, align, and drop shim functions for vtable instances.
@@ -120,16 +80,59 @@ impl<'a> VtableMetadataComputer<'a> {
         // Get the concrete type from the impl
         let concrete_ty = self.get_concrete_type_from_impl()?;
 
-        // 1. Update size field
-        fields[0] = self.compute_size_operand(&concrete_ty)?;
+        // Update both size & align field with the info of the concrete type
+        self.compute_layout(fields, &concrete_ty)?;
 
-        // 2. Update align field
-        fields[1] = self.compute_align_operand(&concrete_ty)?;
-
-        // 3. Update drop field - generate actual shim function instead of opaque
+        // Update drop field - generate actual shim function instead of opaque
         fields[2] = self.generate_drop_shim(&concrete_ty)?;
 
         Ok(())
+    }
+
+    fn compute_layout(&mut self, fields: &mut Vec<Operand>, concrete_ty: &Ty) -> Result<(), Error> {
+        match concrete_ty.layout(&self.ctx.translated) {
+            Ok(layout) => {
+                fields[0] = self.layout_field_constant(match layout.size {
+                    Some(size) => Either::Right(size),
+                    None => Either::Left("Size not available".to_string()),
+                })?;
+                fields[1] = self.layout_field_constant(match layout.align {
+                    Some(align) => Either::Right(align),
+                    None => Either::Left("Align not available".to_string()),
+                })?;
+            }
+            Err(reason) => {
+                // Fallback to opaque values for both size and align when layout computation fails
+                let reason_msg = format!("Layout not available: {}", reason);
+                fields[0] = self.layout_field_constant(Either::Left(reason_msg.clone()))?;
+                fields[1] = self.layout_field_constant(Either::Left(reason_msg))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Create a constant operand for layout fields (size/align)
+    /// If Left(reason), creates an opaque constant with the reason
+    /// If Right(value), creates a literal constant with the value
+    fn layout_field_constant(&self, value: Either<String, u64>) -> Result<Operand, Error> {
+        let constant_expr = match value {
+            Either::Left(reason) => ConstantExpr {
+                value: RawConstantExpr::Opaque(reason),
+                ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+            },
+            Either::Right(val) => ConstantExpr {
+                value: RawConstantExpr::Literal(Literal::Scalar(
+                    ScalarValue::from_uint(
+                        self.ctx.translated.target_information.target_pointer_size,
+                        UIntTy::Usize,
+                        val as u128,
+                    )
+                    .or_else(|_| raise_error!(self.ctx, self.span, "Layout value out of bounds"))?,
+                )),
+                ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+            },
+        };
+        Ok(Operand::Const(Box::new(constant_expr)))
     }
 
     // ========================================
@@ -193,80 +196,6 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     // ========================================
-    // SIZE AND ALIGN COMPUTATION
-    // ========================================
-
-    /// Compute the size operand for the vtable
-    fn compute_size_operand(&self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        match self.get_type_size(concrete_ty) {
-            Some(size) => {
-                let ptr_size = self.ctx.translated.target_information.target_pointer_size;
-                match ScalarValue::from_uint(ptr_size, UIntTy::Usize, size) {
-                    Ok(scalar_val) => {
-                        let size_const = ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(scalar_val)),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(size_const)))
-                    }
-                    Err(_) => {
-                        // Fall back to opaque if value is out of bounds
-                        let opaque_const = ConstantExpr {
-                            value: RawConstantExpr::Opaque("size value out of bounds".to_string()),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(opaque_const)))
-                    }
-                }
-            }
-            None => {
-                let opaque_const = ConstantExpr {
-                    value: RawConstantExpr::Opaque(
-                        "size not available due to generics".to_string(),
-                    ),
-                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                };
-                Ok(Operand::Const(Box::new(opaque_const)))
-            }
-        }
-    }
-
-    /// Compute the align operand for the vtable
-    fn compute_align_operand(&self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        match self.get_type_align(concrete_ty) {
-            Some(align) => {
-                let ptr_size = self.ctx.translated.target_information.target_pointer_size;
-                match ScalarValue::from_uint(ptr_size, UIntTy::Usize, align) {
-                    Ok(scalar_val) => {
-                        let align_const = ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(scalar_val)),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(align_const)))
-                    }
-                    Err(_) => {
-                        // Fall back to opaque if value is out of bounds
-                        let opaque_const = ConstantExpr {
-                            value: RawConstantExpr::Opaque("align value out of bounds".to_string()),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(opaque_const)))
-                    }
-                }
-            }
-            None => {
-                let opaque_const = ConstantExpr {
-                    value: RawConstantExpr::Opaque(
-                        "align not available due to generics".to_string(),
-                    ),
-                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                };
-                Ok(Operand::Const(Box::new(opaque_const)))
-            }
-        }
-    }
-
-    // ========================================
     // DROP SHIM GENERATION
     // ========================================
 
@@ -304,18 +233,25 @@ impl<'a> VtableMetadataComputer<'a> {
         fun_ref: &FunDeclRef,
         concrete_ty: &Ty,
     ) -> Result<Operand, Error> {
-        let shim_name = format!("{{vtable_drop_shim_call_{}_{}}}",  
-            fun_ref.id.index(), 
-            self.type_to_string(concrete_ty));
-        
+        let shim_name = format!(
+            "{{vtable_drop_shim_call_{}_{}}}",
+            fun_ref.id.index(),
+            self.type_to_string(concrete_ty)
+        );
+
         // Create the drop shim function
-        let shim_id = self.create_drop_shim_function(&shim_name, fun_ref.clone(), DropShimKind::CallDrop, concrete_ty)?;
-        
+        let shim_id = self.create_drop_shim_function(
+            &shim_name,
+            fun_ref.clone(),
+            DropShimKind::CallDrop,
+            concrete_ty,
+        )?;
+
         // Create a simple function type that matches our drop shim function
         let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
         let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
         let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-        
+
         // Return function reference as operand
         let shim_const = ConstantExpr {
             value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
@@ -329,21 +265,29 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create an empty drop shim for types that don't need drop (Case 2)  
     fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        let shim_name = format!("{{vtable_drop_shim_empty_{}}}", self.type_to_string(concrete_ty));
-        
+        let shim_name = format!(
+            "{{vtable_drop_shim_empty_{}}}",
+            self.type_to_string(concrete_ty)
+        );
+
         // Create the drop shim function
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
         };
-        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Empty, concrete_ty)?;
-        
+        let shim_id = self.create_drop_shim_function(
+            &shim_name,
+            dummy_fn_ref,
+            DropShimKind::Empty,
+            concrete_ty,
+        )?;
+
         // Create a simple function type that matches our drop shim function
         let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
         let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
         let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-        
-        // Return function reference as operand  
+
+        // Return function reference as operand
         let shim_const = ConstantExpr {
             value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
                 id: shim_id,
@@ -356,20 +300,28 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Create a panic drop shim for missing drop functions (Case 3)
     fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
-        let shim_name = format!("{{vtable_drop_shim_panic_{}}}", self.type_to_string(concrete_ty));
-        
+        let shim_name = format!(
+            "{{vtable_drop_shim_panic_{}}}",
+            self.type_to_string(concrete_ty)
+        );
+
         // Create the drop shim function
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
         };
-        let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Panic(msg.to_string()), concrete_ty)?;
-        
+        let shim_id = self.create_drop_shim_function(
+            &shim_name,
+            dummy_fn_ref,
+            DropShimKind::Panic(msg.to_string()),
+            concrete_ty,
+        )?;
+
         // Create a simple function type that matches our drop shim function
         let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
         let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
         let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-        
+
         // Return function reference as operand
         let shim_const = ConstantExpr {
             value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
@@ -513,104 +465,6 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     // ========================================
-    // TYPE SIZE AND ALIGNMENT COMPUTATION
-    // ========================================
-
-    /// Get the size of a type from its layout information
-    fn get_type_size(&self, ty: &Ty) -> Option<u128> {
-        match ty.kind() {
-            TyKind::Adt(type_decl_ref) => {
-                let TypeId::Adt(type_decl_id) = type_decl_ref.id else {
-                    return None;
-                };
-                let type_decl = self.ctx.translated.type_decls.get(type_decl_id)?;
-                type_decl.layout.as_ref()?.size?.try_into().ok()
-            }
-            TyKind::Literal(lit_ty) => {
-                // For literal types, we can compute size directly
-                Some(match lit_ty {
-                    LiteralTy::Bool => 1,
-                    LiteralTy::Char => 4,
-                    LiteralTy::Int(int_ty) => self.get_int_size(*int_ty),
-                    LiteralTy::UInt(uint_ty) => self.get_uint_size(*uint_ty),
-                    LiteralTy::Float(float_ty) => match float_ty {
-                        FloatTy::F16 => 2,
-                        FloatTy::F32 => 4,
-                        FloatTy::F64 => 8,
-                        FloatTy::F128 => 16,
-                    },
-                })
-            }
-            _ => None, // For complex types like references, generics, etc., we can't determine size here
-        }
-    }
-
-    /// Get the alignment of a type from its layout information  
-    fn get_type_align(&self, ty: &Ty) -> Option<u128> {
-        match ty.kind() {
-            TyKind::Adt(type_decl_ref) => {
-                let TypeId::Adt(type_decl_id) = type_decl_ref.id else {
-                    return None;
-                };
-                let type_decl = self.ctx.translated.type_decls.get(type_decl_id)?;
-                type_decl.layout.as_ref()?.align?.try_into().ok()
-            }
-            TyKind::Literal(lit_ty) => {
-                // For literal types, alignment is typically the same as size (with some exceptions)
-                Some(match lit_ty {
-                    LiteralTy::Bool => 1,
-                    LiteralTy::Char => 4,
-                    LiteralTy::Int(int_ty) => self.get_int_size(*int_ty),
-                    LiteralTy::UInt(uint_ty) => self.get_uint_size(*uint_ty),
-                    LiteralTy::Float(float_ty) => match float_ty {
-                        FloatTy::F16 => 2,
-                        FloatTy::F32 => 4,
-                        FloatTy::F64 => 8,
-                        FloatTy::F128 => 16, // May need special handling
-                    },
-                })
-            }
-            _ => None,
-        }
-    }
-
-    /// Get the size of an integer type
-    fn get_int_size(&self, int_ty: IntTy) -> u128 {
-        match int_ty {
-            IntTy::Isize => self
-                .ctx
-                .translated
-                .target_information
-                .target_pointer_size
-                .try_into()
-                .unwrap(),
-            IntTy::I8 => 1,
-            IntTy::I16 => 2,
-            IntTy::I32 => 4,
-            IntTy::I64 => 8,
-            IntTy::I128 => 16,
-        }
-    }
-
-    /// Get the size of an unsigned integer type
-    fn get_uint_size(&self, uint_ty: UIntTy) -> u128 {
-        match uint_ty {
-            UIntTy::Usize => self
-                .ctx
-                .translated
-                .target_information
-                .target_pointer_size
-                .try_into()
-                .unwrap(),
-            UIntTy::U8 => 1,
-            UIntTy::U16 => 2,
-            UIntTy::U32 => 4,
-            UIntTy::U64 => 8,
-            UIntTy::U128 => 16,
-        }
-    }
-
-    // ========================================
     // FUNCTION TYPE AND GENERICS CREATION
     // ========================================
     // FUNCTION CREATION AND BODY GENERATION
@@ -626,7 +480,7 @@ impl<'a> VtableMetadataComputer<'a> {
     ) -> Result<FunDeclId, Error> {
         // Get the generics from the trait impl - drop shims should have the same generics
         let generics = self.get_trait_impl_generics()?;
-        
+
         // Create the dyn trait type for the parameter
         // For the drop shim, we need *mut (dyn Trait<...>)
         let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
@@ -643,7 +497,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut locals = Locals::default();
         locals.arg_count = 1; // One argument: &mut self
 
-        // Return value (unit)  
+        // Return value (unit)
         let ret_local = Local {
             index: LocalId::new(0),
             name: Some("ret".to_string()),
@@ -652,30 +506,27 @@ impl<'a> VtableMetadataComputer<'a> {
 
         // Self parameter (dyn trait object pointer)
         let self_local = Local {
-            index: LocalId::new(1), 
+            index: LocalId::new(1),
             name: Some("self".to_string()),
             ty: dyn_trait_param_ty.clone(),
         };
 
         let _ = locals.locals.push_with(|_| ret_local);
         let _ = locals.locals.push_with(|_| self_local);
-        
+
         // For CallDrop case, add a local for the concretized concrete type
         let mut concrete_local_id = None;
         if matches!(kind, DropShimKind::CallDrop) {
             // Create the concrete type (mutable reference to the concrete type)
-            let concrete_ref_ty = TyKind::Ref(
-                Region::Erased,
-                concrete_ty.clone(),
-                RefKind::Mut
-            ).into_ty();
-            
+            let concrete_ref_ty =
+                TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
             let concrete_local = Local {
                 index: LocalId::new(2),
                 name: Some("concrete".to_string()),
                 ty: concrete_ref_ty,
             };
-            
+
             concrete_local_id = Some(locals.locals.push_with(|_| concrete_local));
             locals.arg_count = 1; // Still only one argument
         }
@@ -685,7 +536,7 @@ impl<'a> VtableMetadataComputer<'a> {
             DropShimKind::CallDrop => {
                 // Generate a call to the drop function with Concretize cast
                 let mut blocks = Vector::new();
-                
+
                 // Create the concretize cast statement
                 let Some(concrete_local_id) = concrete_local_id else {
                     raise_error!(
@@ -694,32 +545,35 @@ impl<'a> VtableMetadataComputer<'a> {
                         "Expected concrete local to be created for CallDrop case"
                     );
                 };
-                
+
                 // Get the concrete type for the concretize cast
-                let concrete_ref_ty = TyKind::Ref(
-                    Region::Erased,
-                    concrete_ty.clone(),
-                    RefKind::Mut
-                ).into_ty();
-                
+                let concrete_ref_ty =
+                    TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
                 let concretize_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
                         Place::new(concrete_local_id, concrete_ref_ty.clone()),
                         Rvalue::UnaryOp(
-                            UnOp::Cast(CastKind::Concretize(dyn_trait_param_ty.clone(), concrete_ref_ty.clone())),
-                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone()))
-                        )
+                            UnOp::Cast(CastKind::Concretize(
+                                dyn_trait_param_ty.clone(),
+                                concrete_ref_ty.clone(),
+                            )),
+                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                        ),
                     ),
                     comments_before: vec![],
                 };
-                
+
                 let call = Call {
                     func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                         id: drop_fn_ref.id,
                         generics: Box::new(self.create_drop_function_generics()?),
                     })),
-                    args: vec![Operand::Move(Place::new(concrete_local_id, concrete_ref_ty))],
+                    args: vec![Operand::Move(Place::new(
+                        concrete_local_id,
+                        concrete_ref_ty,
+                    ))],
                     dest: Place::new(LocalId::new(0), Ty::mk_unit()),
                 };
 
@@ -787,7 +641,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
                 Body::Unstructured(ExprBody {
                     span: self.span,
-                    locals: locals.clone(), 
+                    locals: locals.clone(),
                     comments: vec![],
                     body: blocks,
                 })
@@ -805,7 +659,7 @@ impl<'a> VtableMetadataComputer<'a> {
             lang_item: None,
         };
 
-        // Create and add function declaration  
+        // Create and add function declaration
         let shim_id = self.ctx.translated.fun_decls.push_with(|id| FunDecl {
             def_id: id,
             item_meta,
@@ -837,7 +691,7 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_dyn_trait_param_type(&self) -> Result<Ty, Error> {
         // For drop shim functions, create a simplified dyn trait type without complex generic references
         // The drop shim just needs to cast to the concrete type, so we don't need the full trait structure
-        
+
         // Use an erased region to avoid binding issues
         Ok(TyKind::Ref(Region::Erased, Ty::mk_unit(), RefKind::Mut).into_ty())
     }
@@ -855,7 +709,7 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         // For drop functions, we need to provide:
-        // 1. Erased region for the lifetime parameter (the mutable reference lifetime)  
+        // 1. Erased region for the lifetime parameter (the mutable reference lifetime)
         // 2. No type parameters (drop functions are usually monomorphic in the type)
         // 3. No const generics
         // 4. No trait refs
@@ -876,7 +730,7 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(GenericArgs {
             regions: Vector::new(),
             types: Vector::new(),
-            const_generics: Vector::new(), 
+            const_generics: Vector::new(),
             trait_refs: Vector::new(),
         })
     }
@@ -911,4 +765,46 @@ fn count_vtable_instances(ctx: &TransformCtx) -> usize {
         .iter()
         .filter(|decl| matches!(decl.kind, ItemKind::VTableInstance { .. }))
         .count()
+}
+
+pub struct Transform;
+
+impl TransformPass for Transform {
+    fn transform_ctx(&self, ctx: &mut TransformCtx) {
+        trace!(
+            "ComputeVtableMetadata: Processing {} vtable instances",
+            count_vtable_instances(ctx)
+        );
+
+        // Process vtable instance initializer functions
+        ctx.for_each_fun_decl(|ctx, decl| {
+            if let ItemKind::VTableInstance { impl_ref } = &decl.kind {
+                if let Ok(body) = &mut decl.body {
+                    let mut computer =
+                        VtableMetadataComputer::new(ctx, impl_ref, decl.item_meta.span);
+
+                    match computer.compute_vtable_metadata_for_function(body) {
+                        Ok(_) => {
+                            trace!(
+                                "Successfully computed vtable metadata for {}",
+                                decl.def_id.with_ctx(&ctx.into_fmt())
+                            );
+                        }
+                        Err(e) => {
+                            register_error!(
+                                ctx,
+                                decl.item_meta.span,
+                                "Failed to compute vtable metadata: {:?}",
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    fn name(&self) -> &str {
+        "ComputeVtableMetadata"
+    }
 }
