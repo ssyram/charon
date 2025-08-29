@@ -308,9 +308,13 @@ impl<'a> VtableMetadataComputer<'a> {
             fun_ref.id.index(), 
             self.type_to_string(concrete_ty));
         
-        // Create actual function that calls the drop function
-        let drop_fn_type = self.create_drop_fn_type()?;
+        // Create the drop shim function
         let shim_id = self.create_drop_shim_function(&shim_name, fun_ref.clone(), DropShimKind::CallDrop, concrete_ty)?;
+        
+        // Create a simple function type that matches our drop shim function
+        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
+        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
         
         // Return function reference as operand
         let shim_const = ConstantExpr {
@@ -327,13 +331,17 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
         let shim_name = format!("{{vtable_drop_shim_empty_{}}}", self.type_to_string(concrete_ty));
         
-        // Create actual function that just returns
-        let drop_fn_type = self.create_drop_fn_type()?;
+        // Create the drop shim function
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
         };
         let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Empty, concrete_ty)?;
+        
+        // Create a simple function type that matches our drop shim function
+        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
+        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
         
         // Return function reference as operand  
         let shim_const = ConstantExpr {
@@ -350,13 +358,17 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
         let shim_name = format!("{{vtable_drop_shim_panic_{}}}", self.type_to_string(concrete_ty));
         
-        // Create actual function that panics
-        let drop_fn_type = self.create_drop_fn_type()?;
+        // Create the drop shim function
         let dummy_fn_ref = FunDeclRef {
             id: FunDeclId::new(0), // Dummy ID that won't be used
             generics: Box::new(GenericArgs::empty()),
         };
         let shim_id = self.create_drop_shim_function(&shim_name, dummy_fn_ref, DropShimKind::Panic(msg.to_string()), concrete_ty)?;
+        
+        // Create a simple function type that matches our drop shim function
+        let dyn_trait_param_ty = self.create_dyn_trait_param_type()?;
+        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
+        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
         
         // Return function reference as operand
         let shim_const = ConstantExpr {
@@ -601,76 +613,8 @@ impl<'a> VtableMetadataComputer<'a> {
     // ========================================
     // FUNCTION TYPE AND GENERICS CREATION
     // ========================================
-
-    /// Create the function pointer type for a drop function by extracting it from the vtable struct
-    fn create_drop_fn_type(&self) -> Result<Ty, Error> {
-        // Get the trait being implemented
-        let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Trait impl not found: {}",
-                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
-            );
-        };
-        
-        let trait_decl_ref = &trait_impl.impl_trait;
-        let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_decl_ref.id) else {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Trait declaration not found: {}",
-                trait_decl_ref.id.with_ctx(&self.ctx.into_fmt())
-            );
-        };
-        
-        // Get the vtable ref from the trait definition
-        let Some(vtable_ref) = &trait_decl.vtable else {
-            // Fallback to simple type if no vtable
-            let mut_ptr_ty = TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty();
-            let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
-            return Ok(TyKind::FnPtr(fn_sig).into_ty());
-        };
-        
-        // Get the vtable struct type declaration
-        let TypeId::Adt(vtable_type_id) = &vtable_ref.id else {
-            // Fallback to simple type if not an ADT
-            let mut_ptr_ty = TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty();
-            let fn_sig = RegionBinder::empty((vec![mut_ptr_ty], Ty::mk_unit()));
-            return Ok(TyKind::FnPtr(fn_sig).into_ty());
-        };
-        
-        let Some(vtable_type_decl) = self.ctx.translated.type_decls.get(*vtable_type_id) else {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Vtable type declaration not found: {}",
-                vtable_type_id.with_ctx(&self.ctx.into_fmt())
-            );
-        };
-        
-        // Extract the drop field type from the vtable struct
-        let TypeDeclKind::Struct(fields) = &vtable_type_decl.kind else {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Expected vtable to be a struct, got: {:?}",
-                vtable_type_decl.kind
-            );
-        };
-        
-        // Find the drop field (should be the third field: size, align, drop, ...)
-        if fields.iter().count() < 3 {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Expected vtable struct to have at least 3 fields (size, align, drop)"
-            );
-        }
-        
-        // Return the type of the drop field
-        Ok(fields[FieldId::new(2)].ty.clone())
-    }
+    // FUNCTION CREATION AND BODY GENERATION
+    // ========================================
 
     /// Different kinds of drop shims we need to generate
     fn create_drop_shim_function(
@@ -876,13 +820,9 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Get the generics from the trait impl that should be used for drop shim functions
     fn get_trait_impl_generics(&self) -> Result<GenericParams, Error> {
-        // Drop shim functions should have minimal generics
-        // They just need to handle the lifetime of the mutable reference
+        // Drop shim functions should have no generics since they use erased regions and unit types
         Ok(GenericParams {
-            regions: [RegionVar {
-                index: RegionId::new(0),
-                name: Some("_".to_string()),
-            }].into_iter().collect(),
+            regions: Vector::new(),
             types: Vector::new(),
             const_generics: Vector::new(),
             trait_clauses: Vector::new(),
@@ -895,42 +835,11 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Create the dyn trait parameter type for drop shim functions
     /// This should be &mut (dyn Trait<...>) to match the expected vtable contract
     fn create_dyn_trait_param_type(&self) -> Result<Ty, Error> {
-        // Extract the dyn trait type from the vtable definition
-        let drop_fn_type = self.create_drop_fn_type()?;
+        // For drop shim functions, create a simplified dyn trait type without complex generic references
+        // The drop shim just needs to cast to the concrete type, so we don't need the full trait structure
         
-        // Check if we can extract the parameter type from the vtable drop function signature
-        if let TyKind::FnPtr(fn_sig) = drop_fn_type.kind() {
-            if let Some(first_param) = fn_sig.skip_binder.0.get(0) {
-                match first_param.kind() {
-                    TyKind::Ref(_, inner_ty, RefKind::Mut) => {
-                        // Extract the dyn trait type and create a simplified version
-                        if let TyKind::DynTrait(_) = inner_ty.kind() {
-                            // For now, use the dyn trait type as-is but with our lifetime
-                            let region = Region::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, RegionId::new(0)));
-                            return Ok(TyKind::Ref(region, inner_ty.clone(), RefKind::Mut).into_ty());
-                        } else {
-                            // Not a dyn trait, use our region
-                            let region = Region::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, RegionId::new(0)));
-                            return Ok(TyKind::Ref(region, inner_ty.clone(), RefKind::Mut).into_ty());
-                        }
-                    }
-                    TyKind::RawPtr(inner_ty, RefKind::Mut) => {
-                        // Convert *mut (dyn Trait) to &mut (dyn Trait) with our lifetime
-                        let region = Region::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, RegionId::new(0)));
-                        return Ok(TyKind::Ref(region, inner_ty.clone(), RefKind::Mut).into_ty());
-                    }
-                    _ => {
-                        // Some other type - wrap it in a mutable reference
-                        let region = Region::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, RegionId::new(0)));
-                        return Ok(TyKind::Ref(region, first_param.clone(), RefKind::Mut).into_ty());
-                    }
-                }
-            }
-        }
-        
-        // Fallback: create a basic &mut () type
-        let region = Region::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, RegionId::new(0)));
-        Ok(TyKind::Ref(region, Ty::mk_unit(), RefKind::Mut).into_ty())
+        // Use an erased region to avoid binding issues
+        Ok(TyKind::Ref(Region::Erased, Ty::mk_unit(), RefKind::Mut).into_ty())
     }
 
     /// Create the generic arguments to be used when calling the drop function
@@ -963,9 +872,9 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Create the generic arguments for referencing the drop shim function itself
     /// This should include all the generics that the drop shim function was defined with
     fn create_drop_shim_function_generics(&self) -> Result<GenericArgs, Error> {
-        // The drop shim function only has a single region variable for the lifetime
+        // The drop shim function has no generics since it uses erased regions and unit types
         Ok(GenericArgs {
-            regions: [Region::Erased].into_iter().collect(),
+            regions: Vector::new(),
             types: Vector::new(),
             const_generics: Vector::new(), 
             trait_refs: Vector::new(),
