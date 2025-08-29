@@ -379,7 +379,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     }
 
                     // No drop implementation found - check if one is needed
-                    if self.type_needs_drop(concrete_ty) {
+                    if self.type_needs_drop(concrete_ty)? {
                         Ok(DropCase::NotTranslated(format!(
                             "Drop implementation for {:?} not found or not translated",
                             concrete_ty
@@ -671,16 +671,17 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Get the generics from the trait impl that should be used for drop shim functions
     fn get_trait_impl_generics(&self) -> Result<GenericParams, Error> {
-        // Drop shim functions should have no generics since they use erased regions and unit types
-        Ok(GenericParams {
-            regions: Vector::new(),
-            types: Vector::new(),
-            const_generics: Vector::new(),
-            trait_clauses: Vector::new(),
-            regions_outlive: Vec::new(),
-            types_outlive: Vec::new(),
-            trait_type_constraints: Vector::new(),
-        })
+        let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Trait impl not found: {}",
+                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
+            );
+        };
+
+        // Drop shim functions should have the same generic parameters as the trait impl
+        Ok(trait_impl.generics.clone())
     }
 
     /// The `&'_ mut (dyn Trait<...>)` receiver, where the lifetime is erased
@@ -696,27 +697,15 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Create the generic arguments to be used when calling the drop function
-    /// This should match the generics from the concrete type being dropped
+    /// This should match the generics from the drop function signature (typically just one lifetime)
     fn create_drop_function_generics(&self) -> Result<GenericArgs, Error> {
-        let Some(_trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Trait impl not found: {}",
-                self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
-            );
-        };
-
-        // For drop functions, we need to provide:
-        // 1. Erased region for the lifetime parameter (the mutable reference lifetime)
-        // 2. No type parameters (drop functions are usually monomorphic in the type)
-        // 3. No const generics
-        // 4. No trait refs
+        // Drop functions typically have a signature like: fn drop<'a>(&'a mut self)
+        // So they expect exactly one region parameter for the mutable reference lifetime
         let drop_generics = GenericArgs {
-            regions: Vector::from_iter(vec![Region::Erased]),
-            types: Vector::new(),
-            const_generics: Vector::new(),
-            trait_refs: Vector::new(),
+            regions: Vector::from_iter(vec![Region::Erased]), // One erased region for the &mut self lifetime
+            types: Vector::new(), // Drop functions don't take type parameters
+            const_generics: Vector::new(), // Drop functions don't take const generics
+            trait_refs: Vector::new(), // Drop functions don't take trait references
         };
 
         Ok(drop_generics)
@@ -725,13 +714,9 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Create the generic arguments for referencing the drop shim function itself
     /// This should include all the generics that the drop shim function was defined with
     fn create_drop_shim_function_generics(&self) -> Result<GenericArgs, Error> {
-        // The drop shim function has no generics since it uses erased regions and unit types
-        Ok(GenericArgs {
-            regions: Vector::new(),
-            types: Vector::new(),
-            const_generics: Vector::new(),
-            trait_refs: Vector::new(),
-        })
+        // The drop shim function reference should use the same generic arguments as the impl_ref
+        // Use the generic arguments from the trait impl ref directly
+        Ok(*self.impl_ref.generics.clone())
     }
 }
 
