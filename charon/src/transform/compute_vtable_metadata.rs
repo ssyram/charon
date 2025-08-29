@@ -224,6 +224,9 @@ impl<'a> VtableMetadataComputer<'a> {
                 );
                 self.create_panic_drop_shim(concrete_ty, &msg)
             }
+            DropCase::Unknown(msg) => {
+                panic!("TODO")
+            }
         }
     }
 
@@ -425,26 +428,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Check if a type needs drop (conservative approach)
     fn type_needs_drop(&self, concrete_ty: &Ty) -> bool {
-        match concrete_ty.kind() {
-            // Literal types never need drop
-            TyKind::Literal(_) => false,
-            // ADT types might need drop - check for non-trivial destructors
-            TyKind::Adt(type_decl_ref) => {
-                if let TypeId::Adt(type_decl_id) = &type_decl_ref.id {
-                    if let Some(_type_decl) = self.ctx.translated.type_decls.get(*type_decl_id) {
-                        // For now, conservatively assume ADTs don't need drop unless explicitly implemented
-                        // This avoids false positives for simple types like structs with only Copy fields
-                        false
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            }
-            // Other types conservatively assumed not to need drop
-            _ => false,
-        }
+        panic!("TODO: Implement type-needs-drop analysis");
     }
 
     /// Convert a type to a string representation for display purposes
@@ -756,6 +740,8 @@ enum DropCase {
     NotNeeded,
     /// Case 3: Drop function not translated - contains error message
     NotTranslated(String),
+    /// Case 4: Unknown due to generics
+    Unknown(String),
 }
 
 /// Count vtable instances for logging
