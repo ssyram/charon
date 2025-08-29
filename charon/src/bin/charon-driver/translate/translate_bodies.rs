@@ -512,12 +512,51 @@ impl BodyTransCtx<'_, '_, '_> {
                                             ),
                                         );
                                     }
-                                    hax::ImplExprAtom::Builtin { .. } => {
-                                        // Builtin traits use automatic vtable generation
-                                        // Registration is handled differently for builtin implementations
+                                    hax::ImplExprAtom::Builtin { trait_data, impl_exprs, types, .. } => {
+                                        // For builtin traits, process and prepare vtable information
+                                        // Extract the trait reference for vtable processing
+                                        let trait_ref_item = &impl_expr.r#trait.hax_skip_binder_ref();
+                                        
+                                        // Extract trait definition for builtin processing
+                                        if let Ok(trait_def) = self.hax_def(trait_ref_item) {
+                                            trace!(
+                                                "Processing builtin trait vtable for {:?}: trait_def={:?}",
+                                                trait_def.def_id(), trait_def.lang_item
+                                            );
+                                            
+                                            // Process trait data and implementation expressions
+                                            trace!(
+                                                "Builtin trait data: {:?}",
+                                                trait_data
+                                            );
+                                            
+                                            for (idx, impl_expr_inner) in impl_exprs.iter().enumerate() {
+                                                trace!(
+                                                    "Processing builtin impl_expr[{}]: {:?}",
+                                                    idx, impl_expr_inner
+                                                );
+                                                // Translate each implementation expression in the builtin context
+                                                let _ = self.translate_trait_impl_expr(span, impl_expr_inner);
+                                            }
+                                            
+                                            for (idx, (def_id, ty, inner_impl_exprs)) in types.iter().enumerate() {
+                                                trace!(
+                                                    "Processing builtin type[{}]: def_id={:?}, ty={:?}",
+                                                    idx, def_id, ty
+                                                );
+                                                // Translate each type in the builtin context  
+                                                let _ = self.translate_ty(span, ty);
+                                                
+                                                // Process inner implementation expressions
+                                                for inner_impl_expr in inner_impl_exprs {
+                                                    let _ = self.translate_trait_impl_expr(span, inner_impl_expr);
+                                                }
+                                            }
+                                        }
+                                        
                                         trace!(
-                                            "builtin impl_expr uses automatic vtable generation: {:?}",
-                                            impl_expr
+                                            "Completed builtin trait vtable processing for: {:?}",
+                                            trait_ref_item
                                         );
                                     }
                                     _ => {
