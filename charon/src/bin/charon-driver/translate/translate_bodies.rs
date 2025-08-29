@@ -512,11 +512,94 @@ impl BodyTransCtx<'_, '_, '_> {
                                             ),
                                         );
                                     }
+                                    hax::ImplExprAtom::Builtin { trait_data, .. } => {
+                                        // Handle built-in implementations, including closures
+                                        use hax::BuiltinTraitData;
+
+                                        let tref = &impl_expr.r#trait;
+                                        let trait_ref_skip = tref.hax_skip_binder_ref();
+                                        let hax_state = self.hax_state_with_id();
+                                        let erased_trait = trait_ref_skip.erase(&hax_state);
+                                        let trait_def = self.hax_def(&erased_trait)?;
+
+                                        // Check for closure implementations (Fn, FnMut, FnOnce)
+                                        let closure_kind =
+                                            trait_def.lang_item.as_deref().and_then(|lang| {
+                                                match lang {
+                                                    "fn_once" => Some(ClosureKind::FnOnce),
+                                                    "fn_mut" => Some(ClosureKind::FnMut),
+                                                    "r#fn" => Some(ClosureKind::Fn),
+                                                    _ => None,
+                                                }
+                                            });
+
+                                        if let Some(closure_kind) = closure_kind {
+                                            if let Some(hax::GenericArg::Type(closure_ty)) =
+                                                trait_ref_skip.generic_args.first()
+                                            {
+                                                if let hax::TyKind::Closure(closure_args) =
+                                                    closure_ty.kind()
+                                                {
+                                                    // Register closure vtable instance
+                                                    let _: GlobalDeclId = self.register_item(
+                                                        span,
+                                                        &closure_args.item,
+                                                        TransItemSourceKind::VTableInstance(
+                                                            TraitImplSource::Closure(closure_kind),
+                                                        ),
+                                                    );
+                                                }
+                                            }
+                                        } else if matches!(
+                                            trait_data,
+                                            BuiltinTraitData::Drop(hax::DropData::Glue { .. })
+                                        ) {
+                                            // Handle drop glue
+                                            if let hax::BuiltinTraitData::Drop(
+                                                hax::DropData::Glue { ty, .. },
+                                            ) = trait_data
+                                            {
+                                                if let hax::TyKind::Adt(item) = ty.kind() {
+                                                    let _: GlobalDeclId = self.register_item(
+                                                        span,
+                                                        item,
+                                                        TransItemSourceKind::VTableInstance(
+                                                            TraitImplSource::DropGlue,
+                                                        ),
+                                                    );
+                                                }
+                                            }
+                                        } else {
+                                            // For this case, we don't know how to register vtable instances
+                                            raise_error!(
+                                                self.i_ctx,
+                                                span,
+                                                "Cannot register vtable instance for built-in impl {:?}",
+                                                impl_expr
+                                            );
+                                        }
+                                    }
+                                    hax::ImplExprAtom::LocalBound { .. } => {
+                                        // No need to register anything here as there is no concrete impl
+                                        // This results in that: the vtable instance in generic case might not exist
+                                        // But this case should not happen in the monomorphized case
+                                        if self.monomorphize() {
+                                            raise_error!(
+                                                self.i_ctx,
+                                                span,
+                                                "Unexpected `LocalBound` in monomorphized context"
+                                            )
+                                        }
+                                    }
+                                    hax::ImplExprAtom::Dyn | hax::ImplExprAtom::Error(..) => {
+                                        // No need to register anything for these cases
+                                    }
                                     // TODO(dyn): more ways of registering vtable instance?
-                                    _ => {
-                                        trace!(
-                                            "impl_expr not triggering registering vtable: {:?}",
-                                            impl_expr
+                                    hax::ImplExprAtom::SelfImpl { .. } => {
+                                        raise_error!(
+                                            self.i_ctx,
+                                            span,
+                                            "`SelfImpl` should not appear in the function body"
                                         )
                                     }
                                 };
