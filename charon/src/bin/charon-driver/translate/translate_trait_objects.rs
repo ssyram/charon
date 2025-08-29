@@ -478,7 +478,11 @@ impl ItemTransCtx<'_, '_> {
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
         let implemented_trait = match impl_def.kind() {
             hax::FullDefKind::TraitImpl { trait_pred, .. } => &trait_pred.trait_ref,
-            _ => unreachable!(),
+            tref => raise_error!(
+                self,
+                span,
+                "TODO: handle this case {tref:?}"
+            ),
         };
         let vtable_struct_ref = self
             .translate_vtable_struct_ref(span, implemented_trait)?

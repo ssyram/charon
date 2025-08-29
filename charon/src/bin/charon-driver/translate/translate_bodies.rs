@@ -513,7 +513,7 @@ impl BodyTransCtx<'_, '_, '_> {
                                         );
                                     }
                                     hax::ImplExprAtom::Builtin { trait_data, .. } => {
-                                        // Handle built-in traits, including closures
+                                        // Handle built-in implementations, including closures
                                         use hax::BuiltinTraitData;
                                         
                                         let tref = &impl_expr.r#trait;
@@ -560,34 +560,25 @@ impl BodyTransCtx<'_, '_, '_> {
                                                 }
                                             }
                                         } else {
-                                            // For other built-in traits, we still register but with Normal source
-                                            // This handles cases like trait aliases and other built-in impls
-                                            let _: GlobalDeclId = self.register_item(
-                                                span,
-                                                trait_ref_skip,
-                                                TransItemSourceKind::VTableInstance(
-                                                    TraitImplSource::Normal,
-                                                ),
-                                            );
+                                            // For this case, we don't know how to register vtable instances
+                                            raise_error!(self.i_ctx, span, "Cannot register vtable instance for built-in impl {:?}", impl_expr);
                                         }
                                     }
-                                    hax::ImplExprAtom::Dyn => {
-                                        // Handle dynamic trait objects
-                                        let tref = &impl_expr.r#trait;
-                                        let _: GlobalDeclId = self.register_item(
-                                            span,
-                                            tref.hax_skip_binder_ref(),
-                                            TransItemSourceKind::VTableInstance(
-                                                TraitImplSource::Normal,
-                                            ),
-                                        );
+                                    hax::ImplExprAtom::LocalBound { .. } => {
+                                        // No need to register anything here as there is no concrete impl
+                                        // This results in that: the vtable instance in generic case might not exist
+                                        // But this case should not happen in the monomorphized case
+                                        if self.monomorphize() {
+                                            raise_error!(self.i_ctx, span, "Unexpected `LocalBound` in monomorphized context")
+                                        }
+                                    }
+                                    hax::ImplExprAtom::Dyn
+                                    | hax::ImplExprAtom::Error(..) => {
+                                        // No need to register anything for these cases
                                     }
                                     // TODO(dyn): more ways of registering vtable instance?
-                                    _ => {
-                                        trace!(
-                                            "impl_expr not triggering registering vtable: {:?}",
-                                            impl_expr
-                                        )
+                                    hax::ImplExprAtom::SelfImpl { .. } => {
+                                        raise_error!(self.i_ctx, span, "`SelfImpl` should not appear in the function body")
                                     }
                                 };
                                 UnsizingMetadata::VTablePtr(tref)
