@@ -73,6 +73,10 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
+    // ========================================
+    // MAIN COMPUTATION ENTRY POINTS
+    // ========================================
+
     /// Compute vtable metadata for a specific vtable instance initializer function
     fn compute_vtable_metadata_for_function(&mut self, body: &mut Body) -> Result<(), Error> {
         let Body::Unstructured(expr_body) = body else {
@@ -97,6 +101,40 @@ impl<'a> VtableMetadataComputer<'a> {
 
         Ok(())
     }
+
+    /// Update the vtable metadata fields (size, align, drop) with correct values
+    fn update_vtable_metadata(
+        &mut self,
+        _vtable_ref: &TypeDeclRef,
+        fields: &mut Vec<Operand>,
+    ) -> Result<(), Error> {
+        // We expect fields in order: size, align, drop, method1, method2, ..., supertrait1, ...
+        if fields.len() < 3 {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Expected at least 3 fields in vtable (size, align, drop)"
+            );
+        }
+
+        // Get the concrete type from the impl
+        let concrete_ty = self.get_concrete_type_from_impl()?;
+
+        // 1. Update size field
+        fields[0] = self.compute_size_operand(&concrete_ty)?;
+
+        // 2. Update align field
+        fields[1] = self.compute_align_operand(&concrete_ty)?;
+
+        // 3. Update drop field - generate actual shim function instead of opaque
+        fields[2] = self.generate_drop_shim(&concrete_ty)?;
+
+        Ok(())
+    }
+
+    // ========================================
+    // VTABLE DETECTION AND TYPE EXTRACTION
+    // ========================================
 
     /// Check if a type ID represents a vtable struct by getting the correct vtable def-id
     /// from the impl-ref: impl-ref → def-id of implemented trait → get definition of the trait → get the vtable-ref → get the type-def-id of target vtable
@@ -135,36 +173,6 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(vtable_ref.id == TypeId::Adt(*type_decl_id))
     }
 
-    /// Update the vtable metadata fields (size, align, drop) with correct values
-    fn update_vtable_metadata(
-        &mut self,
-        _vtable_ref: &TypeDeclRef,
-        fields: &mut Vec<Operand>,
-    ) -> Result<(), Error> {
-        // We expect fields in order: size, align, drop, method1, method2, ..., supertrait1, ...
-        if fields.len() < 3 {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Expected at least 3 fields in vtable (size, align, drop)"
-            );
-        }
-
-        // Get the concrete type from the impl
-        let concrete_ty = self.get_concrete_type_from_impl()?;
-
-        // 1. Update size field
-        fields[0] = self.compute_size_operand(&concrete_ty)?;
-
-        // 2. Update align field
-        fields[1] = self.compute_align_operand(&concrete_ty)?;
-
-        // 3. Update drop field - generate actual shim function instead of opaque
-        fields[2] = self.generate_drop_shim(&concrete_ty)?;
-
-        Ok(())
-    }
-
     /// Extract the concrete type being implemented for from the trait impl reference
     fn get_concrete_type_from_impl(&self) -> Result<Ty, Error> {
         let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
@@ -183,6 +191,84 @@ impl<'a> VtableMetadataComputer<'a> {
 
         Ok(concrete_ty.clone())
     }
+
+    // ========================================
+    // SIZE AND ALIGN COMPUTATION
+    // ========================================
+
+    /// Compute the size operand for the vtable
+    fn compute_size_operand(&self, concrete_ty: &Ty) -> Result<Operand, Error> {
+        match self.get_type_size(concrete_ty) {
+            Some(size) => {
+                let ptr_size = self.ctx.translated.target_information.target_pointer_size;
+                match ScalarValue::from_uint(ptr_size, UIntTy::Usize, size) {
+                    Ok(scalar_val) => {
+                        let size_const = ConstantExpr {
+                            value: RawConstantExpr::Literal(Literal::Scalar(scalar_val)),
+                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                        };
+                        Ok(Operand::Const(Box::new(size_const)))
+                    }
+                    Err(_) => {
+                        // Fall back to opaque if value is out of bounds
+                        let opaque_const = ConstantExpr {
+                            value: RawConstantExpr::Opaque("size value out of bounds".to_string()),
+                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                        };
+                        Ok(Operand::Const(Box::new(opaque_const)))
+                    }
+                }
+            }
+            None => {
+                let opaque_const = ConstantExpr {
+                    value: RawConstantExpr::Opaque(
+                        "size not available due to generics".to_string(),
+                    ),
+                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                };
+                Ok(Operand::Const(Box::new(opaque_const)))
+            }
+        }
+    }
+
+    /// Compute the align operand for the vtable
+    fn compute_align_operand(&self, concrete_ty: &Ty) -> Result<Operand, Error> {
+        match self.get_type_align(concrete_ty) {
+            Some(align) => {
+                let ptr_size = self.ctx.translated.target_information.target_pointer_size;
+                match ScalarValue::from_uint(ptr_size, UIntTy::Usize, align) {
+                    Ok(scalar_val) => {
+                        let align_const = ConstantExpr {
+                            value: RawConstantExpr::Literal(Literal::Scalar(scalar_val)),
+                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                        };
+                        Ok(Operand::Const(Box::new(align_const)))
+                    }
+                    Err(_) => {
+                        // Fall back to opaque if value is out of bounds
+                        let opaque_const = ConstantExpr {
+                            value: RawConstantExpr::Opaque("align value out of bounds".to_string()),
+                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                        };
+                        Ok(Operand::Const(Box::new(opaque_const)))
+                    }
+                }
+            }
+            None => {
+                let opaque_const = ConstantExpr {
+                    value: RawConstantExpr::Opaque(
+                        "align not available due to generics".to_string(),
+                    ),
+                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                };
+                Ok(Operand::Const(Box::new(opaque_const)))
+            }
+        }
+    }
+
+    // ========================================
+    // DROP SHIM GENERATION
+    // ========================================
 
     /// Generate a proper drop shim function instead of using opaque placeholders
     fn generate_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
@@ -283,75 +369,9 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(Operand::Const(Box::new(shim_const)))
     }
 
-    /// Compute the size operand for the vtable
-    fn compute_size_operand(&self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        match self.get_type_size(concrete_ty) {
-            Some(size) => {
-                let ptr_size = self.ctx.translated.target_information.target_pointer_size;
-                match ScalarValue::from_uint(ptr_size, UIntTy::Usize, size) {
-                    Ok(scalar_val) => {
-                        let size_const = ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(scalar_val)),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(size_const)))
-                    }
-                    Err(_) => {
-                        // Fall back to opaque if value is out of bounds
-                        let opaque_const = ConstantExpr {
-                            value: RawConstantExpr::Opaque("size value out of bounds".to_string()),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(opaque_const)))
-                    }
-                }
-            }
-            None => {
-                let opaque_const = ConstantExpr {
-                    value: RawConstantExpr::Opaque(
-                        "size not available due to generics".to_string(),
-                    ),
-                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                };
-                Ok(Operand::Const(Box::new(opaque_const)))
-            }
-        }
-    }
-
-    /// Compute the align operand for the vtable
-    fn compute_align_operand(&self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        match self.get_type_align(concrete_ty) {
-            Some(align) => {
-                let ptr_size = self.ctx.translated.target_information.target_pointer_size;
-                match ScalarValue::from_uint(ptr_size, UIntTy::Usize, align) {
-                    Ok(scalar_val) => {
-                        let align_const = ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(scalar_val)),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(align_const)))
-                    }
-                    Err(_) => {
-                        // Fall back to opaque if value is out of bounds
-                        let opaque_const = ConstantExpr {
-                            value: RawConstantExpr::Opaque("align value out of bounds".to_string()),
-                            ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                        };
-                        Ok(Operand::Const(Box::new(opaque_const)))
-                    }
-                }
-            }
-            None => {
-                let opaque_const = ConstantExpr {
-                    value: RawConstantExpr::Opaque(
-                        "align not available due to generics".to_string(),
-                    ),
-                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                };
-                Ok(Operand::Const(Box::new(opaque_const)))
-            }
-        }
-    }
+    // ========================================
+    // DROP CASE ANALYSIS
+    // ========================================
 
     /// Analyze what kind of drop case applies to the given concrete type
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
@@ -463,6 +483,27 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
+    /// Convert a type to a string representation for display purposes
+    fn type_to_string(&self, ty: &Ty) -> String {
+        match ty.kind() {
+            TyKind::Literal(lit_ty) => match lit_ty {
+                LiteralTy::Bool => "bool".to_string(),
+                LiteralTy::Char => "char".to_string(),
+                LiteralTy::Int(int_ty) => format!("{:?}", int_ty).to_lowercase(),
+                LiteralTy::UInt(uint_ty) => format!("{:?}", uint_ty).to_lowercase(),
+                LiteralTy::Float(float_ty) => format!("{:?}", float_ty).to_lowercase(),
+            },
+            TyKind::Adt(type_decl_ref) => {
+                format!("adt_{:?}", type_decl_ref.id)
+            }
+            _ => format!("{:?}", ty).chars().take(50).collect(),
+        }
+    }
+
+    // ========================================
+    // TYPE SIZE AND ALIGNMENT COMPUTATION
+    // ========================================
+
     /// Get the size of a type from its layout information
     fn get_type_size(&self, ty: &Ty) -> Option<u128> {
         match ty.kind() {
@@ -557,22 +598,9 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Convert a type to a string representation for display purposes
-    fn type_to_string(&self, ty: &Ty) -> String {
-        match ty.kind() {
-            TyKind::Literal(lit_ty) => match lit_ty {
-                LiteralTy::Bool => "bool".to_string(),
-                LiteralTy::Char => "char".to_string(),
-                LiteralTy::Int(int_ty) => format!("{:?}", int_ty).to_lowercase(),
-                LiteralTy::UInt(uint_ty) => format!("{:?}", uint_ty).to_lowercase(),
-                LiteralTy::Float(float_ty) => format!("{:?}", float_ty).to_lowercase(),
-            },
-            TyKind::Adt(type_decl_ref) => {
-                format!("adt_{:?}", type_decl_ref.id)
-            }
-            _ => format!("{:?}", ty).chars().take(50).collect(),
-        }
-    }
+    // ========================================
+    // FUNCTION TYPE AND GENERICS CREATION
+    // ========================================
 
     /// Create the function pointer type for a drop function by extracting it from the vtable struct
     fn create_drop_fn_type(&self) -> Result<Ty, Error> {
@@ -861,7 +889,7 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Create the dyn trait parameter type for drop shim functions
-    /// This should be *mut (dyn Trait<...>) to match the expected vtable contract
+    /// This should be &mut (dyn Trait<...>) to match the expected vtable contract
     fn create_dyn_trait_param_type(&self) -> Result<Ty, Error> {
         // Extract the dyn trait type from the vtable definition using the existing method
         let drop_fn_type = self.create_drop_fn_type()?;
@@ -869,27 +897,26 @@ impl<'a> VtableMetadataComputer<'a> {
         // Check if we can extract the parameter type from the vtable drop function signature
         if let TyKind::FnPtr(fn_sig) = drop_fn_type.kind() {
             if let Some(first_param) = fn_sig.skip_binder.0.get(0) {
-                // The vtable has the drop function type, but we need to convert it to raw pointer
-                // if it's a reference type
+                // The vtable has the drop function type - keep it as reference type
                 match first_param.kind() {
-                    TyKind::Ref(_, inner_ty, RefKind::Mut) => {
-                        // Convert &mut (dyn Trait) to *mut (dyn Trait)
-                        return Ok(TyKind::RawPtr(inner_ty.clone(), RefKind::Mut).into_ty());
-                    }
-                    TyKind::RawPtr(_, _) => {
-                        // Already a raw pointer, use as-is
+                    TyKind::Ref(_, _, RefKind::Mut) => {
+                        // Already a mutable reference, use as-is
                         return Ok(first_param.clone());
                     }
+                    TyKind::RawPtr(inner_ty, RefKind::Mut) => {
+                        // Convert *mut (dyn Trait) to &mut (dyn Trait)
+                        return Ok(TyKind::Ref(Region::Erased, inner_ty.clone(), RefKind::Mut).into_ty());
+                    }
                     _ => {
-                        // Some other type - wrap it in a raw pointer
-                        return Ok(TyKind::RawPtr(first_param.clone(), RefKind::Mut).into_ty());
+                        // Some other type - wrap it in a mutable reference
+                        return Ok(TyKind::Ref(Region::Erased, first_param.clone(), RefKind::Mut).into_ty());
                     }
                 }
             }
         }
         
-        // Fallback: create a basic *mut () type
-        Ok(TyKind::RawPtr(Ty::mk_unit(), RefKind::Mut).into_ty())
+        // Fallback: create a basic &mut () type - this should never happen for i32 or other types
+        Ok(TyKind::Ref(Region::Erased, Ty::mk_unit(), RefKind::Mut).into_ty())
     }
 
     /// Create the generic arguments to be used when calling the drop function
@@ -922,7 +949,7 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Create the generic arguments for referencing the drop shim function itself
     /// This should include all the generics that the drop shim function was defined with
     fn create_drop_shim_function_generics(&self) -> Result<GenericArgs, Error> {
-        let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
+        let Some(_trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
             raise_error!(
                 self.ctx,
                 self.span,
@@ -932,44 +959,8 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         // The drop shim function should be called with the same generics as the trait impl
-        // Convert the trait impl's generic parameters to generic arguments
-        let mut regions = Vector::new();
-        let mut types = Vector::new();
-        let mut const_generics = Vector::new();
-        let mut trait_refs = Vector::new();
-
-        // Add regions - use erased regions
-        for _ in 0..trait_impl.generics.regions.iter().count() {
-            regions.push(Region::Erased);
-        }
-
-        // Add types - use the types from impl_ref generics
-        for type_id in trait_impl.generics.types.all_indices() {
-            types.push(TyKind::TypeVar(DeBruijnVar::Bound(DeBruijnId::ZERO, type_id)).into_ty());
-        }
-
-        // Add const generics - use the const generics from impl_ref generics
-        for const_id in trait_impl.generics.const_generics.all_indices() {
-            const_generics.push(ConstGeneric::Var(DeBruijnVar::Bound(DeBruijnId::ZERO, const_id)));
-        }
-
-        // Add trait refs - use the trait refs from impl_ref generics  
-        for trait_clause_id in trait_impl.generics.trait_clauses.all_indices() {
-            trait_refs.push(TraitRef {
-                kind: TraitRefKind::Clause(DeBruijnVar::Bound(DeBruijnId::ZERO, trait_clause_id)),
-                trait_decl_ref: RegionBinder::empty(TraitDeclRef {
-                    id: TraitDeclId::new(0), // This should be filled properly
-                    generics: Box::new(GenericArgs::empty()),
-                }),
-            });
-        }
-
-        Ok(GenericArgs {
-            regions,
-            types,
-            const_generics,
-            trait_refs,
-        })
+        // Use the generics from the self.impl_ref instead of trying to construct new ones
+        Ok(self.impl_ref.generics.as_ref().clone())
     }
 }
 

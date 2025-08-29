@@ -257,10 +257,10 @@ fn {impl Checkable<i32> for i32}::check<'_0>(@1: &'_0 (i32)) -> bool
     return
 }
 
-fn vtable_drop_shim_empty_i32(@1: *mut ())
+fn {vtable_drop_shim_empty_i32}(@1: *mut (dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, missing(@Type3_0)> + _dyn : '_))
 {
     let ret@0: (); // return
-    let self@1: *mut (); // arg #1
+    let self@1: *mut (dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, missing(@Type3_0)> + _dyn : '_); // arg #1
 
     ret@0 := ()
     return
@@ -428,10 +428,13 @@ where
     return
 }
 
-fn vtable_drop_shim_empty_i32(@1: *mut ())
+fn {vtable_drop_shim_empty_i32}<T>(@1: *mut (dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, missing(@Type3_0)> + _dyn : '_))
+where
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Clone<T>,
 {
     let ret@0: (); // return
-    let self@1: *mut (); // arg #1
+    let self@1: *mut (dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, missing(@Type3_0)> + _dyn : '_); // arg #1
 
     ret@0 := ()
     return
@@ -465,7 +468,7 @@ where
 {
     let ret@0: test_crate::Modifiable::{vtable}<T>; // return
 
-    ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun37), method_modify: const ({impl Modifiable<T> for i32}::modify::{vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun37<T>[@TraitClause0, @TraitClause1]), method_modify: const ({impl Modifiable<T> for i32}::modify::{vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
     return
 }
 
@@ -727,10 +730,10 @@ fn test_crate::{impl Both32And64 for i32}::both_operate<'_0, '_1, '_2>(@1: &'_0 
     return
 }
 
-fn vtable_drop_shim_empty_i32(@1: *mut ())
+fn {vtable_drop_shim_empty_i32}(@1: *mut (dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_))
 {
     let ret@0: (); // return
-    let self@1: *mut (); // arg #1
+    let self@1: *mut (dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_); // arg #1
 
     ret@0 := ()
     return
