@@ -87,10 +87,10 @@ where
     return
 }
 
-fn {vtable_drop_shim_empty_i32}(@1: &'_ mut (()))
+fn {vtable_drop_shim_empty_i32}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, missing(@Type2_0)> + _dyn : '_)))
 {
     let ret@0: (); // return
-    let self@1: &'_ mut (()); // arg #1
+    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, missing(@Type2_0)> + _dyn : '_)); // arg #1
 
     ret@0 := ()
     return
