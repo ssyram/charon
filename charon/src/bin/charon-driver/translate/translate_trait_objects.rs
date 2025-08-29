@@ -442,6 +442,7 @@ impl ItemTransCtx<'_, '_> {
             kind,
             layout: Some(layout),
             ptr_metadata: None,
+            drop_glue: None,
         })
     }
 }

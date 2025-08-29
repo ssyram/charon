@@ -36,8 +36,27 @@ impl Clone for i32 {
     non-dyn-compatible
 }
 
+// Full name: core::ops::drop::Drop
+#[lang_item("drop")]
+pub trait Drop<Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    fn drop<'_0> = core::ops::drop::Drop::drop<'_0_0, Self>[Self]
+    vtable: core::ops::drop::Drop::{vtable}
+}
+
 // Full name: core::fmt::Error
 pub struct Error {}
+
+// Full name: core::fmt::Error::{impl Drop for Error}
+impl Drop for Error {
+    parent_clause0 = MetaSized<Error>
+    fn drop<'_0> = {impl Drop for Error}::drop<'_0_0>
+    non-dyn-compatible
+}
+
+// Full name: core::fmt::Error::{impl Drop for Error}::drop
+fn {impl Drop for Error}::drop<'_0>(@1: &'_0 mut (Error))
 
 // Full name: core::fmt::Arguments
 #[lang_item("format_arguments")]
@@ -85,15 +104,6 @@ pub trait Destruct<Self>
     vtable: core::marker::Destruct::{vtable}
 }
 
-// Full name: core::ops::drop::Drop
-#[lang_item("drop")]
-pub trait Drop<Self>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    fn drop<'_0> = core::ops::drop::Drop::drop<'_0_0, Self>[Self]
-    vtable: core::ops::drop::Drop::{vtable}
-}
-
 pub fn core::ops::drop::Drop::drop<'_0, Self>(@1: &'_0 mut (Self))
 where
     [@TraitClause0]: Drop<Self>,
@@ -115,12 +125,19 @@ pub enum AssertKind {
   Match,
 }
 
+// Full name: core::panicking::AssertKind::{impl Drop for AssertKind}
+impl Drop for AssertKind {
+    parent_clause0 = MetaSized<AssertKind>
+    fn drop<'_0> = {impl Drop for AssertKind}::drop<'_0_0>
+    non-dyn-compatible
+}
+
+// Full name: core::panicking::AssertKind::{impl Drop for AssertKind}::drop
+fn {impl Drop for AssertKind}::drop<'_0>(@1: &'_0 mut (AssertKind))
+
 // Full name: alloc::string::String
 #[lang_item("String")]
 pub opaque type String
-
-// Full name: alloc::string::String::{impl Drop for String}::drop
-fn {impl Drop for String}::drop<'_0>(@1: &'_0 mut (String))
 
 // Full name: alloc::string::String::{impl Drop for String}
 impl Drop for String {
@@ -128,6 +145,9 @@ impl Drop for String {
     fn drop<'_0> = {impl Drop for String}::drop<'_0_0>
     non-dyn-compatible
 }
+
+// Full name: alloc::string::String::{impl Drop for String}::drop
+fn {impl Drop for String}::drop<'_0>(@1: &'_0 mut (String))
 
 // Full name: alloc::string::{String}::is_empty
 pub fn is_empty<'_0>(@1: &'_0 (String)) -> bool

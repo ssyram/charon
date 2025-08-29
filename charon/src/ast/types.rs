@@ -457,6 +457,9 @@ pub struct TypeDecl {
     ///     but due to some limitation to be fixed, we are unable to obtain the info.
     /// See `translate_types::{impl ItemTransCtx}::translate_ptr_metadata` for more details.
     pub ptr_metadata: Option<PtrMetadata>,
+    /// The drop implementation for this type, if any.
+    /// This is `Some` if and only if the given type has a drop implementation.
+    pub drop_glue: Option<TraitImplRef>,
 }
 
 generate_index_type!(VariantId, "Variant");
