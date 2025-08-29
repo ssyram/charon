@@ -603,10 +603,11 @@ impl Ty {
         match self.kind() {
             TyKind::Adt(type_decl_ref) => match type_decl_ref.id {
                 TypeId::Adt(type_decl_id) => {
-                    let type_decl = translated.type_decls.get(type_decl_id)
-                        .ok_or_else(|| format!("Type declaration for {} not found", type_decl_id))?;
+                    let type_decl = translated.type_decls.get(type_decl_id).ok_or_else(|| {
+                        format!("Type declaration for {} not found", type_decl_id)
+                    })?;
                     Ok(type_decl.drop_glue.is_some())
-                },
+                }
                 TypeId::Tuple => {
                     let tuple_generics = &type_decl_ref.generics.types;
                     // A tuple needs drop if any of its elements need drop
@@ -616,24 +617,27 @@ impl Ty {
                         }
                     }
                     Ok(false)
-                },
+                }
                 TypeId::Builtin(builtin_ty) => match builtin_ty {
                     BuiltinTy::Box => Ok(true), // Box always needs drop
                     BuiltinTy::Array | BuiltinTy::Slice => {
                         let element_ty = &type_decl_ref.generics.types[0];
                         element_ty.needs_drop(translated)
-                    },
+                    }
                     BuiltinTy::Str => Ok(false), // str does not need drop
                 },
             },
             TyKind::DynTrait(..) => Ok(true), // `dyn Trait` is assumed to always need drop
             TyKind::Literal(..) => Ok(false), // Literal types do not need drop
             TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(false), // References and raw pointers do not need drop
-            TyKind::FnPtr(..) => Ok(false), // Function pointers do not need drop
+            TyKind::FnPtr(..) => Ok(false),                    // Function pointers do not need drop
             TyKind::FnDef(..) => Ok(false), // Function definitions do not need drop
             TyKind::TraitType(..) | TyKind::TypeVar(..) | TyKind::Never | TyKind::Error(_) => {
-                Err(format!("Cannot determine if type {} needs drop", self.with_ctx(&translated.into_fmt())))
-            },
+                Err(format!(
+                    "Cannot determine if type {} needs drop",
+                    self.with_ctx(&translated.into_fmt())
+                ))
+            }
         }
     }
 

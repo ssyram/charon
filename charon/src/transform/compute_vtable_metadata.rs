@@ -352,8 +352,12 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Analyze what kind of drop case applies to the given concrete type
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
+        match concrete_ty.needs_drop(&self.ctx.translated) {
+            Ok(false) => return Ok(DropCase::NotNeeded),
+            Ok(true) => { } // Continue to check for drop implementation
+            Err(reason) => return Ok(DropCase::Unknown(reason)),
+        }
         match concrete_ty.kind() {
-            // For ADT types, check if there's a drop implementation
             TyKind::Adt(type_decl_ref) => {
                 if let TypeId::Adt(_type_decl_id) = &type_decl_ref.id {
                     // Look for drop implementations for this type
@@ -378,25 +382,27 @@ impl<'a> VtableMetadataComputer<'a> {
                         }
                     }
 
-                    // No drop implementation found - check if one is needed
-                    if self.type_needs_drop(concrete_ty)? {
-                        Ok(DropCase::NotTranslated(format!(
-                            "Drop implementation for {:?} not found or not translated",
-                            concrete_ty
-                        )))
-                    } else {
-                        Ok(DropCase::NotNeeded)
-                    }
+                    Ok(DropCase::NotTranslated(format!(
+                        "Drop implementation for {:?} not found or not translated",
+                        concrete_ty
+                    )))
                 } else {
                     Ok(DropCase::NotNeeded)
                 }
             }
 
-            // For literal types like i32, no drop is needed
             TyKind::Literal(_) => Ok(DropCase::NotNeeded),
 
-            // For other types, conservatively assume no drop is needed for now
-            _ => Ok(DropCase::NotNeeded),
+            TyKind::Ref(..) |
+            TyKind::RawPtr(..) => Ok(DropCase::NotNeeded),  // References and raw pointers don't need drop
+            
+            TyKind::TraitType(..) |
+            TyKind::DynTrait(..) |
+            TyKind::FnPtr(..) |
+            TyKind::FnDef(..) |
+            TyKind::Never |
+            TyKind::TypeVar(..) |
+            TyKind::Error(..) => Ok(DropCase::Unknown(format!("Unknown Drop for type: {}", self.type_to_string(concrete_ty)))),
         }
     }
 
