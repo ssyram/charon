@@ -22,23 +22,41 @@ pub struct Transform;
 
 impl TransformPass for Transform {
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
+        eprintln!("DEBUG: simplify_box_impls transform started, raw_boxes = {}, hide_allocator = {}", 
+                  ctx.options.raw_boxes, ctx.options.hide_allocator);
+        
         if ctx.options.raw_boxes {
             // Don't simplify when raw-boxes is enabled
+            eprintln!("DEBUG: raw_boxes enabled, skipping transform");
             return;
         }
+        
+        // Note: hide_allocator_param transform has already run by this point,
+        // so we're working with partially processed Box types
 
         // First, identify trait implementations that need to be simplified
         let mut box_trait_impls_to_replace = Vec::new();
         let mut box_methods_to_replace = Vec::new();
         
         for timpl in ctx.translated.trait_impls.iter() {
-            if is_box_allocator_drop_impl(timpl) {
+            // Debug: print all trait implementations to understand the structure
+            eprintln!("DEBUG: Found trait impl: {:?}", timpl.item_meta.name);
+            eprintln!("  - Type params: {}", timpl.generics.types.elem_count());
+            eprintln!("  - Trait clauses: {}", timpl.generics.trait_clauses.elem_count());
+            if timpl.generics.types.elem_count() >= 1 {
+                if let Some(first_type) = timpl.impl_trait.generics.types.iter().next() {
+                    eprintln!("  - First impl type: {:?}", first_type);
+                }
+            }
+            
+            if is_box_allocator_drop_impl(timpl, ctx) {
+                eprintln!("  - IDENTIFIED as Box Drop impl!");
                 box_trait_impls_to_replace.push(timpl.def_id);
             }
         }
         
         for fun_decl in ctx.translated.fun_decls.iter() {
-            if is_box_allocator_drop_method(&fun_decl) {
+            if is_box_allocator_drop_method(&fun_decl, ctx) {
                 box_methods_to_replace.push(fun_decl.def_id);
             }
         }
@@ -72,33 +90,82 @@ impl TransformPass for Transform {
 }
 
 /// Check if this trait implementation is a Box Drop implementation with allocator parameters
-fn is_box_allocator_drop_impl(timpl: &TraitImpl) -> bool {
-    // Check if this has the pattern we're looking for:
-    // - 2 type parameters (T and A)
-    // - 3 trait clauses (MetaSized<T>, Sized<A>, Allocator<A>) 
-    // - Implementation of Drop trait
-    timpl.generics.types.elem_count() == 2 && 
-    timpl.generics.trait_clauses.elem_count() == 3 &&
-    is_drop_trait_implementation(timpl)
+fn is_box_allocator_drop_impl(timpl: &TraitImpl, ctx: &TransformCtx) -> bool {
+    // Check if this has Drop trait characteristics and Box patterns
+    if timpl.generics.types.elem_count() == 0 {
+        return false;
+    }
+    
+    // After hide_allocator_param runs, Box Drop implementations will have:
+    // - 1-2 type parameters (T, and possibly still A)  
+    // - 1-2 trait clauses (MetaSized<T>, and possibly Sized<A>)
+    
+    // Look for Box types by checking if this impl is for a Box type
+    // First, get the Self type from the impl_trait generics
+    if let Some(self_ty) = timpl.impl_trait.generics.types.iter().next() {
+        if is_box_type(self_ty, ctx) {
+            eprintln!("DEBUG: Found Box type in trait impl");
+            return true;
+        }
+    }
+    
+    // Also check by name pattern matching
+    let name_str = format!("{:?}", timpl.item_meta.name);
+    if name_str.contains("Box") && name_str.contains("Drop") {
+        eprintln!("DEBUG: Found Box Drop by name pattern: {}", name_str);
+        return true;
+    }
+    
+    // Check if this has the structure we expect after hide_allocator_param has run
+    // Box Drop implementations might still have trait clauses we want to remove
+    if timpl.generics.types.elem_count() >= 1 && 
+       timpl.generics.trait_clauses.elem_count() >= 1 {
+        // This could be a Box Drop implementation that we should process
+        // Check if any trait clauses mention MetaSized which is common in Box impls
+        eprintln!("DEBUG: Found potential Box impl with {} types, {} clauses", 
+                  timpl.generics.types.elem_count(),
+                  timpl.generics.trait_clauses.elem_count());
+        
+        // For now, let's be conservative and only process impls that clearly look like Box
+        return name_str.contains("alloc") && name_str.contains("boxed");
+    }
+    
+    false
 }
 
-/// Check if this function is a Box Drop method with allocator parameters
-fn is_box_allocator_drop_method(fun_decl: &FunDecl) -> bool {
-    if let ItemKind::TraitImpl { item_name, .. } = &fun_decl.kind {
-        item_name.0 == "drop" && 
-        fun_decl.signature.generics.types.elem_count() == 2 && 
-        fun_decl.signature.generics.trait_clauses.elem_count() == 3
-    } else {
-        false
+/// Check if a type is a Box type (either alloc::boxed::Box or builtin Box)
+fn is_box_type(ty: &Ty, _ctx: &TransformCtx) -> bool {
+    match &**ty {
+        TyKind::Adt(type_decl_ref) => {
+            match &type_decl_ref.id {
+                TypeId::Builtin(BuiltinTy::Box) => true,
+                TypeId::Adt(_type_id) => {
+                    // For now, assume any ADT with 2 type params and 2+ trait refs could be Box
+                    // This is a heuristic but should work for the specific Box case
+                    type_decl_ref.generics.types.elem_count() >= 1 && 
+                    type_decl_ref.generics.trait_refs.elem_count() >= 1
+                }
+                _ => false,
+            }
+        }
+        _ => false,
     }
 }
 
-/// Check if a trait implementation is implementing the Drop trait
-fn is_drop_trait_implementation(_timpl: &TraitImpl) -> bool {
-    // This is a heuristic - we could check the trait name more precisely
-    // For now, we use the pattern of having exactly 3 trait clauses and 2 type params
-    // which matches the Box<T, A> Drop implementation pattern
-    true // We already check the structure in the caller
+/// Check if this function is a Box Drop method with allocator parameters
+fn is_box_allocator_drop_method(fun_decl: &FunDecl, ctx: &TransformCtx) -> bool {
+    if let ItemKind::TraitImpl { item_name, .. } = &fun_decl.kind {
+        if item_name.0 == "drop" {
+            // Check if this is a Box-related Drop method by examining the signature
+            if fun_decl.signature.generics.types.elem_count() >= 1 {
+                // Look at the first parameter type (self) to see if it's a Box
+                if let Some(first_input) = fun_decl.signature.inputs.iter().next() {
+                    return is_box_type(first_input, ctx);
+                }
+            }
+        }
+    }
+    false
 }
 
 /// Create a simplified Box Drop trait implementation from a complex one
@@ -106,17 +173,15 @@ fn create_simplified_box_drop_impl(original: &TraitImpl) -> TraitImpl {
     // Create simplified generics with only the first type parameter (T)
     let mut simplified_generics = original.generics.clone();
     
-    // Keep only the first type parameter
+    // Keep only the first type parameter (T), remove allocator (A)
     if simplified_generics.types.elem_count() >= 2 {
         // Remove the second type parameter (allocator)
         simplified_generics.types.remove_and_shift_ids(TypeVarId::new(1));
     }
     
-    // Keep only the first trait clause
-    if simplified_generics.trait_clauses.elem_count() >= 3 {
-        // Remove the last two trait clauses
-        simplified_generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(2));
-        simplified_generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(1));
+    // Remove ALL trait clauses as requested - we don't need MetaSized<T> either
+    while simplified_generics.trait_clauses.elem_count() > 0 {
+        simplified_generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(0));
     }
     
     // Create simplified impl_trait - for now, keep the original structure
@@ -148,17 +213,15 @@ fn create_simplified_box_drop_method(original: &FunDecl) -> FunDecl {
     // Create simplified generics with only the first type parameter (T)
     let mut simplified_generics = original.signature.generics.clone();
     
-    // Keep only the first type parameter
+    // Keep only the first type parameter (T), remove allocator (A)
     if simplified_generics.types.elem_count() >= 2 {
         // Remove the second type parameter (allocator)
         simplified_generics.types.remove_and_shift_ids(TypeVarId::new(1));
     }
     
-    // Keep only the first trait clause
-    if simplified_generics.trait_clauses.elem_count() >= 3 {
-        // Remove the last two trait clauses
-        simplified_generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(2));
-        simplified_generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(1));
+    // Remove ALL trait clauses as requested
+    while simplified_generics.trait_clauses.elem_count() > 0 {
+        simplified_generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(0));
     }
     
     // Create simplified signature
@@ -187,19 +250,40 @@ struct BoxTypeSimplifier;
 
 impl VisitAstMut for BoxTypeSimplifier {
     fn enter_type_decl_ref(&mut self, ty_ref: &mut TypeDeclRef) {
-        // Check if this is a Box type with 2 type parameters that should be simplified to 1
-        if ty_ref.generics.types.elem_count() == 2 && ty_ref.generics.trait_refs.elem_count() == 3 {
-            // This looks like an alloc::boxed::Box<T, A> that should be simplified to Box<T>
-            
-            // Change to builtin Box type
-            ty_ref.id = TypeId::Builtin(BuiltinTy::Box);
-            
-            // Remove the second type parameter (allocator)
-            ty_ref.generics.types.remove_and_shift_ids(TypeVarId::new(1));
-            
-            // Remove the last two trait references
-            ty_ref.generics.trait_refs.remove_and_shift_ids(TraitClauseId::new(2));
-            ty_ref.generics.trait_refs.remove_and_shift_ids(TraitClauseId::new(1));
+        // Check if this is specifically a Box type that should be simplified
+        match &ty_ref.id {
+            TypeId::Adt(_) => {
+                // This might be alloc::boxed::Box<T, A> that should be converted to builtin Box<T>
+                if ty_ref.generics.types.elem_count() == 2 && ty_ref.generics.trait_refs.elem_count() >= 2 {
+                    // Change to builtin Box type
+                    ty_ref.id = TypeId::Builtin(BuiltinTy::Box);
+                    
+                    // Remove the second type parameter (allocator)
+                    ty_ref.generics.types.remove_and_shift_ids(TypeVarId::new(1));
+                    
+                    // Remove ALL trait references as requested
+                    while ty_ref.generics.trait_refs.elem_count() > 0 {
+                        ty_ref.generics.trait_refs.remove_and_shift_ids(TraitClauseId::new(0));
+                    }
+                }
+            }
+            TypeId::Builtin(BuiltinTy::Box) => {
+                // Already a builtin Box, but might still have too many type args or trait refs
+                if ty_ref.generics.types.elem_count() > 1 {
+                    // Remove extra type parameters beyond the first one
+                    while ty_ref.generics.types.elem_count() > 1 {
+                        ty_ref.generics.types.remove_and_shift_ids(TypeVarId::new(1));
+                    }
+                }
+                
+                // Remove ALL trait references as requested
+                while ty_ref.generics.trait_refs.elem_count() > 0 {
+                    ty_ref.generics.trait_refs.remove_and_shift_ids(TraitClauseId::new(0));
+                }
+            }
+            _ => {
+                // Not a Box type, don't modify
+            }
         }
     }
 }
@@ -214,14 +298,15 @@ struct BoxReferenceUpdater {
 impl BoxReferenceUpdater {
     fn process_generic_args_for_simplified_item(&self, args: &mut GenericArgs) {
         // If this is referencing a simplified Box item, update the generic args
-        // Remove the second type argument and the last two trait references
-        if args.types.elem_count() == 2 && args.trait_refs.elem_count() == 3 {
+        // Remove the second type argument and ALL trait references
+        if args.types.elem_count() >= 2 {
             // Remove allocator type parameter
             args.types.remove_and_shift_ids(TypeVarId::new(1));
-            
-            // Remove the last two trait references
-            args.trait_refs.remove_and_shift_ids(TraitClauseId::new(2));
-            args.trait_refs.remove_and_shift_ids(TraitClauseId::new(1));
+        }
+        
+        // Remove ALL trait references as requested
+        while args.trait_refs.elem_count() > 0 {
+            args.trait_refs.remove_and_shift_ids(TraitClauseId::new(0));
         }
     }
 }
