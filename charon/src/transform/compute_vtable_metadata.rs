@@ -209,16 +209,16 @@ impl<'a> VtableMetadataComputer<'a> {
         // Analyze what kind of drop functionality this type has
         let drop_case = self.analyze_drop_case(concrete_ty)?;
 
-        match drop_case {
-            DropCase::Found(drop_found) => {
-                // Case 1: Drop function found - generate appropriate shim based on type
-                self.create_drop_shim_for_found(drop_found, concrete_ty)
+        match &drop_case {
+            DropCase::Direct(fun_ref) => {
+                // Case 1: Direct drop function found - call it
+                self.create_drop_shim(fun_ref, concrete_ty, &drop_case)
             }
-            DropCase::NotNeeded => {
-                // Case 2: No drop function needed - generate empty shim function
-                self.create_empty_drop_shim(concrete_ty)
+            DropCase::Empty => {
+                // Case 2: No drop function needed - generate empty shim
+                self.create_drop_shim_empty(concrete_ty, &drop_case)
             }
-            DropCase::NotTranslated(msg) => {
+            DropCase::Panic(msg) => {
                 // Case 3: Drop function not translated - generate panic shim + register error
                 register_error!(
                     self.ctx,
@@ -227,9 +227,17 @@ impl<'a> VtableMetadataComputer<'a> {
                     self.type_to_string(concrete_ty),
                     msg
                 );
-                self.create_panic_drop_shim(concrete_ty, &msg)
+                self.create_drop_shim_empty(concrete_ty, &drop_case)
             }
-            DropCase::Unknown(msg) => Ok(Operand::opaque(msg, self.get_drop_field_ty()?.clone())),
+            DropCase::Unknown(msg) => Ok(Operand::opaque(msg.clone(), self.get_drop_field_ty()?.clone())),
+            DropCase::Array { element_ty: _, element_drop: _ } => {
+                // Case 5: Array traversal drop
+                self.create_drop_shim_empty(concrete_ty, &drop_case)
+            }
+            DropCase::Tuple { fields: _ } => {
+                // Case 6: Tuple field drop
+                self.create_drop_shim_empty(concrete_ty, &drop_case)
+            }
         }
     }
 
@@ -240,158 +248,25 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Create drop shim based on the specific DropFound case
-    fn create_drop_shim_for_found(&mut self, drop_found: DropFound, concrete_ty: &Ty) -> Result<Operand, Error> {
-        match drop_found {
-            DropFound::Direct(fun_ref) => {
-                // Simple case: direct drop implementation
-                self.create_drop_shim_with_call(&fun_ref, concrete_ty)
-            }
-            DropFound::Array { element_ty, element_drop } => {
-                // Generate array traversal drop shim
-                self.create_array_drop_shim(concrete_ty, &element_ty, *element_drop)
-            }
-            DropFound::Tuple { fields } => {
-                // Generate tuple field-by-field drop shim
-                self.create_tuple_drop_shim(concrete_ty, fields)
-            }
-            DropFound::Box { inner_ty, inner_drop } => {
-                // Generate Box drop shim
-                self.create_box_drop_shim(concrete_ty, &inner_ty, *inner_drop)
-            }
-        }
-    }
-
-    /// Create a drop shim that calls the actual drop function (Case 1)
-    fn create_drop_shim_with_call(
-        &mut self,
-        fun_ref: &FunDeclRef,
-        concrete_ty: &Ty,
-    ) -> Result<Operand, Error> {
-        let shim_name = format!(
-            "{{vtable_drop_shim_call_{}_{}}}",
-            fun_ref.id.index(),
-            self.type_to_string(concrete_ty)
-        );
+    /// Create drop shim function for the given case
+    fn create_drop_shim(&mut self, fun_ref: &FunDeclRef, concrete_ty: &Ty, drop_case: &DropCase) -> Result<Operand, Error> {
+        let shim_name = match drop_case {
+            DropCase::Direct(_) => format!(
+                "{{vtable_drop_shim_call_{}_{}}}",
+                fun_ref.id.index(),
+                self.type_to_string(concrete_ty)
+            ),
+            _ => format!(
+                "{{vtable_drop_shim_{}}}",
+                self.type_to_string(concrete_ty)
+            )
+        };
 
         // Create the drop shim function
         let shim_id = self.create_drop_shim_function(
             &shim_name,
             fun_ref.clone(),
-            DropShimKind::CallDrop,
-            concrete_ty,
-        )?;
-
-        // Create a simple function type that matches our drop shim function
-        let dyn_trait_param_ty = self.get_drop_receiver()?;
-        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
-        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-
-        // Return function reference as operand
-        let shim_const = ConstantExpr {
-            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
-                id: shim_id,
-                generics: Box::new(self.create_drop_shim_function_generics()?),
-            })),
-            ty: drop_fn_type,
-        };
-        Ok(Operand::Const(Box::new(shim_const)))
-    }
-
-    /// Create an empty drop shim for types that don't need drop (Case 2)  
-    fn create_empty_drop_shim(&mut self, concrete_ty: &Ty) -> Result<Operand, Error> {
-        let shim_name = format!(
-            "{{vtable_drop_shim_empty_{}}}",
-            self.type_to_string(concrete_ty)
-        );
-
-        // Create the drop shim function
-        let dummy_fn_ref = FunDeclRef {
-            id: FunDeclId::new(0), // Dummy ID that won't be used
-            generics: Box::new(GenericArgs::empty()),
-        };
-        let shim_id = self.create_drop_shim_function(
-            &shim_name,
-            dummy_fn_ref,
-            DropShimKind::Empty,
-            concrete_ty,
-        )?;
-
-        // Create a simple function type that matches our drop shim function
-        let dyn_trait_param_ty = self.get_drop_receiver()?;
-        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
-        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-
-        // Return function reference as operand
-        let shim_const = ConstantExpr {
-            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
-                id: shim_id,
-                generics: Box::new(self.create_drop_shim_function_generics()?),
-            })),
-            ty: drop_fn_type,
-        };
-        Ok(Operand::Const(Box::new(shim_const)))
-    }
-
-    /// Create a panic drop shim for missing drop functions (Case 3)
-    fn create_panic_drop_shim(&mut self, concrete_ty: &Ty, msg: &str) -> Result<Operand, Error> {
-        let shim_name = format!(
-            "{{vtable_drop_shim_panic_{}}}",
-            self.type_to_string(concrete_ty)
-        );
-
-        // Create the drop shim function
-        let dummy_fn_ref = FunDeclRef {
-            id: FunDeclId::new(0), // Dummy ID that won't be used
-            generics: Box::new(GenericArgs::empty()),
-        };
-        let shim_id = self.create_drop_shim_function(
-            &shim_name,
-            dummy_fn_ref,
-            DropShimKind::Panic(msg.to_string()),
-            concrete_ty,
-        )?;
-
-        // Create a simple function type that matches our drop shim function
-        let dyn_trait_param_ty = self.get_drop_receiver()?;
-        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
-        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-
-        // Return function reference as operand
-        let shim_const = ConstantExpr {
-            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
-                id: shim_id,
-                generics: Box::new(self.create_drop_shim_function_generics()?),
-            })),
-            ty: drop_fn_type,
-        };
-        Ok(Operand::Const(Box::new(shim_const)))
-    }
-
-    // ========================================
-    // SPECIALIZED DROP SHIM CREATION METHODS  
-    // ========================================
-
-    /// Create a drop shim for array types that traverses and drops each element
-    fn create_array_drop_shim(&mut self, concrete_ty: &Ty, element_ty: &Ty, element_drop: DropCase) -> Result<Operand, Error> {
-        let shim_name = format!(
-            "{{vtable_drop_shim_array_{}_elem_{}}}",
-            self.type_to_string(concrete_ty),
-            self.type_to_string(element_ty)
-        );
-
-        // Create the drop shim function
-        let dummy_fn_ref = FunDeclRef {
-            id: FunDeclId::new(0), // Dummy ID that won't be used
-            generics: Box::new(GenericArgs::empty()),
-        };
-        let shim_id = self.create_drop_shim_function(
-            &shim_name,
-            dummy_fn_ref,
-            DropShimKind::ArrayTraversal {
-                element_ty: element_ty.clone(),
-                element_drop: element_drop,
-            },
+            drop_case,
             concrete_ty,
         )?;
 
@@ -410,13 +285,33 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(Operand::Const(Box::new(shim_const)))
     }
 
-    /// Create a drop shim for tuple types that drops each field needing drop
-    fn create_tuple_drop_shim(&mut self, concrete_ty: &Ty, fields: Vec<(usize, Ty, DropCase)>) -> Result<Operand, Error> {
-        let shim_name = format!(
-            "{{vtable_drop_shim_tuple_{}_fields_{}}}",
-            self.type_to_string(concrete_ty),
-            fields.len()
-        );
+    /// Create an empty drop shim for types that don't need drop or for complex cases
+    fn create_drop_shim_empty(&mut self, concrete_ty: &Ty, drop_case: &DropCase) -> Result<Operand, Error> {
+        let shim_name = match drop_case {
+            DropCase::Empty => format!(
+                "{{vtable_drop_shim_empty_{}}}",
+                self.type_to_string(concrete_ty)
+            ),
+            DropCase::Panic(msg) => format!(
+                "{{vtable_drop_shim_panic_{}_{}}}",
+                self.type_to_string(concrete_ty),
+                msg.chars().take(20).collect::<String>()
+            ),
+            DropCase::Array { element_ty, .. } => format!(
+                "{{vtable_drop_shim_array_{}_elem_{}}}",
+                self.type_to_string(concrete_ty),
+                self.type_to_string(element_ty)
+            ),
+            DropCase::Tuple { fields } => format!(
+                "{{vtable_drop_shim_tuple_{}_fields_{}}}",
+                self.type_to_string(concrete_ty),
+                fields.len()
+            ),
+            _ => format!(
+                "{{vtable_drop_shim_{}}}",
+                self.type_to_string(concrete_ty)
+            ),
+        };
 
         // Create the drop shim function
         let dummy_fn_ref = FunDeclRef {
@@ -426,45 +321,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let shim_id = self.create_drop_shim_function(
             &shim_name,
             dummy_fn_ref,
-            DropShimKind::TupleFields { fields },
-            concrete_ty,
-        )?;
-
-        // Create function reference as operand
-        let dyn_trait_param_ty = self.get_drop_receiver()?;
-        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
-        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-
-        let shim_const = ConstantExpr {
-            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
-                id: shim_id,
-                generics: Box::new(self.create_drop_shim_function_generics()?),
-            })),
-            ty: drop_fn_type,
-        };
-        Ok(Operand::Const(Box::new(shim_const)))
-    }
-
-    /// Create a drop shim for Box types
-    fn create_box_drop_shim(&mut self, concrete_ty: &Ty, inner_ty: &Ty, inner_drop: DropCase) -> Result<Operand, Error> {
-        let shim_name = format!(
-            "{{vtable_drop_shim_box_{}_inner_{}}}",
-            self.type_to_string(concrete_ty),
-            self.type_to_string(inner_ty)
-        );
-
-        // Create the drop shim function
-        let dummy_fn_ref = FunDeclRef {
-            id: FunDeclId::new(0), // Dummy ID that won't be used
-            generics: Box::new(GenericArgs::empty()),
-        };
-        let shim_id = self.create_drop_shim_function(
-            &shim_name,
-            dummy_fn_ref,
-            DropShimKind::BoxDrop {
-                inner_ty: inner_ty.clone(),
-                inner_drop: inner_drop,
-            },
+            drop_case,
             concrete_ty,
         )?;
 
@@ -491,7 +348,7 @@ impl<'a> VtableMetadataComputer<'a> {
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
         // First check if the type needs drop at all
         match concrete_ty.needs_drop(&self.ctx.translated) {
-            Ok(false) => return Ok(DropCase::NotNeeded),
+            Ok(false) => return Ok(DropCase::Empty),
             Ok(true) => {}  // Continue to check for drop implementation
             Err(reason) => return Ok(DropCase::Unknown(reason)),
         }
@@ -501,11 +358,11 @@ impl<'a> VtableMetadataComputer<'a> {
             TyKind::Adt(type_decl_ref) => {
                 match &type_decl_ref.id {
                     TypeId::Adt(_type_decl_id) => {
-                        // Look for direct drop implementation for ADT types
+                        // Look for direct drop implementation for ADT types (including Box)
                         if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
-                            Ok(DropCase::Found(DropFound::Direct(fun_ref)))
+                            Ok(DropCase::Direct(fun_ref))
                         } else {
-                            Ok(DropCase::NotTranslated(format!(
+                            Ok(DropCase::Panic(format!(
                                 "Drop implementation for {:?} not found or not translated",
                                 concrete_ty
                             )))
@@ -518,8 +375,14 @@ impl<'a> VtableMetadataComputer<'a> {
                     TypeId::Builtin(builtin_ty) => {
                         match builtin_ty {
                             BuiltinTy::Box => {
-                                // Handle Box drop
-                                self.analyze_box_drop(type_decl_ref)
+                                // For Box, simply look for Box's Drop implementation  
+                                if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
+                                    Ok(DropCase::Direct(fun_ref))
+                                } else {
+                                    Ok(DropCase::Panic(format!(
+                                        "Box Drop implementation not found or not translated"
+                                    )))
+                                }
                             }
                             BuiltinTy::Array => {
                                 // Handle array drop - traverse and drop each element
@@ -529,15 +392,15 @@ impl<'a> VtableMetadataComputer<'a> {
                                 // Handle slice drop - similar to array
                                 self.analyze_slice_drop(type_decl_ref)
                             }
-                            BuiltinTy::Str => Ok(DropCase::NotNeeded), // str does not need drop
+                            BuiltinTy::Str => Ok(DropCase::Empty), // str does not need drop
                         }
                     }
                 }
             }
 
-            TyKind::Literal(_) => Ok(DropCase::NotNeeded),
+            TyKind::Literal(_) => Ok(DropCase::Empty),
 
-            TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(DropCase::NotNeeded), // References and raw pointers don't need drop
+            TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(DropCase::Empty), // References and raw pointers don't need drop
 
             TyKind::TraitType(..)
             | TyKind::DynTrait(..)
@@ -646,31 +509,17 @@ impl<'a> VtableMetadataComputer<'a> {
             
             // Only include fields that need dropping
             match field_drop_case {
-                DropCase::NotNeeded => continue, // Skip fields that don't need drop
+                DropCase::Empty => continue, // Skip fields that don't need drop
                 _ => fields.push((field_index, field_ty.clone(), field_drop_case)),
             }
         }
 
         if fields.is_empty() {
             // No fields need dropping
-            Ok(DropCase::NotNeeded)
+            Ok(DropCase::Empty)
         } else {
             // Some fields need dropping - generate composite drop
-            Ok(DropCase::Found(DropFound::Tuple { fields }))
-        }
-    }
-
-    /// Analyze drop case for Box types
-    fn analyze_box_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
-        // Box<T> always needs drop, but we need to determine the drop strategy for T
-        if let Some(inner_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
-            let inner_drop_case = self.analyze_drop_case(inner_ty)?;
-            Ok(DropCase::Found(DropFound::Box {
-                inner_ty: inner_ty.clone(),
-                inner_drop: Box::new(inner_drop_case),
-            }))
-        } else {
-            Ok(DropCase::Unknown("Box type missing inner type parameter".to_string()))
+            Ok(DropCase::Tuple { fields })
         }
     }
 
@@ -680,11 +529,11 @@ impl<'a> VtableMetadataComputer<'a> {
         if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
             let element_drop_case = self.analyze_drop_case(element_ty)?;
             match element_drop_case {
-                DropCase::NotNeeded => Ok(DropCase::NotNeeded),
-                _ => Ok(DropCase::Found(DropFound::Array {
+                DropCase::Empty => Ok(DropCase::Empty),
+                _ => Ok(DropCase::Array {
                     element_ty: element_ty.clone(),
                     element_drop: Box::new(element_drop_case),
-                })),
+                }),
             }
         } else {
             Ok(DropCase::Unknown("Array type missing element type parameter".to_string()))
@@ -697,11 +546,11 @@ impl<'a> VtableMetadataComputer<'a> {
         if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
             let element_drop_case = self.analyze_drop_case(element_ty)?;
             match element_drop_case {
-                DropCase::NotNeeded => Ok(DropCase::NotNeeded),
-                _ => Ok(DropCase::Found(DropFound::Array {
+                DropCase::Empty => Ok(DropCase::Empty),
+                _ => Ok(DropCase::Array {
                     element_ty: element_ty.clone(),
                     element_drop: Box::new(element_drop_case),
-                })),
+                }),
             }
         } else {
             Ok(DropCase::Unknown("Slice type missing element type parameter".to_string()))
@@ -718,15 +567,15 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_drop_shim_function(
         &mut self,
         name: &str,
-        drop_fn_ref: FunDeclRef,
-        kind: DropShimKind,
+        _drop_fn_ref: FunDeclRef,
+        drop_case: &DropCase,
         concrete_ty: &Ty,
     ) -> Result<FunDeclId, Error> {
         // Get the generics from the trait impl - drop shims should have the same generics
         let generics = self.get_trait_impl_generics()?;
 
         // Create the dyn trait type for the parameter
-        // For the drop shim, we need *mut (dyn Trait<...>)
+        // For the drop shim, we need &mut (dyn Trait<...>)
         let dyn_trait_param_ty = self.get_drop_receiver()?;
 
         // Create function signature with proper generics
@@ -758,755 +607,31 @@ impl<'a> VtableMetadataComputer<'a> {
         let _ = locals.locals.push_with(|_| ret_local);
         let _ = locals.locals.push_with(|_| self_local);
 
-        // For CallDrop case, add a local for the concretized concrete type
-        let mut concrete_local_id = None;
-        if matches!(kind, DropShimKind::CallDrop) {
-            // Create the concrete type (mutable reference to the concrete type)
-            let concrete_ref_ty =
-                TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
-
-            let concrete_local = Local {
-                index: LocalId::new(2),
-                name: Some("concrete".to_string()),
-                ty: concrete_ref_ty,
-            };
-
-            concrete_local_id = Some(locals.locals.push_with(|_| concrete_local));
-            locals.arg_count = 1; // Still only one argument
-        }
-
-        // Create function body based on the kind
-        let body = match kind {
-            DropShimKind::CallDrop => {
+        // Create function body based on the drop case
+        let body = match drop_case {
+            DropCase::Direct(fun_ref) => {
                 // Generate a call to the drop function with Concretize cast
-                let mut blocks = Vector::new();
-
-                // Create the concretize cast statement
-                let Some(concrete_local_id) = concrete_local_id else {
-                    raise_error!(
-                        self.ctx,
-                        self.span,
-                        "Expected concrete local to be created for CallDrop case"
-                    );
-                };
-
-                // Get the concrete type for the concretize cast
-                let concrete_ref_ty =
-                    TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
-
-                let concretize_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        Place::new(concrete_local_id, concrete_ref_ty.clone()),
-                        Rvalue::UnaryOp(
-                            UnOp::Cast(CastKind::Concretize(
-                                dyn_trait_param_ty.clone(),
-                                concrete_ref_ty.clone(),
-                            )),
-                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
-                        ),
-                    ),
-                    comments_before: vec![],
-                };
-
-                let call = Call {
-                    func: FnOperand::Regular(FnPtr::from(FunDeclRef {
-                        id: drop_fn_ref.id,
-                        generics: Box::new(self.create_drop_function_generics()?),
-                    })),
-                    args: vec![Operand::Move(Place::new(
-                        concrete_local_id,
-                        concrete_ref_ty,
-                    ))],
-                    dest: Place::new(LocalId::new(0), Ty::mk_unit()),
-                };
-
-                let terminator = Terminator {
-                    span: self.span,
-                    content: RawTerminator::Call {
-                        call,
-                        target: BlockId::new(1),
-                        on_unwind: BlockId::new(1), // Same as target for simplicity
-                    },
-                    comments_before: vec![],
-                };
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![concretize_stmt],
-                    terminator,
-                });
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Return,
-                        comments_before: vec![],
-                    },
-                });
-
-                Body::Unstructured(ExprBody {
-                    span: self.span,
-                    locals: locals.clone(),
-                    comments: vec![],
-                    body: blocks,
-                })
+                self.create_direct_drop_body(&mut locals, &dyn_trait_param_ty, concrete_ty, fun_ref)?
             }
-            DropShimKind::Empty => {
+            DropCase::Empty => {
                 // Generate an empty function that just returns
-                let mut blocks = Vector::new();
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Return,
-                        comments_before: vec![],
-                    },
-                });
-
-                Body::Unstructured(ExprBody {
-                    span: self.span,
-                    locals: locals.clone(),
-                    comments: vec![],
-                    body: blocks,
-                })
+                self.create_empty_drop_body(&locals)?
             }
-            DropShimKind::Panic(msg) => {
+            DropCase::Panic(msg) => {
                 // Generate a function that panics
-                let mut blocks = Vector::new();
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Abort(AbortKind::Panic(None)),
-                        comments_before: vec![format!("Panic: {}", msg)],
-                    },
-                });
-
-                Body::Unstructured(ExprBody {
-                    span: self.span,
-                    locals: locals.clone(),
-                    comments: vec![],
-                    body: blocks,
-                })
+                self.create_panic_drop_body(&locals, msg)?
             }
-            DropShimKind::ArrayTraversal { element_ty: _, element_drop } => {
-                // Generate array traversal drop logic
-                let mut blocks = Vector::new();
-
-                // Create a concretize cast from dyn trait to concrete array type
-                let concrete_array_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
-
-                // Add local for the concretized array
-                let concrete_local = Local {
-                    index: LocalId::new(2), // ret=0, self=1, concrete=2
-                    name: Some("concrete_array".to_string()),
-                    ty: concrete_array_ref_ty.clone(),
-                };
-                let concrete_local_id = locals.locals.push_with(|_| concrete_local);
-
-                // Create the concretize cast statement
-                let concretize_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        Place::new(concrete_local_id, concrete_array_ref_ty.clone()),
-                        Rvalue::UnaryOp(
-                            UnOp::Cast(CastKind::Concretize(
-                                dyn_trait_param_ty.clone(),
-                                concrete_array_ref_ty.clone(),
-                            )),
-                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
-                        ),
-                    ),
-                    comments_before: vec![format!("Concretize to concrete array type for traversal drop")],
-                };
-
-                // Generate statements for the drop operations
-                let mut statements = vec![concretize_stmt];
-
-                // Generate array element traversal and drop logic
-                match element_drop {
-                    DropCase::Found(DropFound::Direct(fun_ref)) => {
-                        // Generate loop to traverse array elements and drop each one
-                        // For now, we'll implement a simplified version that adds a placeholder
-                        // for the actual loop construct, but generates the drop call structure
-                        
-                        // Add a local for array length (we would get this from the array type)
-                        let len_local = Local {
-                            index: LocalId::new(3), // ret=0, self=1, concrete=2, len=3
-                            name: Some("array_len".to_string()),
-                            ty: Ty::mk_usize(),
-                        };
-                        let _len_local_id = locals.locals.push_with(|_| len_local);
-                        
-                        // Add a local for loop index
-                        let index_local = Local {
-                            index: LocalId::new(4), // ret=0, self=1, concrete=2, len=3, index=4
-                            name: Some("index".to_string()),
-                            ty: Ty::mk_usize(),
-                        };
-                        let _index_local_id = locals.locals.push_with(|_| index_local);
-                        
-                        // For now, add placeholder statements that indicate the loop structure
-                        // In a full implementation, we would need to generate proper loop blocks
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("BEGIN: Loop through array elements for drop")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Initialize index = 0")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  LOOP: while index < array_len")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("    Get element reference: &mut array[index]")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("    Call drop function {} on element", fun_ref.id.index())],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("    Increment index")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("END: Array element drop loop completed")],
-                        });
-                    }
-                    DropCase::NotNeeded => {
-                        // Elements don't need drop - array itself may still need cleanup
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Array elements don't need drop - array cleanup complete")],
-                        });
-                    }
-                    DropCase::Found(DropFound::Array { element_ty: inner_elem_ty, element_drop: inner_elem_drop }) => {
-                        // Nested array case
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("BEGIN: Nested array drop - array of arrays")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  LOOP: For each array element of type: {:?}", inner_elem_ty)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("    Recursively handle inner array drop: {:?}", inner_elem_drop)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("END: Nested array drop completed")],
-                        });
-                    }
-                    DropCase::Found(DropFound::Tuple { fields }) => {
-                        // Array of tuples case
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("BEGIN: Array of tuples drop - {} fields per tuple", fields.len())],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  LOOP: For each tuple element")],
-                        });
-                        
-                        for (field_idx, field_ty, field_drop) in &fields {
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!("    Drop tuple field {}: {:?} with {:?}", field_idx, field_ty, field_drop)],
-                            });
-                        }
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("END: Array of tuples drop completed")],
-                        });
-                    }
-                    DropCase::Found(DropFound::Box { inner_ty, inner_drop }) => {
-                        // Array of boxes case
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("BEGIN: Array of boxes drop")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  LOOP: For each Box<{:?}> element", inner_ty)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("    Handle Box drop with inner drop: {:?}", inner_drop)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("END: Array of boxes drop completed")],
-                        });
-                    }
-                    DropCase::NotTranslated(msg) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Array element drop not translated: {}", msg)],
-                        });
-                    }
-                    DropCase::Unknown(msg) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Unknown array element drop case: {}", msg)],
-                        });
-                    }
-                }
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements,
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Return,
-                        comments_before: vec![format!("Array traversal drop completed")],
-                    },
-                });
-
-                Body::Unstructured(ExprBody {
-                    span: self.span,
-                    locals,
-                    comments: vec![],
-                    body: blocks,
-                })
+            DropCase::Array { element_ty, element_drop } => {
+                // Generate array traversal drop logic placeholder
+                self.create_array_drop_body(&mut locals, &dyn_trait_param_ty, concrete_ty, element_ty, element_drop)?
             }
-            DropShimKind::TupleFields { fields } => {
-                // Generate tuple field-by-field drop logic
-                let mut blocks = Vector::new();
-
-                // Create a concretize cast from dyn trait to concrete tuple type
-                let concrete_tuple_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
-
-                // Add local for the concretized tuple
-                let concrete_local = Local {
-                    index: LocalId::new(2), // ret=0, self=1, concrete=2
-                    name: Some("concrete_tuple".to_string()),
-                    ty: concrete_tuple_ref_ty.clone(),
-                };
-                let concrete_local_id = locals.locals.push_with(|_| concrete_local);
-
-                // Create the concretize cast statement
-                let concretize_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        Place::new(concrete_local_id, concrete_tuple_ref_ty.clone()),
-                        Rvalue::UnaryOp(
-                            UnOp::Cast(CastKind::Concretize(
-                                dyn_trait_param_ty.clone(),
-                                concrete_tuple_ref_ty.clone(),
-                            )),
-                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
-                        ),
-                    ),
-                    comments_before: vec![format!("Concretize to concrete tuple type for field drop")],
-                };
-
-                // Generate statements for the drop operations
-                let mut statements = vec![concretize_stmt];
-
-                // Process each field that needs dropping
-                for (field_index, field_ty, field_drop_case) in &fields {
-                    match field_drop_case {
-                        DropCase::Found(DropFound::Direct(fun_ref)) => {
-                            // Generate field access and direct drop call
-                            // Create field projection to access tuple field
-                            let field_place = Place {
-                                kind: PlaceKind::Projection(
-                                    Box::new(Place::new(concrete_local_id, concrete_tuple_ref_ty.clone())),
-                                    ProjectionElem::Field(
-                                        FieldProjKind::Tuple(fields.len()),
-                                        FieldId::new(*field_index)
-                                    )
-                                ),
-                                ty: field_ty.clone(),
-                            };
-                            
-                            // Create a local for the field reference 
-                            let field_ref_ty = TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
-                            let field_local = Local {
-                                index: LocalId::new(3 + *field_index), // ret=0, self=1, concrete=2, field_N=3+N
-                                name: Some(format!("field_{}", field_index)),
-                                ty: field_ref_ty.clone(),
-                            };
-                            let field_local_id = locals.locals.push_with(|_| field_local);
-                            
-                            // Create assignment to get mutable reference to the field
-                            let field_assign_stmt = Statement {
-                                span: self.span,
-                                content: RawStatement::Assign(
-                                    Place::new(field_local_id, field_ref_ty.clone()),
-                                    Rvalue::Ref(field_place, BorrowKind::Mut)
-                                ),
-                                comments_before: vec![format!("Get mutable reference to tuple field {}", field_index)],
-                            };
-                            statements.push(field_assign_stmt);
-                            
-                            // Generate the drop call for this field
-                            // Create call to drop function with proper generics
-                            let drop_call_stmt = Statement {
-                                span: self.span,
-                                content: RawStatement::Nop, // Will be replaced with Call terminator in full implementation
-                                comments_before: vec![format!(
-                                    "Call drop function {} on tuple field {} of type: {:?}",
-                                    fun_ref.id.index(), 
-                                    field_index,
-                                    field_ty
-                                )],
-                            };
-                            statements.push(drop_call_stmt);
-                        }
-                        DropCase::Found(DropFound::Array { element_ty, element_drop }) => {
-                            // Field is an array that needs element-wise drop
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "Tuple field {} is array with element type: {:?}, element drop: {:?}",
-                                    field_index, element_ty, element_drop
-                                )],
-                            });
-                            
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "  BEGIN: Drop array elements in tuple field {}", field_index
-                                )],
-                            });
-                            
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "  END: Array elements in tuple field {} dropped", field_index
-                                )],
-                            });
-                        }
-                        DropCase::Found(DropFound::Tuple { fields: nested_fields }) => {
-                            // Field is a nested tuple
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "Tuple field {} is nested tuple with {} fields",
-                                    field_index, nested_fields.len()
-                                )],
-                            });
-                            
-                            for (nested_idx, nested_ty, nested_drop) in nested_fields {
-                                statements.push(Statement {
-                                    span: self.span,
-                                    content: RawStatement::Nop,
-                                    comments_before: vec![format!(
-                                        "  Nested field {}.{}: {:?} with drop: {:?}",
-                                        field_index, nested_idx, nested_ty, nested_drop
-                                    )],
-                                });
-                            }
-                        }
-                        DropCase::Found(DropFound::Box { inner_ty, inner_drop }) => {
-                            // Field is a Box
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "Tuple field {} is Box<{:?}> with inner drop: {:?}",
-                                    field_index, inner_ty, inner_drop
-                                )],
-                            });
-                            
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "  Handle Box drop for tuple field {}", field_index
-                                )],
-                            });
-                        }
-                        DropCase::NotNeeded => {
-                            // Field doesn't need drop - add comment for clarity
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!("Tuple field {} doesn't need drop - skip", field_index)],
-                            });
-                        }
-                        DropCase::NotTranslated(msg) => {
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "Tuple field {} drop not translated: {}", field_index, msg
-                                )],
-                            });
-                        }
-                        DropCase::Unknown(msg) => {
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!(
-                                    "Unknown drop case for tuple field {}: {}", field_index, msg
-                                )],
-                            });
-                        }
-                    }
-                }
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements,
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Return,
-                        comments_before: vec![format!("Tuple field drop completed for {} fields", fields.len())],
-                    },
-                });
-
-                Body::Unstructured(ExprBody {
-                    span: self.span,
-                    locals,
-                    comments: vec![],
-                    body: blocks,
-                })
+            DropCase::Tuple { fields } => {
+                // Generate tuple field-by-field drop logic placeholder
+                self.create_tuple_drop_body(&mut locals, &dyn_trait_param_ty, concrete_ty, fields)?
             }
-            DropShimKind::BoxDrop { inner_ty, inner_drop } => {
-                // Generate Box drop logic
-                let mut blocks = Vector::new();
-
-                // Create a concretize cast from dyn trait to concrete Box type
-                let concrete_box_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
-
-                // Add local for the concretized box
-                let concrete_local = Local {
-                    index: LocalId::new(2), // ret=0, self=1, concrete=2
-                    name: Some("concrete_box".to_string()),
-                    ty: concrete_box_ref_ty.clone(),
-                };
-                let concrete_local_id = locals.locals.push_with(|_| concrete_local);
-
-                // Create the concretize cast statement
-                let concretize_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        Place::new(concrete_local_id, concrete_box_ref_ty.clone()),
-                        Rvalue::UnaryOp(
-                            UnOp::Cast(CastKind::Concretize(
-                                dyn_trait_param_ty.clone(),
-                                concrete_box_ref_ty.clone(),
-                            )),
-                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
-                        ),
-                    ),
-                    comments_before: vec![format!("Concretize to concrete Box type for Box drop")],
-                };
-
-                // Generate statements for the Box drop operations
-                let mut statements = vec![concretize_stmt];
-
-                // Handle Box drop - both inner value and Box itself need to be handled
-                statements.push(Statement {
-                    span: self.span,
-                    content: RawStatement::Nop,
-                    comments_before: vec![format!("BEGIN: Box<{:?}> drop handling", inner_ty)],
-                });
-
-                // First, handle inner value drop if needed
-                match inner_drop {
-                    DropCase::Found(DropFound::Direct(fun_ref)) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Drop inner Box value")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Dereference Box to get inner value: *box_ref")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Call drop function {} on inner value of type: {:?}", 
-                                fun_ref.id.index(), inner_ty)],
-                        });
-                    }
-                    DropCase::Found(DropFound::Array { element_ty, element_drop }) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Box contains array - drop array elements")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Inner array element type: {:?}", element_ty)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Inner array element drop: {:?}", element_drop)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  BEGIN: Loop through Box<[T; N]> array elements")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  END: Box<[T; N]> array elements dropped")],
-                        });
-                    }
-                    DropCase::Found(DropFound::Tuple { fields }) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Box contains tuple - drop tuple fields")],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Inner tuple has {} fields", fields.len())],
-                        });
-                        
-                        for (field_idx, field_ty, field_drop) in &fields {
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!("    Box<Tuple> field {}: {:?} with drop: {:?}", 
-                                    field_idx, field_ty, field_drop)],
-                            });
-                        }
-                    }
-                    DropCase::Found(DropFound::Box { inner_ty: nested_inner_ty, inner_drop: nested_inner_drop }) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Nested Box - Box<Box<{:?}>>", nested_inner_ty)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Nested inner drop: {:?}", nested_inner_drop)],
-                        });
-                        
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("  Handle nested Box drop recursively")],
-                        });
-                    }
-                    DropCase::NotNeeded => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Inner Box value doesn't need drop")],
-                        });
-                    }
-                    DropCase::NotTranslated(msg) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Inner Box value drop not translated: {}", msg)],
-                        });
-                    }
-                    DropCase::Unknown(msg) => {
-                        statements.push(Statement {
-                            span: self.span,
-                            content: RawStatement::Nop,
-                            comments_before: vec![format!("Step 1: Unknown inner Box drop case: {}", msg)],
-                        });
-                    }
-                }
-
-                // Second, handle Box itself drop (Box always needs drop for deallocation)
-                statements.push(Statement {
-                    span: self.span,
-                    content: RawStatement::Nop,
-                    comments_before: vec![format!("Step 2: Drop the Box itself (deallocate)")],
-                });
-                
-                statements.push(Statement {
-                    span: self.span,
-                    content: RawStatement::Nop,
-                    comments_before: vec![format!("  Call Box::drop or equivalent deallocation function")],
-                });
-                
-                statements.push(Statement {
-                    span: self.span,
-                    content: RawStatement::Nop,
-                    comments_before: vec![format!("  Box memory deallocation completed")],
-                });
-                
-                statements.push(Statement {
-                    span: self.span,
-                    content: RawStatement::Nop,
-                    comments_before: vec![format!("END: Box<{:?}> drop completed", inner_ty)],
-                });
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements,
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Return,
-                        comments_before: vec![format!("Box drop completed")],
-                    },
-                });
-
-                Body::Unstructured(ExprBody {
-                    span: self.span,
-                    locals,
-                    comments: vec![],
-                    body: blocks,
-                })
+            DropCase::Unknown(_) => {
+                // Generate an empty function for unknown cases
+                self.create_empty_drop_body(&locals)?
             }
         };
 
@@ -1534,7 +659,235 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(shim_id)
     }
 
-    /// Get the generics from the trait impl that should be used for drop shim functions
+    /// Create function body for direct drop calls
+    fn create_direct_drop_body(
+        &self,
+        locals: &mut Locals,
+        dyn_trait_param_ty: &Ty,
+        concrete_ty: &Ty,
+        fun_ref: &FunDeclRef,
+    ) -> Result<Body, Error> {
+        let mut blocks = Vector::new();
+
+        // Create the concrete type (mutable reference to the concrete type)
+        let concrete_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
+        let concrete_local = Local {
+            index: LocalId::new(2),
+            name: Some("concrete".to_string()),
+            ty: concrete_ref_ty.clone(),
+        };
+
+        let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+
+        // Create the concretize cast statement
+        let concretize_stmt = Statement {
+            span: self.span,
+            content: RawStatement::Assign(
+                Place::new(concrete_local_id, concrete_ref_ty.clone()),
+                Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(
+                        dyn_trait_param_ty.clone(),
+                        concrete_ref_ty.clone(),
+                    )),
+                    Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                ),
+            ),
+            comments_before: vec![],
+        };
+
+        let call = Call {
+            func: FnOperand::Regular(FnPtr::from(FunDeclRef {
+                id: fun_ref.id,
+                generics: Box::new(self.create_drop_function_generics()?),
+            })),
+            args: vec![Operand::Move(Place::new(
+                concrete_local_id,
+                concrete_ref_ty,
+            ))],
+            dest: Place::new(LocalId::new(0), Ty::mk_unit()),
+        };
+
+        let terminator = Terminator {
+            span: self.span,
+            content: RawTerminator::Call {
+                call,
+                target: BlockId::new(1),
+                on_unwind: BlockId::new(1), // Same as target for simplicity
+            },
+            comments_before: vec![],
+        };
+
+        let _ = blocks.push_with(|_| BlockData {
+            statements: vec![concretize_stmt],
+            terminator,
+        });
+
+        let _ = blocks.push_with(|_| BlockData {
+            statements: vec![],
+            terminator: Terminator {
+                span: self.span,
+                content: RawTerminator::Return,
+                comments_before: vec![],
+            },
+        });
+
+        Ok(Body::Unstructured(ExprBody {
+            span: self.span,
+            locals: locals.clone(),
+            comments: vec![],
+            body: blocks,
+        }))
+    }
+
+    /// Create function body for empty drop functions
+    fn create_empty_drop_body(&self, locals: &Locals) -> Result<Body, Error> {
+        let mut blocks = Vector::new();
+        let _ = blocks.push_with(|_| BlockData {
+            statements: vec![],
+            terminator: Terminator {
+                span: self.span,
+                content: RawTerminator::Return,
+                comments_before: vec![],
+            },
+        });
+
+        Ok(Body::Unstructured(ExprBody {
+            span: self.span,
+            locals: locals.clone(),
+            comments: vec![],
+            body: blocks,
+        }))
+    }
+
+    /// Create function body for panic drop functions
+    fn create_panic_drop_body(&self, locals: &Locals, msg: &str) -> Result<Body, Error> {
+        let mut blocks = Vector::new();
+        let _ = blocks.push_with(|_| BlockData {
+            statements: vec![],
+            terminator: Terminator {
+                span: self.span,
+                content: RawTerminator::Abort(AbortKind::Panic(None)),
+                comments_before: vec![format!("Panic: {}", msg)],
+            },
+        });
+
+        Ok(Body::Unstructured(ExprBody {
+            span: self.span,
+            locals: locals.clone(),
+            comments: vec![],
+            body: blocks,
+        }))
+    }
+
+    /// Create function body for array drop functions (placeholder)
+    fn create_array_drop_body(
+        &self,
+        locals: &mut Locals,
+        dyn_trait_param_ty: &Ty,
+        concrete_ty: &Ty,
+        element_ty: &Ty,
+        _element_drop: &DropCase,
+    ) -> Result<Body, Error> {
+        let mut blocks = Vector::new();
+
+        // Create a concretize cast from dyn trait to concrete array type
+        let concrete_array_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
+        // Add local for the concretized array
+        let concrete_local = Local {
+            index: LocalId::new(2), // ret=0, self=1, concrete=2
+            name: Some("concrete_array".to_string()),
+            ty: concrete_array_ref_ty.clone(),
+        };
+        let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+
+        // Create the concretize cast statement
+        let concretize_stmt = Statement {
+            span: self.span,
+            content: RawStatement::Assign(
+                Place::new(concrete_local_id, concrete_array_ref_ty.clone()),
+                Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(
+                        dyn_trait_param_ty.clone(),
+                        concrete_array_ref_ty.clone(),
+                    )),
+                    Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                ),
+            ),
+            comments_before: vec![format!("Concretize to concrete array type - element type: {:?}", element_ty)],
+        };
+
+        let _ = blocks.push_with(|_| BlockData {
+            statements: vec![concretize_stmt],
+            terminator: Terminator {
+                span: self.span,
+                content: RawTerminator::Return,
+                comments_before: vec![format!("Array drop placeholder - TODO: implement element traversal")],
+            },
+        });
+
+        Ok(Body::Unstructured(ExprBody {
+            span: self.span,
+            locals: locals.clone(),
+            comments: vec![],
+            body: blocks,
+        }))
+    }
+
+    /// Create function body for tuple drop functions (placeholder)
+    fn create_tuple_drop_body(
+        &self,
+        locals: &mut Locals,
+        dyn_trait_param_ty: &Ty,
+        concrete_ty: &Ty,
+        fields: &[(usize, Ty, DropCase)],
+    ) -> Result<Body, Error> {
+        let mut blocks = Vector::new();
+
+        // Create a concretize cast from dyn trait to concrete tuple type
+        let concrete_tuple_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
+        // Add local for the concretized tuple
+        let concrete_local = Local {
+            index: LocalId::new(2), // ret=0, self=1, concrete=2
+            name: Some("concrete_tuple".to_string()),
+            ty: concrete_tuple_ref_ty.clone(),
+        };
+        let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+
+        // Create the concretize cast statement
+        let concretize_stmt = Statement {
+            span: self.span,
+            content: RawStatement::Assign(
+                Place::new(concrete_local_id, concrete_tuple_ref_ty.clone()),
+                Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(
+                        dyn_trait_param_ty.clone(),
+                        concrete_tuple_ref_ty.clone(),
+                    )),
+                    Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                ),
+            ),
+            comments_before: vec![format!("Concretize to concrete tuple type - {} fields", fields.len())],
+        };
+
+        let _ = blocks.push_with(|_| BlockData {
+            statements: vec![concretize_stmt],
+            terminator: Terminator {
+                span: self.span,
+                content: RawTerminator::Return,
+                comments_before: vec![format!("Tuple drop placeholder - TODO: implement field-by-field drop")],
+            },
+        });
+
+        Ok(Body::Unstructured(ExprBody {
+            span: self.span,
+            locals: locals.clone(),
+            comments: vec![],
+            body: blocks,
+        }))
+    }
     fn get_trait_impl_generics(&self) -> Result<GenericParams, Error> {
         let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
             raise_error!(
@@ -1585,62 +938,25 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 }
 
-/// Different kinds of drop shims we need to generate
-#[derive(Debug, Clone)]
-enum DropShimKind {
-    /// Call the actual drop function
-    CallDrop,
-    /// Empty function (no drop needed)
-    Empty,
-    /// Panic function (drop not translated)
-    Panic(String),
-    /// Array traversal drop (drop each element)
-    ArrayTraversal {
-        element_ty: Ty,
-        element_drop: DropCase,
-    },
-    /// Tuple field-by-field drop (drop each field that needs it)
-    TupleFields {
-        fields: Vec<(usize, Ty, DropCase)>,
-    },
-    /// Box drop (drop the contained value and then the box itself)
-    BoxDrop {
-        inner_ty: Ty,
-        inner_drop: DropCase,
-    },
-}
-
-/// Represents the different cases for drop function resolution
+/// Represents the different cases for drop function resolution and shim generation
 #[derive(Debug, Clone)]
 enum DropCase {
-    /// Case 1: Drop function found - contains the function reference
-    Found(DropFound),
-    /// Case 2: No drop function needed (e.g., i32)
-    NotNeeded,
-    /// Case 3: Drop function not translated - contains error message
-    NotTranslated(String),
-    /// Case 4: Unknown due to generics
-    Unknown(String),
-}
-
-/// Sub-cases for when a drop function is found or needs to be generated
-#[derive(Debug, Clone)]
-enum DropFound {
-    /// Simple case: Direct drop implementation available
+    /// Case 1: Drop function found - call it directly
     Direct(FunDeclRef),
-    /// Array case: Generate shim to traverse and drop each element
+    /// Case 2: No drop function needed (e.g., i32) - generate empty shim
+    Empty,
+    /// Case 3: Drop function not translated - generate panic shim
+    Panic(String),
+    /// Case 4: Unknown due to generics - generate opaque
+    Unknown(String),
+    /// Case 5: Array traversal drop (drop each element)
     Array {
         element_ty: Ty,
         element_drop: Box<DropCase>,
     },
-    /// Tuple case: Generate shim to drop each field that needs drop
+    /// Case 6: Tuple field-by-field drop (drop each field that needs it)
     Tuple {
         fields: Vec<(usize, Ty, DropCase)>, // (field_index, field_type, field_drop_case)
-    },
-    /// Box case: Generate shim for Box drop
-    Box {
-        inner_ty: Ty,
-        inner_drop: Box<DropCase>,
     },
 }
 
