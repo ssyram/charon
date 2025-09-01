@@ -918,6 +918,12 @@ impl TypeDeclRef {
     }
 }
 
+impl From<LiteralTy> for Ty {
+    fn from(lit: LiteralTy) -> Ty {
+        TyKind::Literal(lit).into_ty()
+    }
+}
+
 impl TraitDeclRef {
     pub fn self_ty<'a>(&'a self, krate: &'a TranslatedCrate) -> Option<&'a Ty> {
         match self.generics.types.iter().next() {

@@ -24,15 +24,22 @@ struct VtableMetadataComputer<'a> {
     span: Span,
     /// The type of the drop field: `fn<'a>(self: &'a mut dyn Trait<...>)`
     drop_field_ty: Option<Ty>,
+    generics: &'a GenericParams,
 }
 
 impl<'a> VtableMetadataComputer<'a> {
-    fn new(ctx: &'a mut TransformCtx, impl_ref: &'a TraitImplRef, span: Span) -> Self {
+    fn new(
+        ctx: &'a mut TransformCtx,
+        impl_ref: &'a TraitImplRef,
+        span: Span,
+        generics: &'a GenericParams,
+    ) -> Self {
         Self {
             ctx,
             impl_ref,
             span,
             drop_field_ty: None,
+            generics,
         }
     }
 
@@ -266,22 +273,26 @@ impl<'a> VtableMetadataComputer<'a> {
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
         trace!("[ANALYZE] Analyzing drop case for type: {:?}", concrete_ty);
         trace!("[ANALYZE] Type kind: {:?}", concrete_ty.kind());
-        
+
         // For arrays and tuples, we want to analyze them specifically even if they don't need dropping
         // so we can generate proper traversal logic
         let should_analyze_composite = match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
                 trace!("[ANALYZE] ADT type with ID: {:?}", type_decl_ref.id);
-                matches!(&type_decl_ref.id, 
-                    TypeId::Builtin(BuiltinTy::Array) | 
-                    TypeId::Tuple | 
-                    TypeId::Builtin(BuiltinTy::Slice)
+                matches!(
+                    &type_decl_ref.id,
+                    TypeId::Builtin(BuiltinTy::Array)
+                        | TypeId::Tuple
+                        | TypeId::Builtin(BuiltinTy::Slice)
                 )
             }
             _ => false,
         };
-        
-        trace!("[ANALYZE] Should analyze composite: {}", should_analyze_composite);
+
+        trace!(
+            "[ANALYZE] Should analyze composite: {}",
+            should_analyze_composite
+        );
 
         if !should_analyze_composite {
             // First check if the type needs drop at all (for non-composite types)
@@ -400,11 +411,9 @@ impl<'a> VtableMetadataComputer<'a> {
                     // Check if this ADT is a Box by looking at its name or structure
                     if let Some(type_decl) = self.ctx.translated.type_decls.get(*type_decl_id) {
                         // Check if the name contains "Box" - this is a heuristic
-                        type_decl.item_meta.name.name.iter().any(|elem| {
-                            match elem {
-                                PathElem::Ident(name, _) => name.contains("Box"),
-                                _ => false,
-                            }
+                        type_decl.item_meta.name.name.iter().any(|elem| match elem {
+                            PathElem::Ident(name, _) => name.contains("Box"),
+                            _ => false,
                         })
                     } else {
                         false
@@ -495,7 +504,7 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Analyze drop case for tuple types
     fn analyze_tuple_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
         trace!("[TUPLE] Analyzing tuple drop for type: {:?}", type_decl_ref);
-        
+
         let tuple_generics = &type_decl_ref.generics.types;
         let mut fields = Vec::new();
 
@@ -512,7 +521,7 @@ impl<'a> VtableMetadataComputer<'a> {
             Ok(DropCase::Empty)
         } else {
             trace!("[TUPLE] Creating tuple drop with {} fields", fields.len());
-            // Always generate tuple drop logic, even if no fields need dropping, 
+            // Always generate tuple drop logic, even if no fields need dropping,
             // to demonstrate the field-by-field logic
             Ok(DropCase::Tuple { fields })
         }
@@ -521,22 +530,24 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Analyze drop case for array types [T; N]
     fn analyze_array_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
         trace!("[ARRAY] Analyzing array drop for type: {:?}", type_decl_ref);
-        
+
         // Array [T; N] needs drop if T needs drop
         if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
             trace!("[ARRAY] Element type: {:?}", element_ty);
             let element_drop_case = self.analyze_drop_case(element_ty)?;
             trace!("[ARRAY] Element drop case: {:?}", element_drop_case);
-            
+
             match element_drop_case {
                 DropCase::Empty => {
-                    trace!("[ARRAY] Element doesn't need drop, but creating array traversal anyway");
+                    trace!(
+                        "[ARRAY] Element doesn't need drop, but creating array traversal anyway"
+                    );
                     // Even if elements don't need drop, we create array traversal for demonstration
                     Ok(DropCase::Array {
                         element_ty: element_ty.clone(),
                         element_drop: Box::new(element_drop_case),
                     })
-                },
+                }
                 _ => {
                     trace!("[ARRAY] Element needs drop, creating array traversal");
                     Ok(DropCase::Array {
@@ -827,24 +838,41 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Get array length from the concrete type (for [T; N], N is the const generic)
-    fn get_array_length(&self, concrete_ty: &Ty) -> Result<u32, Error> {
+    fn get_array_length(&self, concrete_ty: &Ty) -> Result<ConstantExpr, Error> {
         if let TyKind::Adt(type_decl_ref) = concrete_ty.kind() {
             if let Some(const_val) = type_decl_ref
                 .generics
                 .const_generics
                 .get(ConstGenericVarId::new(0))
             {
-                // Extract the const value - for array length this should be a literal
                 match const_val {
-                    ConstGeneric::Value(Literal::Scalar(ScalarValue::Unsigned(_, length))) => {
-                        Ok(*length as u32)
-                    },
-                    _ => {
-                        // For generic const parameters like @ConstGeneric0_0, we can't get concrete length
-                        // but we can still generate the loop logic with symbolic length
-                        // Use a placeholder value - the loop logic will still be correct
-                        Ok(10) // placeholder for demonstration
+                    ConstGeneric::Global(global_decl_id) => {
+                        let ty = self
+                            .ctx
+                            .translated
+                            .global_decls
+                            .get(*global_decl_id)
+                            .unwrap()
+                            .ty
+                            .clone();
+                        Ok(ConstantExpr {
+                            value: RawConstantExpr::Global(GlobalDeclRef {
+                                id: *global_decl_id,
+                                generics: Box::new(GenericArgs::empty()),
+                            }),
+                            ty,
+                        })
                     }
+                    ConstGeneric::Var(de_bruijn_var) => {
+                        let DeBruijnVar::Bound(_, var_id) = de_bruijn_var else {
+                            unreachable!()
+                        };
+                        let ty = self.generics.const_generics.get(*var_id).unwrap().ty.clone().into();
+                        Ok(ConstantExpr { value: RawConstantExpr::Var(de_bruijn_var.clone()), ty })
+                    },
+                    ConstGeneric::Value(literal) => {
+                        Ok(literal.clone().into())
+                    },
                 }
             } else {
                 raise_error!(
@@ -867,7 +895,7 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_array_drop_body(
         &self,
         locals: &mut Locals,
-        dyn_trait_param_ty: &Ty,
+        receiver: &Place,
         concrete_ty: &Ty,
         element_ty: &Ty,
         element_drop: &DropCase,
@@ -876,30 +904,26 @@ impl<'a> VtableMetadataComputer<'a> {
 
         // Get array length
         let array_length = self.get_array_length(concrete_ty)?;
+        let length_ty = array_length.ty.clone();
 
         // Create a concretize cast from dyn trait to concrete array type
         let concrete_array_ref_ty =
             TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
 
         // Add local for the concretized array
-        let concrete_local = Local {
-            index: LocalId::new(2), // ret=0, self=1, concrete=2
-            name: Some("concrete_array".to_string()),
-            ty: concrete_array_ref_ty.clone(),
-        };
-        let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+        let concrete = locals.new_var(Some("concrete_array".into()), concrete_array_ref_ty.clone());
 
         // Create the concretize cast statement
         let concretize_stmt = Statement {
             span: self.span,
             content: RawStatement::Assign(
-                Place::new(concrete_local_id, concrete_array_ref_ty.clone()),
+                concrete.clone(),
                 Rvalue::UnaryOp(
                     UnOp::Cast(CastKind::Concretize(
-                        dyn_trait_param_ty.clone(),
+                        receiver.ty.clone(),
                         concrete_array_ref_ty.clone(),
                     )),
-                    Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                    Operand::Move(receiver.clone()),
                 ),
             ),
             comments_before: vec![format!(
@@ -908,20 +932,17 @@ impl<'a> VtableMetadataComputer<'a> {
             )],
         };
 
-
-
         match element_drop {
             DropCase::Empty => {
                 // Elements don't need dropping, but still generate traversal logic for demonstration
                 // Create loop structure that iterates through elements but doesn't call drop
-                
+
                 // Add counter local for loop iteration
-                let counter_local = Local {
-                    index: LocalId::new(3), // ret=0, self=1, concrete=2, counter=3
+                let counter_local_id = locals.locals.push_with(|idx| Local {
+                    index: idx,
                     name: Some("counter".to_string()),
                     ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                };
-                let counter_local_id = locals.locals.push_with(|_| counter_local);
+                });
 
                 // Block 0: Setup - concretize and initialize counter
                 let counter_init_stmt = Statement {
@@ -938,7 +959,9 @@ impl<'a> VtableMetadataComputer<'a> {
                             ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
                         }))),
                     ),
-                    comments_before: vec!["Initialize counter to 0 (elements don't need drop)".to_string()],
+                    comments_before: vec![
+                        "Initialize counter to 0 (elements don't need drop)".to_string(),
+                    ],
                 };
 
                 let _ = blocks.push_with(|_| BlockData {
@@ -963,19 +986,14 @@ impl<'a> VtableMetadataComputer<'a> {
                         ),
                         Rvalue::BinaryOp(
                             BinOp::Lt,
-                            Operand::Copy(Place::new(
-                                counter_local_id,
-                                TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            )),
-                            Operand::Const(Box::new(ConstantExpr {
-                                value: RawConstantExpr::Literal(Literal::Scalar(
-                                    ScalarValue::Unsigned(UIntTy::U32, array_length as u128),
-                                )),
-                                ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            })),
+                            Operand::Copy(Place::new(counter_local_id, length_ty.clone())),
+                            Operand::Const(Box::new(array_length.clone())),
                         ),
                     ),
-                    comments_before: vec![format!("Check if counter < {} (no drops needed)", array_length)],
+                    comments_before: vec![format!(
+                        "Check if counter < {} (no drops needed)",
+                        array_length
+                    )],
                 };
 
                 let loop_switch = SwitchTargets::If(
@@ -994,7 +1012,9 @@ impl<'a> VtableMetadataComputer<'a> {
                             )),
                             targets: loop_switch,
                         },
-                        comments_before: vec!["Branch based on loop condition (no drops needed)".to_string()],
+                        comments_before: vec![
+                            "Branch based on loop condition (no drops needed)".to_string(),
+                        ],
                     },
                 });
 
@@ -1020,7 +1040,9 @@ impl<'a> VtableMetadataComputer<'a> {
                             })),
                         ),
                     ),
-                    comments_before: vec!["Increment counter (element doesn't need drop)".to_string()],
+                    comments_before: vec![
+                        "Increment counter (element doesn't need drop)".to_string(),
+                    ],
                 };
 
                 let _ = blocks.push_with(|_| BlockData {
@@ -1034,7 +1056,9 @@ impl<'a> VtableMetadataComputer<'a> {
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec!["Array traversal complete (no drops needed)".to_string()],
+                        comments_before: vec![
+                            "Array traversal complete (no drops needed)".to_string(),
+                        ],
                     },
                 });
             }
@@ -1317,7 +1341,7 @@ impl<'a> VtableMetadataComputer<'a> {
             .collect();
 
         if fields.is_empty() {
-            // Empty tuple - just return immediately 
+            // Empty tuple - just return immediately
             let _ = blocks.push_with(|_| BlockData {
                 statements: vec![],
                 terminator: Terminator {
@@ -1434,7 +1458,10 @@ impl<'a> VtableMetadataComputer<'a> {
                                 Place::new(field_local_id, field_ref_ty.clone()),
                                 Rvalue::Use(Operand::Move(projected_place)),
                             ),
-                            comments_before: vec![format!("Access tuple field {} (no drop needed)", i)],
+                            comments_before: vec![format!(
+                                "Access tuple field {} (no drop needed)",
+                                i
+                            )],
                         };
 
                         let terminator = Terminator::goto(self.span, next_block_id);
@@ -1454,11 +1481,17 @@ impl<'a> VtableMetadataComputer<'a> {
                             content: RawStatement::Assign(
                                 Place::new(LocalId::new(0), Ty::mk_unit()),
                                 Rvalue::Use(Operand::opaque(
-                                    format!("panic: tuple field {} drop not translated: {}", i, msg),
+                                    format!(
+                                        "panic: tuple field {} drop not translated: {}",
+                                        i, msg
+                                    ),
                                     Ty::mk_unit(),
                                 )),
                             ),
-                            comments_before: vec![format!("Panic for tuple field {} drop not translated", i)],
+                            comments_before: vec![format!(
+                                "Panic for tuple field {} drop not translated",
+                                i
+                            )],
                         };
 
                         let terminator = Terminator::goto(self.span, next_block_id);
@@ -1519,7 +1552,7 @@ impl<'a> VtableMetadataComputer<'a> {
         // Drop shim functions should have the same generic parameters as the trait impl
         // but with at least one region binder for the receiver
         let mut generics = trait_impl.generics.clone();
-        
+
         // Ensure we have at least one region for the receiver parameter
         if generics.regions.is_empty() {
             let _ = generics.regions.push_with(|id| RegionVar {
@@ -1527,7 +1560,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 name: None,
             });
         }
-        
+
         Ok(generics)
     }
 
@@ -1550,7 +1583,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut generics = match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
                 let mut generic_args = type_decl_ref.generics.clone();
-                
+
                 // Special handling for Box types
                 if self.is_box_type(concrete_ty) {
                     // Check if this is a built-in Box
@@ -1566,7 +1599,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         }
                     }
                 }
-                
+
                 generic_args
             }
             _ => {
@@ -1578,7 +1611,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 );
             }
         };
-        
+
         // Use proper region variable instead of Region::Erased
         let region_var = Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0)));
         generics
@@ -1596,8 +1629,10 @@ impl<'a> VtableMetadataComputer<'a> {
 
         // We create the function pointer there, which is `fn<'a>(&'a mut dyn Trait<...>)`
         // But the shim itself should have erased region for this
-        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Erased);
-        
+        generics
+            .regions
+            .insert_and_shift_ids(RegionId::ZERO, Region::Erased);
+
         Ok(generics)
     }
 }
@@ -1646,8 +1681,9 @@ impl TransformPass for Transform {
         ctx.for_each_fun_decl(|ctx, decl| {
             if let ItemKind::VTableInstance { impl_ref } = &decl.kind {
                 if let Ok(body) = &mut decl.body {
+                    let generics = &decl.signature.generics;
                     let mut computer =
-                        VtableMetadataComputer::new(ctx, impl_ref, decl.item_meta.span);
+                        VtableMetadataComputer::new(ctx, impl_ref, decl.item_meta.span, generics);
 
                     match computer.compute_vtable_metadata_for_function(body) {
                         Ok(_) => {
