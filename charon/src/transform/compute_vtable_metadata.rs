@@ -274,59 +274,105 @@ impl<'a> VtableMetadataComputer<'a> {
         trace!("[ANALYZE] Analyzing drop case for type: {:?}", concrete_ty);
         trace!("[ANALYZE] Type kind: {:?}", concrete_ty.kind());
 
-        // For arrays and tuples, we want to analyze them specifically even if they don't need dropping
-        // so we can generate proper traversal logic
-        let should_analyze_composite = match concrete_ty.kind() {
-            TyKind::Adt(type_decl_ref) => {
-                trace!("[ANALYZE] ADT type with ID: {:?}", type_decl_ref.id);
-                matches!(
-                    &type_decl_ref.id,
-                    TypeId::Builtin(BuiltinTy::Array)
-                        | TypeId::Tuple
-                        | TypeId::Builtin(BuiltinTy::Slice)
-                )
-            }
-            _ => false,
-        };
-
-        trace!(
-            "[ANALYZE] Should analyze composite: {}",
-            should_analyze_composite
-        );
-
-        if !should_analyze_composite {
-            // First check if the type needs drop at all (for non-composite types)
-            // However, for ADT types, we should always check for drop implementations
-            // because types like Vec<T> need drop even if T doesn't need drop
-            let bypass_needs_drop_check = matches!(concrete_ty.kind(), TyKind::Adt(_));
-
-            if !bypass_needs_drop_check {
-                match concrete_ty.needs_drop(&self.ctx.translated) {
-                    Ok(false) => {
-                        trace!("[ANALYZE] Type doesn't need drop, returning Empty");
-                        return Ok(DropCase::Empty);
-                    }
-                    Ok(true) => {
-                        trace!("[ANALYZE] Type needs drop, continuing with analysis");
-                    } // Continue to check for drop implementation
-                    Err(reason) => {
-                        trace!("[ANALYZE] Error checking needs_drop: {}", reason);
-                        return Ok(DropCase::Unknown(reason));
-                    }
-                }
-            } else {
-                trace!(
-                    "[ANALYZE] ADT type - bypassing needs_drop check, looking for drop impl directly"
-                );
-            }
-        }
-
-        // Analyze the specific type to determine how to handle dropping
+        // Use proper recursive analysis: match the concrete_ty structure first,
+        // then recursively analyze sub-components for composite types
         match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
                 match &type_decl_ref.id {
+                    TypeId::Builtin(BuiltinTy::Array) => {
+                        trace!("[ANALYZE] Found Array type, recursively analyzing element");
+                        // Array [T; N] - recursively analyze element type
+                        if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
+                            // Check if array length is 0 - if so, no drops needed
+                            if let Some(const_val) = type_decl_ref
+                                .generics
+                                .const_generics
+                                .get(ConstGenericVarId::new(0))
+                            {
+                                if let ConstGeneric::Value(literal) = const_val {
+                                    if let Literal::Scalar(ScalarValue::Unsigned(_, 0))
+                                    | Literal::Scalar(ScalarValue::Signed(_, 0)) = literal
+                                    {
+                                        trace!("[ANALYZE] Array has length 0, no drops needed");
+                                        return Ok(DropCase::Empty);
+                                    }
+                                }
+                            }
+
+                            let element_case = self.analyze_drop_case(element_ty)?;
+                            trace!("[ANALYZE] Array element drop case: {:?}", element_case);
+                            match element_case {
+                                DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
+                                    // If element is Empty/Panic/Unknown, return that directly
+                                    Ok(element_case)
+                                }
+                                _ => {
+                                    // Otherwise, wrap in Array case
+                                    trace!("[ANALYZE] Wrapping element case in Array traversal");
+                                    Ok(DropCase::Array {
+                                        element_ty: element_ty.clone(),
+                                        element_drop: Box::new(element_case),
+                                    })
+                                }
+                            }
+                        } else {
+                            Ok(DropCase::Unknown(
+                                "Array type missing element type parameter".to_string(),
+                            ))
+                        }
+                    }
+                    TypeId::Tuple => {
+                        trace!("[ANALYZE] Found Tuple type, recursively analyzing fields");
+                        // Tuple (T1, T2, ...) - recursively analyze each field
+                        let tuple_generics = &type_decl_ref.generics.types;
+                        let mut fields = Vec::new();
+
+                        // Analyze each field in the tuple
+                        for (idx, field_ty) in tuple_generics.iter().enumerate() {
+                            trace!("[ANALYZE] Tuple field {}: {:?}", idx, field_ty);
+                            let field_case = self.analyze_drop_case(field_ty)?;
+                            trace!("[ANALYZE] Tuple field {} drop case: {:?}", idx, field_case);
+                            
+                            match field_case {
+                                DropCase::Panic(_) | DropCase::Unknown(_) => {
+                                    // If any field is Panic/Unknown, return that immediately
+                                    trace!("[ANALYZE] Field {} has error case, returning early", idx);
+                                    return Ok(field_case);
+                                }
+                                _ => {
+                                    fields.push((field_ty.clone(), field_case));
+                                }
+                            }
+                        }
+
+                        if fields.is_empty() {
+                            trace!("[ANALYZE] Empty tuple, no fields need dropping");
+                            Ok(DropCase::Empty)
+                        } else {
+                            // Check if any field actually needs dropping
+                            let has_drops = fields
+                                .iter()
+                                .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
+
+                            if !has_drops {
+                                trace!("[ANALYZE] No tuple fields need dropping, using empty drop");
+                                Ok(DropCase::Empty)
+                            } else {
+                                trace!(
+                                    "[ANALYZE] Creating tuple drop with {} fields, {} need drops",
+                                    fields.len(),
+                                    fields
+                                        .iter()
+                                        .filter(|(_, dc)| !matches!(dc, DropCase::Empty))
+                                        .count()
+                                );
+                                Ok(DropCase::Tuple { fields })
+                            }
+                        }
+                    }
                     TypeId::Adt(_type_decl_id) => {
-                        // Look for direct drop implementation for ADT types (including Box)
+                        trace!("[ANALYZE] Found ADT type, looking for direct drop implementation");
+                        // Regular ADT - look for direct drop implementation
                         if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
                             Ok(DropCase::Direct(fun_ref))
                         } else {
@@ -336,55 +382,74 @@ impl<'a> VtableMetadataComputer<'a> {
                             )))
                         }
                     }
-                    TypeId::Tuple => {
-                        trace!("[ANALYZE] Found Tuple type, analyzing tuple drop");
-                        // Handle tuple drop - analyze each field
-                        self.analyze_tuple_drop(type_decl_ref)
-                    }
                     TypeId::Builtin(builtin_ty) => {
                         trace!("[ANALYZE] Found Builtin type: {:?}", builtin_ty);
                         match builtin_ty {
+                            BuiltinTy::Array => {
+                                // This should not happen since Array is handled at the higher level
+                                // but included for completeness
+                                unreachable!("Array should be handled at the higher level")
+                            }
                             BuiltinTy::Box => {
-                                trace!("[ANALYZE] Handling Box type");
+                                trace!("[ANALYZE] Handling Box type - looking for direct drop");
                                 // For Box, simply look for Box's Drop implementation
                                 if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
                                     Ok(DropCase::Direct(fun_ref))
                                 } else {
-                                    Ok(DropCase::Panic(format!(
-                                        "Box Drop implementation not found or not translated"
-                                    )))
+                                    Ok(DropCase::Panic(
+                                        "Box Drop implementation not found or not translated".to_string()
+                                    ))
                                 }
                             }
-                            BuiltinTy::Array => {
-                                trace!("[ANALYZE] Handling Array type");
-                                // Handle array drop - traverse and drop each element
-                                self.analyze_array_drop(type_decl_ref)
-                            }
                             BuiltinTy::Slice => {
-                                trace!("[ANALYZE] Handling Slice type");
-                                // Handle slice drop - similar to array
-                                self.analyze_slice_drop(type_decl_ref)
+                                trace!("[ANALYZE] Found Slice type, recursively analyzing element");
+                                // Slice &[T] - recursively analyze element type (similar to Array)
+                                if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
+                                    let element_case = self.analyze_drop_case(element_ty)?;
+                                    trace!("[ANALYZE] Slice element drop case: {:?}", element_case);
+                                    match element_case {
+                                        DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
+                                            Ok(element_case)
+                                        }
+                                        _ => {
+                                            Ok(DropCase::Array {
+                                                element_ty: element_ty.clone(),
+                                                element_drop: Box::new(element_case),
+                                            })
+                                        }
+                                    }
+                                } else {
+                                    Ok(DropCase::Unknown(
+                                        "Slice type missing element type parameter".to_string(),
+                                    ))
+                                }
                             }
-                            BuiltinTy::Str => Ok(DropCase::Empty), // str does not need drop
+                            BuiltinTy::Str => {
+                                trace!("[ANALYZE] str type doesn't need drop");
+                                Ok(DropCase::Empty) // str does not need drop
+                            }
                         }
                     }
                 }
             }
-
-            TyKind::Literal(_) => Ok(DropCase::Empty),
-
-            TyKind::Ref(..) | TyKind::RawPtr(..) => Ok(DropCase::Empty), // References and raw pointers don't need drop
-
-            TyKind::TraitType(..)
-            | TyKind::DynTrait(..)
-            | TyKind::FnPtr(..)
-            | TyKind::FnDef(..)
-            | TyKind::Never
-            | TyKind::TypeVar(..)
-            | TyKind::Error(..) => Ok(DropCase::Unknown(format!(
-                "Unknown Drop for type: {}",
-                self.type_to_string(concrete_ty)
-            ))),
+            // Non-ADT types - handle primitive types that don't need drop
+            TyKind::Literal(_) => {
+                trace!("[ANALYZE] Literal type doesn't need drop");
+                Ok(DropCase::Empty)
+            }
+            TyKind::Ref(..) | TyKind::RawPtr(..) => {
+                trace!("[ANALYZE] Reference/pointer type doesn't need drop");
+                Ok(DropCase::Empty) // References and raw pointers don't need drop
+            }
+            // Other non-ADT types should raise an error - these cases should not be called with drop
+            _ => {
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Unsupported type for drop case analysis: {}",
+                    self.type_to_string(concrete_ty)
+                )
+            }
         }
     }
 
@@ -556,112 +621,7 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(None)
     }
 
-    /// Analyze drop case for tuple types
-    fn analyze_tuple_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
-        trace!("[TUPLE] Analyzing tuple drop for type: {:?}", type_decl_ref);
 
-        let tuple_generics = &type_decl_ref.generics.types;
-        let mut fields = Vec::new();
-
-        // Analyze each field in the tuple
-        for (idx, field_ty) in tuple_generics.iter().enumerate() {
-            trace!("[TUPLE] Field {}: {:?}", idx, field_ty);
-            let field_drop_case = self.analyze_drop_case(field_ty)?;
-            trace!("[TUPLE] Field {} drop case: {:?}", idx, field_drop_case);
-            fields.push((field_ty.clone(), field_drop_case))
-        }
-
-        if fields.is_empty() {
-            trace!("[TUPLE] Empty tuple, no fields need dropping");
-            Ok(DropCase::Empty)
-        } else {
-            // Check if any field actually needs dropping
-            let has_drops = fields
-                .iter()
-                .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
-
-            if !has_drops {
-                trace!("[TUPLE] No fields need dropping, using empty drop");
-                Ok(DropCase::Empty)
-            } else {
-                trace!(
-                    "[TUPLE] Creating tuple drop with {} fields, {} need drops",
-                    fields.len(),
-                    fields
-                        .iter()
-                        .filter(|(_, dc)| !matches!(dc, DropCase::Empty))
-                        .count()
-                );
-                Ok(DropCase::Tuple { fields })
-            }
-        }
-    }
-
-    /// Analyze drop case for array types [T; N]
-    fn analyze_array_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
-        trace!("[ARRAY] Analyzing array drop for type: {:?}", type_decl_ref);
-
-        // Array [T; N] needs drop if T needs drop
-        if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
-            trace!("[ARRAY] Element type: {:?}", element_ty);
-            let element_drop_case = self.analyze_drop_case(element_ty)?;
-            trace!("[ARRAY] Element drop case: {:?}", element_drop_case);
-
-            // Check if array length is 0 - if so, no drops needed
-            if let Some(const_val) = type_decl_ref
-                .generics
-                .const_generics
-                .get(ConstGenericVarId::new(0))
-            {
-                if let ConstGeneric::Value(literal) = const_val {
-                    if let Literal::Scalar(ScalarValue::Unsigned(_, 0))
-                    | Literal::Scalar(ScalarValue::Signed(_, 0)) = literal
-                    {
-                        trace!("[ARRAY] Array has length 0, no drops needed");
-                        return Ok(DropCase::Empty);
-                    }
-                }
-            }
-
-            match element_drop_case {
-                DropCase::Empty => {
-                    trace!("[ARRAY] Element doesn't need drop, array drop is empty");
-                    Ok(DropCase::Empty)
-                }
-                _ => {
-                    trace!("[ARRAY] Element needs drop, creating array traversal");
-                    Ok(DropCase::Array {
-                        element_ty: element_ty.clone(),
-                        element_drop: Box::new(element_drop_case),
-                    })
-                }
-            }
-        } else {
-            trace!("[ARRAY] Array type missing element type parameter");
-            Ok(DropCase::Unknown(
-                "Array type missing element type parameter".to_string(),
-            ))
-        }
-    }
-
-    /// Analyze drop case for slice types &[T]
-    fn analyze_slice_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
-        // Slice &[T] needs drop if T needs drop (similar to array)
-        if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
-            let element_drop_case = self.analyze_drop_case(element_ty)?;
-            match element_drop_case {
-                DropCase::Empty => Ok(DropCase::Empty),
-                _ => Ok(DropCase::Array {
-                    element_ty: element_ty.clone(),
-                    element_drop: Box::new(element_drop_case),
-                }),
-            }
-        } else {
-            Ok(DropCase::Unknown(
-                "Slice type missing element type parameter".to_string(),
-            ))
-        }
-    }
 
     // ========================================
     // FUNCTION TYPE AND GENERICS CREATION
