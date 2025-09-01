@@ -895,23 +895,25 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_array_drop_body(
         &self,
         locals: &mut Locals,
-        receiver: &Place,
+        dyn_trait_param_ty: &Ty,
         concrete_ty: &Ty,
         element_ty: &Ty,
         element_drop: &DropCase,
     ) -> Result<Body, Error> {
         let mut blocks = Vector::new();
 
-        // Get array length
-        let array_length = self.get_array_length(concrete_ty)?;
-        let length_ty = array_length.ty.clone();
+        // Get array length as a constant expression
+        let array_length_expr = self.get_array_length(concrete_ty)?;
 
         // Create a concretize cast from dyn trait to concrete array type
         let concrete_array_ref_ty =
             TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
 
-        // Add local for the concretized array
+        // Add local for the concretized array using the utility method
         let concrete = locals.new_var(Some("concrete_array".into()), concrete_array_ref_ty.clone());
+
+        // Create the receiver place from the self parameter
+        let receiver = locals.place_for_var(LocalId::new(1));
 
         // Create the concretize cast statement
         let concretize_stmt = Statement {
@@ -920,10 +922,10 @@ impl<'a> VtableMetadataComputer<'a> {
                 concrete.clone(),
                 Rvalue::UnaryOp(
                     UnOp::Cast(CastKind::Concretize(
-                        receiver.ty.clone(),
+                        dyn_trait_param_ty.clone(),
                         concrete_array_ref_ty.clone(),
                     )),
-                    Operand::Move(receiver.clone()),
+                    Operand::Move(receiver),
                 ),
             ),
             comments_before: vec![format!(
@@ -937,21 +939,17 @@ impl<'a> VtableMetadataComputer<'a> {
                 // Elements don't need dropping, but still generate traversal logic for demonstration
                 // Create loop structure that iterates through elements but doesn't call drop
 
-                // Add counter local for loop iteration
-                let counter_local_id = locals.locals.push_with(|idx| Local {
-                    index: idx,
-                    name: Some("counter".to_string()),
-                    ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                });
+                // Add counter local for loop iteration using utility method
+                let counter = locals.new_var(
+                    Some("counter".to_string()),
+                    TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                );
 
                 // Block 0: Setup - concretize and initialize counter
                 let counter_init_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(
-                            counter_local_id,
-                            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                        ),
+                        counter.clone(),
                         Rvalue::Use(Operand::Const(Box::new(ConstantExpr {
                             value: RawConstantExpr::Literal(Literal::Scalar(
                                 ScalarValue::Unsigned(UIntTy::U32, 0),
@@ -970,29 +968,23 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 1: Loop condition check
-                let counter_check_local = Local {
-                    index: LocalId::new(4), // ret=0, self=1, concrete=2, counter=3, counter_check=4
-                    name: Some("counter_check".to_string()),
-                    ty: TyKind::Literal(LiteralTy::Bool).into_ty(),
-                };
-                let counter_check_local_id = locals.locals.push_with(|_| counter_check_local);
+                let counter_check = locals.new_var(
+                    Some("counter_check".to_string()),
+                    TyKind::Literal(LiteralTy::Bool).into_ty(),
+                );
 
                 let counter_check_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(
-                            counter_check_local_id,
-                            TyKind::Literal(LiteralTy::Bool).into_ty(),
-                        ),
+                        counter_check.clone(),
                         Rvalue::BinaryOp(
                             BinOp::Lt,
-                            Operand::Copy(Place::new(counter_local_id, length_ty.clone())),
-                            Operand::Const(Box::new(array_length.clone())),
+                            Operand::Copy(counter.clone()),
+                            Operand::Const(Box::new(array_length_expr.clone())),
                         ),
                     ),
                     comments_before: vec![format!(
-                        "Check if counter < {} (no drops needed)",
-                        array_length
+                        "Check if counter < array length (no drops needed)"
                     )],
                 };
 
@@ -1006,10 +998,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Switch {
-                            discr: Operand::Move(Place::new(
-                                counter_check_local_id,
-                                TyKind::Literal(LiteralTy::Bool).into_ty(),
-                            )),
+                            discr: Operand::Move(counter_check.clone()),
                             targets: loop_switch,
                         },
                         comments_before: vec![
@@ -1022,16 +1011,10 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter_incr_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(
-                            counter_local_id,
-                            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                        ),
+                        counter.clone(),
                         Rvalue::BinaryOp(
                             BinOp::Add(OverflowMode::Panic),
-                            Operand::Move(Place::new(
-                                counter_local_id,
-                                TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            )),
+                            Operand::Move(counter.clone()),
                             Operand::Const(Box::new(ConstantExpr {
                                 value: RawConstantExpr::Literal(Literal::Scalar(
                                     ScalarValue::Unsigned(UIntTy::U32, 1),
@@ -1066,22 +1049,17 @@ impl<'a> VtableMetadataComputer<'a> {
                 // Elements need direct drop function calls
                 // Create loop structure to drop each element
 
-                // Add counter local for loop iteration
-                let counter_local = Local {
-                    index: LocalId::new(3), // ret=0, self=1, concrete=2, counter=3
-                    name: Some("counter".to_string()),
-                    ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                };
-                let counter_local_id = locals.locals.push_with(|_| counter_local);
+                // Add counter local for loop iteration using utility method
+                let counter = locals.new_var(
+                    Some("counter".to_string()),
+                    TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                );
 
                 // Block 0: Setup - concretize and initialize counter
                 let counter_init_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(
-                            counter_local_id,
-                            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                        ),
+                        counter.clone(),
                         Rvalue::Use(Operand::Const(Box::new(ConstantExpr {
                             value: RawConstantExpr::Literal(Literal::Scalar(
                                 ScalarValue::Unsigned(UIntTy::U32, 0),
@@ -1098,35 +1076,22 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 1: Loop condition check
-                let counter_check_local = Local {
-                    index: LocalId::new(4), // ret=0, self=1, concrete=2, counter=3, counter_check=4
-                    name: Some("counter_check".to_string()),
-                    ty: TyKind::Literal(LiteralTy::Bool).into_ty(),
-                };
-                let counter_check_local_id = locals.locals.push_with(|_| counter_check_local);
+                let counter_check = locals.new_var(
+                    Some("counter_check".to_string()),
+                    TyKind::Literal(LiteralTy::Bool).into_ty(),
+                );
 
                 let counter_check_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(
-                            counter_check_local_id,
-                            TyKind::Literal(LiteralTy::Bool).into_ty(),
-                        ),
+                        counter_check.clone(),
                         Rvalue::BinaryOp(
                             BinOp::Lt,
-                            Operand::Copy(Place::new(
-                                counter_local_id,
-                                TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            )),
-                            Operand::Const(Box::new(ConstantExpr {
-                                value: RawConstantExpr::Literal(Literal::Scalar(
-                                    ScalarValue::Unsigned(UIntTy::U32, array_length as u128),
-                                )),
-                                ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            })),
+                            Operand::Copy(counter.clone()),
+                            Operand::Const(Box::new(array_length_expr.clone())),
                         ),
                     ),
-                    comments_before: vec![format!("Check if counter < {}", array_length)],
+                    comments_before: vec![format!("Check if counter < array length")],
                 };
 
                 let loop_switch = SwitchTargets::If(
@@ -1139,10 +1104,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Switch {
-                            discr: Operand::Move(Place::new(
-                                counter_check_local_id,
-                                TyKind::Literal(LiteralTy::Bool).into_ty(),
-                            )),
+                            discr: Operand::Move(counter_check.clone()),
                             targets: loop_switch,
                         },
                         comments_before: vec!["Branch based on loop condition".to_string()],
@@ -1153,29 +1115,24 @@ impl<'a> VtableMetadataComputer<'a> {
                 let element_ref_ty =
                     TyKind::Ref(Region::Erased, element_ty.clone(), RefKind::Mut).into_ty();
 
-                let element_local = Local {
-                    index: LocalId::new(5), // ret=0, self=1, concrete=2, counter=3, counter_check=4, element=5
-                    name: Some("element_ref".to_string()),
-                    ty: element_ref_ty.clone(),
-                };
-                let element_local_id = locals.locals.push_with(|_| element_local);
+                let element_ref = locals.new_var(
+                    Some("element_ref".to_string()),
+                    element_ref_ty.clone(),
+                );
 
                 // Create array index projection
                 let index_projection = ProjectionElem::Index {
-                    offset: Box::new(Operand::Copy(Place::new(
-                        counter_local_id,
-                        TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                    ))),
+                    offset: Box::new(Operand::Copy(counter.clone())),
                     from_end: false,
                 };
 
-                let projected_place = Place::new(concrete_local_id, concrete_array_ref_ty.clone())
+                let projected_place = concrete
                     .project(index_projection, element_ref_ty.clone());
 
                 let element_proj_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(element_local_id, element_ref_ty.clone()),
+                        element_ref.clone(),
                         Rvalue::Ref(projected_place, BorrowKind::Mut),
                     ),
                     comments_before: vec!["Project to current array element".to_string()],
@@ -1187,8 +1144,8 @@ impl<'a> VtableMetadataComputer<'a> {
                         id: fun_ref.id,
                         generics: self.create_drop_function_generics(concrete_ty)?,
                     })),
-                    args: vec![Operand::Move(Place::new(element_local_id, element_ref_ty))],
-                    dest: Place::new(LocalId::new(0), Ty::mk_unit()),
+                    args: vec![Operand::Move(element_ref.clone())],
+                    dest: locals.return_place(),
                 };
 
                 let _ = blocks.push_with(|_| BlockData {
@@ -1208,16 +1165,10 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter_increment_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(
-                            counter_local_id,
-                            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                        ),
+                        counter.clone(),
                         Rvalue::BinaryOp(
                             BinOp::Add(OverflowMode::Panic),
-                            Operand::Move(Place::new(
-                                counter_local_id,
-                                TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            )),
+                            Operand::Move(counter.clone()),
                             Operand::Const(Box::new(ConstantExpr {
                                 value: RawConstantExpr::Literal(Literal::Scalar(
                                     ScalarValue::Unsigned(UIntTy::U32, 1),
@@ -1249,7 +1200,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 let panic_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(LocalId::new(0), Ty::mk_unit()),
+                        locals.return_place(),
                         Rvalue::Use(Operand::opaque(
                             format!("panic: array element drop not translated: {}", msg),
                             Ty::mk_unit(),
@@ -1306,25 +1257,26 @@ impl<'a> VtableMetadataComputer<'a> {
         let concrete_tuple_ref_ty =
             TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
 
-        // Add local for the concretized tuple
-        let concrete_local = Local {
-            index: LocalId::new(2), // ret=0, self=1, concrete=2
-            name: Some("concrete_tuple".to_string()),
-            ty: concrete_tuple_ref_ty.clone(),
-        };
-        let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+        // Add local for the concretized tuple using utility method
+        let concrete = locals.new_var(
+            Some("concrete_tuple".to_string()),
+            concrete_tuple_ref_ty.clone(),
+        );
+
+        // Create the receiver place from the self parameter
+        let receiver = locals.place_for_var(LocalId::new(1));
 
         // Create the concretize cast statement
         let concretize_stmt = Statement {
             span: self.span,
             content: RawStatement::Assign(
-                Place::new(concrete_local_id, concrete_tuple_ref_ty.clone()),
+                concrete.clone(),
                 Rvalue::UnaryOp(
                     UnOp::Cast(CastKind::Concretize(
                         dyn_trait_param_ty.clone(),
                         concrete_tuple_ref_ty.clone(),
                     )),
-                    Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                    Operand::Move(receiver),
                 ),
             ),
             comments_before: vec![format!(
@@ -1332,13 +1284,6 @@ impl<'a> VtableMetadataComputer<'a> {
                 fields.len()
             )],
         };
-
-        // Find fields that actually need dropping
-        let fields_needing_drop: Vec<_> = fields
-            .iter()
-            .enumerate()
-            .filter(|(_, (_, drop_case))| !matches!(drop_case, DropCase::Empty))
-            .collect();
 
         if fields.is_empty() {
             // Empty tuple - just return immediately
@@ -1382,23 +1327,20 @@ impl<'a> VtableMetadataComputer<'a> {
                         let field_ref_ty =
                             TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
 
-                        // Add local for field reference
-                        let field_local = Local {
-                            index: LocalId::new(3 + i), // Start from 3 (after ret=0, self=1, concrete=2)
-                            name: Some(format!("field_{}_ref", i)),
-                            ty: field_ref_ty.clone(),
-                        };
-                        let field_local_id = locals.locals.push_with(|_| field_local);
+                        // Add local for field reference using utility method
+                        let field_ref = locals.new_var(
+                            Some(format!("field_{}_ref", i)),
+                            field_ref_ty.clone(),
+                        );
 
                         // Create field projection statement
-                        let projected_place =
-                            Place::new(concrete_local_id, concrete_tuple_ref_ty.clone())
-                                .project(field_projection, field_ref_ty.clone());
+                        let projected_place = concrete.clone()
+                            .project(field_projection, field_ref_ty.clone());
 
                         let field_assign_stmt = Statement {
                             span: self.span,
                             content: RawStatement::Assign(
-                                Place::new(field_local_id, field_ref_ty.clone()),
+                                field_ref.clone(),
                                 Rvalue::Use(Operand::Move(projected_place)),
                             ),
                             comments_before: vec![format!("Get reference to tuple field {}", i)],
@@ -1407,8 +1349,8 @@ impl<'a> VtableMetadataComputer<'a> {
                         // Create drop call statement
                         let call = Call {
                             func: FnOperand::Regular(FnPtr::from(fun_ref.clone())),
-                            args: vec![Operand::Move(Place::new(field_local_id, field_ref_ty))],
-                            dest: Place::new(LocalId::new(0), Ty::mk_unit()),
+                            args: vec![Operand::Move(field_ref)],
+                            dest: locals.return_place(),
                         };
 
                         let terminator = Terminator {
@@ -1439,23 +1381,20 @@ impl<'a> VtableMetadataComputer<'a> {
                         let field_ref_ty =
                             TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
 
-                        // Add local for field reference
-                        let field_local = Local {
-                            index: LocalId::new(3 + i),
-                            name: Some(format!("field_{}_ref", i)),
-                            ty: field_ref_ty.clone(),
-                        };
-                        let field_local_id = locals.locals.push_with(|_| field_local);
+                        // Add local for field reference using utility method
+                        let field_ref = locals.new_var(
+                            Some(format!("field_{}_ref", i)),
+                            field_ref_ty.clone(),
+                        );
 
                         // Create field projection statement
-                        let projected_place =
-                            Place::new(concrete_local_id, concrete_tuple_ref_ty.clone())
-                                .project(field_projection, field_ref_ty.clone());
+                        let projected_place = concrete.clone()
+                            .project(field_projection, field_ref_ty.clone());
 
                         let field_assign_stmt = Statement {
                             span: self.span,
                             content: RawStatement::Assign(
-                                Place::new(field_local_id, field_ref_ty.clone()),
+                                field_ref,
                                 Rvalue::Use(Operand::Move(projected_place)),
                             ),
                             comments_before: vec![format!(
@@ -1479,7 +1418,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         let panic_stmt = Statement {
                             span: self.span,
                             content: RawStatement::Assign(
-                                Place::new(LocalId::new(0), Ty::mk_unit()),
+                                locals.return_place(),
                                 Rvalue::Use(Operand::opaque(
                                     format!(
                                         "panic: tuple field {} drop not translated: {}",

@@ -1178,7 +1178,7 @@ fn {{impl Checkable<i32> for Array<i32, const N : usize>}}::{vtable}::{drop_meth
     concrete_array@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<i32, const N : usize>)>(move (self@1))
     counter@3 := const (0 : u32)
     loop {
-        counter_check@4 := copy (counter@3) < const (10 : u32)
+        counter_check@4 := copy (counter@3) < const (const N : usize)
         if move (counter_check@4) {
             counter@3 := move (counter@3) panic.+ const (1 : u32)
             continue 0
