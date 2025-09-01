@@ -384,7 +384,19 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Check if this is a built-in Box type (vs ADT Box)
     fn is_builtin_box(&self, type_id: &TypeId) -> bool {
-        matches!(type_id, TypeId::Builtin(BuiltinTy::Box))
+        match type_id {
+            TypeId::Builtin(BuiltinTy::Box) => true,
+            TypeId::Adt(type_decl_id) => {
+                // Also check for opaque Box types that have the box lang item
+                if let Some(type_decl) = self.ctx.translated.type_decls.get(*type_decl_id) {
+                    if let Some(ref lang_item) = type_decl.item_meta.lang_item {
+                        return lang_item == "owned_box";
+                    }
+                }
+                false
+            }
+            _ => false,
+        }
     }
 
     /// Check if two types match for the purpose of drop implementation lookup
@@ -1357,8 +1369,18 @@ impl<'a> VtableMetadataComputer<'a> {
     /// This should include all the generics that the drop shim function was defined with
     fn create_drop_shim_function_generics(&self) -> Result<GenericArgs, Error> {
         // The drop shim function reference should use the same generic arguments as the impl_ref
-        // Use the generic arguments from the trait impl ref directly
-        Ok(*self.impl_ref.generics.clone())
+        // but also include the region parameter for the receiver
+        let mut generics = *self.impl_ref.generics.clone();
+        
+        // Add the region parameter for the receiver if not already present
+        if generics.regions.is_empty() {
+            let _ = generics.regions.push_with(|id| Region::Var(DeBruijnVar::bound(
+                DeBruijnId::new(0),
+                id
+            )));
+        }
+        
+        Ok(generics)
     }
 }
 
