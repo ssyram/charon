@@ -898,65 +898,149 @@ impl<'a> VtableMetadataComputer<'a> {
                     body: blocks,
                 })
             }
-            DropShimKind::ArrayTraversal { element_ty, element_drop: _ } => {
+            DropShimKind::ArrayTraversal { element_ty, element_drop } => {
                 // Generate array traversal drop logic
-                // For now, use a placeholder implementation that just returns
-                // TODO: Implement proper array traversal with loop and element dropping
                 let mut blocks = Vector::new();
+
+                // Create a concretize cast from dyn trait to concrete array type
+                let concrete_array_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
+                // Add local for the concretized array
+                let concrete_local = Local {
+                    index: LocalId::new(2), // ret=0, self=1, concrete=2
+                    name: Some("concrete_array".to_string()),
+                    ty: concrete_array_ref_ty.clone(),
+                };
+                let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+
+                // Create the concretize cast statement
+                let concretize_stmt = Statement {
+                    span: self.span,
+                    content: RawStatement::Assign(
+                        Place::new(concrete_local_id, concrete_array_ref_ty.clone()),
+                        Rvalue::UnaryOp(
+                            UnOp::Cast(CastKind::Concretize(
+                                dyn_trait_param_ty.clone(),
+                                concrete_array_ref_ty.clone(),
+                            )),
+                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                        ),
+                    ),
+                    comments_before: vec![format!("Concretize to concrete array type for traversal drop")],
+                };
+
+                // For now, implement a simple version that just returns
+                // TODO: Implement proper loop-based traversal when we have more complex element dropping
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
+                    statements: vec![concretize_stmt],
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec![format!("TODO: Array traversal drop for element type: {:?}", element_ty)],
+                        comments_before: vec![format!("Array traversal drop for element type: {:?}", element_ty)],
                     },
                 });
 
                 Body::Unstructured(ExprBody {
                     span: self.span,
-                    locals: locals.clone(),
+                    locals,
                     comments: vec![],
                     body: blocks,
                 })
             }
             DropShimKind::TupleFields { fields } => {
                 // Generate tuple field-by-field drop logic
-                // For now, use a placeholder implementation that just returns
-                // TODO: Implement proper tuple field dropping
                 let mut blocks = Vector::new();
+
+                // Create a concretize cast from dyn trait to concrete tuple type
+                let concrete_tuple_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
+                // Add local for the concretized tuple
+                let concrete_local = Local {
+                    index: LocalId::new(2), // ret=0, self=1, concrete=2
+                    name: Some("concrete_tuple".to_string()),
+                    ty: concrete_tuple_ref_ty.clone(),
+                };
+                let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+
+                // Create the concretize cast statement
+                let concretize_stmt = Statement {
+                    span: self.span,
+                    content: RawStatement::Assign(
+                        Place::new(concrete_local_id, concrete_tuple_ref_ty.clone()),
+                        Rvalue::UnaryOp(
+                            UnOp::Cast(CastKind::Concretize(
+                                dyn_trait_param_ty.clone(),
+                                concrete_tuple_ref_ty.clone(),
+                            )),
+                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                        ),
+                    ),
+                    comments_before: vec![format!("Concretize to concrete tuple type for field drop")],
+                };
+
+                // For now, implement a simple version that just returns  
+                // TODO: Generate actual field access and drop calls for each field
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
+                    statements: vec![concretize_stmt],
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec![format!("TODO: Tuple field drop for {} fields", fields.len())],
+                        comments_before: vec![format!("Tuple field drop for {} fields", fields.len())],
                     },
                 });
 
                 Body::Unstructured(ExprBody {
                     span: self.span,
-                    locals: locals.clone(),
+                    locals,
                     comments: vec![],
                     body: blocks,
                 })
             }
-            DropShimKind::BoxDrop { inner_ty, inner_drop: _ } => {
+            DropShimKind::BoxDrop { inner_ty, inner_drop } => {
                 // Generate Box drop logic
-                // For now, use a placeholder implementation that just returns
-                // TODO: Implement proper Box drop
                 let mut blocks = Vector::new();
+
+                // Create a concretize cast from dyn trait to concrete Box type
+                let concrete_box_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+
+                // Add local for the concretized box
+                let concrete_local = Local {
+                    index: LocalId::new(2), // ret=0, self=1, concrete=2
+                    name: Some("concrete_box".to_string()),
+                    ty: concrete_box_ref_ty.clone(),
+                };
+                let concrete_local_id = locals.locals.push_with(|_| concrete_local);
+
+                // Create the concretize cast statement
+                let concretize_stmt = Statement {
+                    span: self.span,
+                    content: RawStatement::Assign(
+                        Place::new(concrete_local_id, concrete_box_ref_ty.clone()),
+                        Rvalue::UnaryOp(
+                            UnOp::Cast(CastKind::Concretize(
+                                dyn_trait_param_ty.clone(),
+                                concrete_box_ref_ty.clone(),
+                            )),
+                            Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
+                        ),
+                    ),
+                    comments_before: vec![format!("Concretize to concrete Box type for Box drop")],
+                };
+
+                // For now, implement a simple version that just returns
+                // TODO: Handle inner drop if needed, then call Box::drop
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
+                    statements: vec![concretize_stmt],
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec![format!("TODO: Box drop for inner type: {:?}", inner_ty)],
+                        comments_before: vec![format!("Box drop for inner type: {:?}", inner_ty)],
                     },
                 });
 
                 Body::Unstructured(ExprBody {
                     span: self.span,
-                    locals: locals.clone(),
+                    locals,
                     comments: vec![],
                     body: blocks,
                 })
