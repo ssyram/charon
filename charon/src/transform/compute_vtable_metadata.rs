@@ -694,7 +694,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let call = Call {
             func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                 id: fun_ref.id,
-                generics: Box::new(self.create_drop_function_generics()?),
+                generics: Box::new(self.create_drop_function_generics_for_concrete_type(concrete_ty)?),
             })),
             args: vec![Operand::Move(Place::new(
                 concrete_local_id,
@@ -949,7 +949,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 let call = Call {
                     func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                         id: fun_ref.id,
-                        generics: Box::new(self.create_drop_function_generics()?),
+                        generics: Box::new(self.create_drop_function_generics_for_concrete_type(element_ty)?),
                     })),
                     args: vec![Operand::Move(Place::new(element_local_id, element_ref_ty))],
                     dest: Place::new(LocalId::new(0), Ty::mk_unit()),
@@ -1156,7 +1156,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         let call = Call {
                             func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                                 id: fun_ref.id,
-                                generics: Box::new(self.create_drop_function_generics()?),
+                                generics: Box::new(self.create_drop_function_generics_for_concrete_type(field_ty)?),
                             })),
                             args: vec![Operand::Move(Place::new(field_local_id, field_ref_ty))],
                             dest: Place::new(LocalId::new(0), Ty::mk_unit()),
@@ -1247,6 +1247,80 @@ impl<'a> VtableMetadataComputer<'a> {
             },
             None => raise_error!(self.ctx, self.span, "Uninitialized drop field ty!"),
         }
+    }
+
+    /// Create the generic arguments to be used when calling the drop function for a specific concrete type
+    /// This extracts the proper generics needed for the drop function being called
+    fn create_drop_function_generics_for_concrete_type(&self, concrete_ty: &Ty) -> Result<GenericArgs, Error> {
+        // Analyze the concrete type to determine what generics the drop function needs
+        match concrete_ty.kind() {
+            TyKind::Adt(type_decl_ref) if matches!(type_decl_ref.id, TypeId::Builtin(BuiltinTy::Box)) => {
+                // For Box<T, A>, we need to provide T and A as type parameters
+                // Box is represented as Box<T>[MetaSized<T>, Sized<A>] where:
+                // - T is the element type (in types[0])  
+                // - A is the allocator type (which is typically Global)
+                
+                if type_decl_ref.generics.types.elem_count() >= 1 {
+                    let element_ty = &type_decl_ref.generics.types[0];
+                    
+                    // Look up the Global allocator type in the translated crate
+                    let global_ty = self.find_global_type().unwrap_or_else(|| {
+                        // Fallback: create a placeholder type
+                        TyKind::Literal(LiteralTy::Bool).into_ty()
+                    });
+                    
+                    // Extract the trait clauses from the Box type itself
+                    // The Box type is represented as Box<T>[MetaSized<T>, Sized<A>]
+                    // so we can reuse these trait clauses for the drop function call
+                    let extracted_trait_refs = if type_decl_ref.generics.trait_refs.elem_count() >= 2 {
+                        Vector::from_iter(vec![
+                            type_decl_ref.generics.trait_refs[0].clone(), // MetaSized<T>
+                            type_decl_ref.generics.trait_refs[1].clone(), // Sized<A>
+                        ])
+                    } else {
+                        Vector::new()
+                    };
+                    
+                    Ok(GenericArgs {
+                        regions: Vector::from_iter(vec![Region::Erased]), // &mut self lifetime
+                        types: Vector::from_iter(vec![element_ty.clone(), global_ty]), // T, A
+                        const_generics: Vector::new(),
+                        trait_refs: extracted_trait_refs, // Use the trait clauses from the Box type
+                    })
+                } else {
+                    Ok(GenericArgs {
+                        regions: Vector::from_iter(vec![Region::Erased]),
+                        types: Vector::new(),
+                        const_generics: Vector::new(),
+                        trait_refs: Vector::new(),
+                    })
+                }
+            }
+            _ => {
+                // For other types (like String, i32, etc.), just provide the lifetime
+                Ok(GenericArgs {
+                    regions: Vector::from_iter(vec![Region::Erased]),
+                    types: Vector::new(),
+                    const_generics: Vector::new(), 
+                    trait_refs: Vector::new(),
+                })
+            }
+        }
+    }
+    
+    /// Try to find the Global allocator type in the translated crate
+    fn find_global_type(&self) -> Option<Ty> {
+        // Look for Global in the type declarations
+        for type_decl in self.ctx.translated.type_decls.iter() {
+            let name_str = format!("{}", type_decl.item_meta.name.with_ctx(&self.ctx.into_fmt()));
+            if name_str.contains("Global") {
+                return Some(TyKind::Adt(TypeDeclRef {
+                    id: TypeId::Adt(type_decl.def_id),
+                    generics: Box::new(GenericArgs::empty()),
+                }).into_ty());
+            }
+        }
+        None
     }
 
     /// Create the generic arguments to be used when calling the drop function
