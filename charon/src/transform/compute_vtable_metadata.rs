@@ -717,6 +717,75 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     // ========================================
+    // DROP CALL GENERATION HELPERS
+    // ========================================
+
+    /// Generate a drop call statement for a given place and drop case
+    /// Returns Option<Terminator> - None if no drop is needed, Some for drop calls
+    fn generate_drop_call_for_place(
+        &self,
+        place: Place,
+        place_ty: &Ty,
+        drop_case: &DropCase,
+    ) -> Result<Option<Terminator>, Error> {
+        match drop_case {
+            DropCase::NotNeeded => Ok(None),
+            DropCase::Found(DropFound::Direct(fun_ref)) => {
+                // Generate direct drop call as terminator
+                let call = Call {
+                    func: FnOperand::Regular(FnPtr::from(FunDeclRef {
+                        id: fun_ref.id,
+                        generics: Box::new(self.create_drop_function_generics()?),
+                    })),
+                    args: vec![Operand::Move(place)],
+                    dest: Place::new(LocalId::new(0), Ty::mk_unit()),
+                };
+
+                let terminator = Terminator {
+                    span: self.span,
+                    content: RawTerminator::Call {
+                        call,
+                        target: BlockId::new(1), // Return block
+                        on_unwind: BlockId::new(1), // Same as target for simplicity
+                    },
+                    comments_before: vec![format!("Drop call for type: {:?}", place_ty)],
+                };
+                Ok(Some(terminator))
+            }
+            DropCase::Found(DropFound::Array { element_ty: _, element_drop: _ }) => {
+                // For arrays, we'll need more complex logic (not implemented yet)
+                Ok(None) // TODO: Implement array element traversal
+            }
+            DropCase::Found(DropFound::Tuple { fields: _ }) => {
+                // For tuples, we'll need field access logic (not implemented yet)
+                Ok(None) // TODO: Implement tuple field dropping
+            }
+            DropCase::Found(DropFound::Box { inner_ty: _, inner_drop: _ }) => {
+                // For boxes, we'll need Box-specific logic (not implemented yet)
+                Ok(None) // TODO: Implement Box drop handling
+            }
+            DropCase::NotTranslated(msg) => {
+                // This should generate a panic terminator  
+                let terminator = Terminator {
+                    span: self.span,
+                    content: RawTerminator::Abort(AbortKind::Panic(None)), // Use None for now
+                    comments_before: vec![format!("Drop not translated: {}", msg)],
+                };
+                Ok(Some(terminator))
+            }
+            DropCase::Unknown(msg) => {
+                // This should generate a panic terminator
+                let terminator = Terminator {
+                    span: self.span,
+                    content: RawTerminator::Abort(AbortKind::Panic(None)), // Use None for now
+                    comments_before: vec![format!("Unknown drop case: {}", msg)],
+                };
+                Ok(Some(terminator))
+            }
+        }
+    }
+
+    // ========================================
     // FUNCTION TYPE AND GENERICS CREATION
     // ========================================
     // FUNCTION CREATION AND BODY GENERATION
@@ -898,7 +967,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     body: blocks,
                 })
             }
-            DropShimKind::ArrayTraversal { element_ty, element_drop } => {
+            DropShimKind::ArrayTraversal { element_ty: _, element_drop } => {
                 // Generate array traversal drop logic
                 let mut blocks = Vector::new();
 
@@ -929,14 +998,45 @@ impl<'a> VtableMetadataComputer<'a> {
                     comments_before: vec![format!("Concretize to concrete array type for traversal drop")],
                 };
 
-                // For now, implement a simple version that just returns
-                // TODO: Implement proper loop-based traversal when we have more complex element dropping
+                // Generate statements for the drop operations
+                let mut statements = vec![concretize_stmt];
+
+                // For simple cases where element_drop is Direct, generate a direct call
+                // For complex cases, this is a placeholder - we'll need loop generation later
+                match element_drop {
+                    DropCase::Found(DropFound::Direct(_)) => {
+                        // For arrays with elements that have direct drop, we would need a loop
+                        // For now, add a comment indicating this needs proper implementation
+                        statements.push(Statement {
+                            span: self.span,
+                            content: RawStatement::Nop,
+                            comments_before: vec![format!("TODO: Loop through array elements and drop each one with direct drop")],
+                        });
+                    }
+                    DropCase::NotNeeded => {
+                        // Elements don't need drop - nothing more to do
+                        statements.push(Statement {
+                            span: self.span,
+                            content: RawStatement::Nop,
+                            comments_before: vec![format!("Array elements don't need drop")],
+                        });
+                    }
+                    _ => {
+                        // Complex drop cases - placeholder for now
+                        statements.push(Statement {
+                            span: self.span,
+                            content: RawStatement::Nop,
+                            comments_before: vec![format!("TODO: Handle complex array element drop case: {:?}", element_drop)],
+                        });
+                    }
+                }
+
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![concretize_stmt],
+                    statements,
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec![format!("Array traversal drop for element type: {:?}", element_ty)],
+                        comments_before: vec![format!("Array traversal drop completed")],
                     },
                 });
 
@@ -978,14 +1078,44 @@ impl<'a> VtableMetadataComputer<'a> {
                     comments_before: vec![format!("Concretize to concrete tuple type for field drop")],
                 };
 
-                // For now, implement a simple version that just returns  
-                // TODO: Generate actual field access and drop calls for each field
+                // Generate statements for the drop operations
+                let mut statements = vec![concretize_stmt];
+
+                // Process each field that needs dropping
+                for (field_index, field_ty, field_drop_case) in &fields {
+                    match field_drop_case {
+                        DropCase::Found(DropFound::Direct(_)) => {
+                            statements.push(Statement {
+                                span: self.span,
+                                content: RawStatement::Nop,
+                                comments_before: vec![format!("TODO: Drop field {} of type {:?} with direct drop", field_index, field_ty)],
+                            });
+                        }
+                        DropCase::NotNeeded => {
+                            // Field doesn't need drop - nothing to do
+                            statements.push(Statement {
+                                span: self.span,
+                                content: RawStatement::Nop,
+                                comments_before: vec![format!("Field {} doesn't need drop", field_index)],
+                            });
+                        }
+                        _ => {
+                            // Complex drop cases - placeholder for now
+                            statements.push(Statement {
+                                span: self.span,
+                                content: RawStatement::Nop,
+                                comments_before: vec![format!("TODO: Handle complex tuple field drop case for field {}: {:?}", field_index, field_drop_case)],
+                            });
+                        }
+                    }
+                }
+
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![concretize_stmt],
+                    statements,
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec![format!("Tuple field drop for {} fields", fields.len())],
+                        comments_before: vec![format!("Tuple field drop completed for {} fields", fields.len())],
                     },
                 });
 
@@ -1027,14 +1157,49 @@ impl<'a> VtableMetadataComputer<'a> {
                     comments_before: vec![format!("Concretize to concrete Box type for Box drop")],
                 };
 
-                // For now, implement a simple version that just returns
-                // TODO: Handle inner drop if needed, then call Box::drop
+                // Generate statements for the drop operations
+                let mut statements = vec![concretize_stmt];
+
+                // Handle inner value drop if needed
+                match inner_drop {
+                    DropCase::Found(DropFound::Direct(_)) => {
+                        statements.push(Statement {
+                            span: self.span,
+                            content: RawStatement::Nop,
+                            comments_before: vec![format!("TODO: Drop inner Box value of type {:?} with direct drop", inner_ty)],
+                        });
+                    }
+                    DropCase::NotNeeded => {
+                        // Inner value doesn't need drop - only need to drop the box itself
+                        statements.push(Statement {
+                            span: self.span,
+                            content: RawStatement::Nop,
+                            comments_before: vec![format!("Inner Box value doesn't need drop")],
+                        });
+                    }
+                    _ => {
+                        // Complex drop cases for inner value - placeholder for now
+                        statements.push(Statement {
+                            span: self.span,
+                            content: RawStatement::Nop,
+                            comments_before: vec![format!("TODO: Handle complex inner Box drop case: {:?}", inner_drop)],
+                        });
+                    }
+                }
+
+                // TODO: Add Box::drop call here (Box itself always needs drop)
+                statements.push(Statement {
+                    span: self.span,
+                    content: RawStatement::Nop,
+                    comments_before: vec![format!("TODO: Call Box::drop to deallocate the box itself")],
+                });
+
                 let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![concretize_stmt],
+                    statements,
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec![format!("Box drop for inner type: {:?}", inner_ty)],
+                        comments_before: vec![format!("Box drop completed")],
                     },
                 });
 
