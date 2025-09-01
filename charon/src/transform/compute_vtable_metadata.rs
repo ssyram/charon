@@ -1097,7 +1097,6 @@ impl<'a> VtableMetadataComputer<'a> {
             });
         } else {
             // Create blocks for each field that needs dropping
-            let mut block_id = BlockId::new(0);
 
             // First block: concretize and start field dropping chain
             let next_block = if fields_needing_drop.is_empty() {
@@ -1110,7 +1109,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 statements: vec![concretize_stmt],
                 terminator: Terminator::goto(self.span, next_block),
             });
-            block_id = next_block;
+            
+            let mut block_id = next_block;
 
             // Create drop blocks for each field that needs dropping
             for (i, (field_idx, (field_ty, drop_case))) in fields_needing_drop.iter().enumerate() {

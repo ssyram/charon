@@ -83,6 +83,31 @@ fn use_alias(x: &dyn Alias) {
     x.both_operate(&100, &200);
 }
 
+// Test cases for tuple and array drop shim generation  
+trait DropTuple {
+    fn process_tuple(&self, t: (String, Vec<i32>)) -> usize;
+}
+impl DropTuple for i32 {
+    fn process_tuple(&self, t: (String, Vec<i32>)) -> usize {
+        t.0.len() + t.1.len()
+    }
+}
+fn use_drop_tuple(x: &dyn DropTuple) -> usize {
+    x.process_tuple(("hello".to_string(), vec![1, 2, 3]))
+}
+
+trait DropArray {
+    fn process_array(&self, arr: [String; 3]) -> usize;
+}
+impl DropArray for i32 {
+    fn process_array(&self, arr: [String; 3]) -> usize {
+        arr.iter().map(|s| s.len()).sum()
+    }
+}
+fn use_drop_array(x: &dyn DropArray) -> usize {
+    x.process_array(["a".to_string(), "bb".to_string(), "ccc".to_string()])
+}
+
 fn main() {
     let x: &dyn Checkable<i32> = &42;
     assert!(x.check());
@@ -93,4 +118,11 @@ fn main() {
     z.dummy();
     let a: &dyn Both32And64 = &42;
     a.both_operate(&100, &200);
+    
+    // Test tuple and array drop shim generation through trait objects
+    let tuple_handler: &dyn DropTuple = &42;
+    assert_eq!(tuple_handler.process_tuple(("test".to_string(), vec![1, 2])), 6);
+    
+    let array_handler: &dyn DropArray = &42;
+    assert_eq!(array_handler.process_array(["x".to_string(), "yy".to_string(), "zzz".to_string()]), 6);
 }
