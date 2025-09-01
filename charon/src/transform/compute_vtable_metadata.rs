@@ -83,6 +83,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
         // Get the concrete type from the impl
         let concrete_ty = self.get_concrete_type_from_impl()?;
+        println!("PROCESSING VTABLE FOR CONCRETE TYPE: {:?}", concrete_ty);
 
         // Update both size & align field with the info of the concrete type
         self.compute_layout(fields, &concrete_ty)?;
@@ -687,7 +688,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut blocks = Vector::new();
 
         // Create the concrete type (mutable reference to the concrete type)
-        let concrete_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))), concrete_ty.clone(), RefKind::Mut).into_ty();
+        let concrete_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::free(RegionId::new(0))), concrete_ty.clone(), RefKind::Mut).into_ty();
 
         let concrete_local = Local {
             index: LocalId::new(2),
@@ -809,7 +810,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut blocks = Vector::new();
 
         // Create a concretize cast from dyn trait to concrete array type
-        let concrete_array_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))), concrete_ty.clone(), RefKind::Mut).into_ty();
+        let concrete_array_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::free(RegionId::new(0))), concrete_ty.clone(), RefKind::Mut).into_ty();
 
         // Add local for the concretized array
         let concrete_local = Local {
@@ -940,7 +941,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 2: Loop body - drop current element
-                let element_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))), element_ty.clone(), RefKind::Mut).into_ty();
+                let element_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::free(RegionId::new(0))), element_ty.clone(), RefKind::Mut).into_ty();
                 
                 let element_local = Local {
                     index: LocalId::new(5), // ret=0, self=1, concrete=2, counter=3, counter_check=4, element=5
@@ -1074,7 +1075,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut blocks = Vector::new();
 
         // Create a concretize cast from dyn trait to concrete tuple type
-        let concrete_tuple_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))), concrete_ty.clone(), RefKind::Mut).into_ty();
+        let concrete_tuple_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::free(RegionId::new(0))), concrete_ty.clone(), RefKind::Mut).into_ty();
 
         // Add local for the concretized tuple
         let concrete_local = Local {
@@ -1151,7 +1152,7 @@ impl<'a> VtableMetadataComputer<'a> {
                             FieldId::new(*field_idx),
                         );
                         
-                        let field_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))), field_ty.clone(), RefKind::Mut).into_ty();
+                        let field_ref_ty = TyKind::Ref(Region::Var(DeBruijnVar::free(RegionId::new(0))), field_ty.clone(), RefKind::Mut).into_ty();
                         
                         // Add local for field reference
                         let field_local = Local {
@@ -1276,19 +1277,49 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Additionally, we should add the lifetime as the first region argument for the `&mut self` receiver.
     /// Special handling for built-in Box: ignore allocator parameter A when Box is built-in.
     fn create_drop_function_generics(&self, concrete_ty: &Ty) -> Result<Box<GenericArgs>, Error> {
+        println!("DEBUG: create_drop_function_generics called with: {:?}", concrete_ty);
         let mut generics = match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
+                println!("DEBUG: Processing ADT: {:?}", type_decl_ref.id);
                 // Check if this is a Box type (either built-in or ADT)
                 if self.is_box_type(type_decl_ref) {
+                    println!("DEBUG: Detected Box type!");
                     if self.is_builtin_box(type_decl_ref) {
-                        // For built-in Box, only use the first type parameter T, ignore allocator A
+                        println!("DEBUG: Using builtin Box handling");
+                        // For built-in Box, we need both T and A parameters but the trait clauses
+                        // According to @ssyram: "built-in version of Box has no clause constraints"
+                        // But the error shows the drop function still expects trait clauses
+                        // So we include them but they should be simpler for builtin
                         let mut box_generics = GenericArgs::empty();
+                        
+                        // Add element type T (first type parameter)
                         if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
                             box_generics.types.push_with(|_| element_ty.clone());
+                            println!("DEBUG: Added element type T: {:?}", element_ty);
                         }
-                        // No trait clauses for built-in Box
+                        
+                        // Extract Global allocator from trait clauses for builtin Box too
+                        for trait_ref in &type_decl_ref.generics.trait_refs {
+                            let trait_decl_ref_inner = &trait_ref.trait_decl_ref.skip_binder;
+                            if let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_decl_ref_inner.id) {
+                                if trait_decl.item_meta.lang_item.as_deref() == Some("sized") {
+                                    // This is Sized<A> - the A parameter is the allocator type
+                                    if let Some(allocator_ty) = trait_decl_ref_inner.generics.types.get(TypeVarId::new(0)) {
+                                        box_generics.types.push_with(|_| allocator_ty.clone());
+                                        println!("DEBUG: Added allocator type A: {:?}", allocator_ty);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Include trait clauses for builtin Box since drop function expects them
+                        box_generics.trait_refs = type_decl_ref.generics.trait_refs.clone();
+                        println!("DEBUG: Added {} trait clauses for builtin Box", box_generics.trait_refs.elem_count());
+                        
                         Box::new(box_generics)
                     } else {
+                        println!("DEBUG: Using ADT Box handling");
                         // For ADT Box, we need both T and A parameters plus trait clauses
                         // The concrete type Box<i64>[MetaSized<i64>, Sized<Global>] needs [i64, Global] + trait clauses
                         let mut box_generics = GenericArgs::empty();
@@ -1319,6 +1350,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         Box::new(box_generics)
                     }
                 } else {
+                    println!("DEBUG: Not a Box type, using full generics");
                     // For non-Box types, use all generics normally
                     type_decl_ref.generics.clone()
                 }
@@ -1327,8 +1359,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 raise_error!(self.ctx, self.span, "Expected ADT type as concrete type for drop function generics, found: {:?}", concrete_ty);
             }
         };
-        // Add proper region binder instead of Erased
-        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))));
+        // Add proper region binder - use Erased for simplicity to avoid binding issues
+        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Erased);
         Ok(generics)
     }
 
@@ -1338,9 +1370,11 @@ impl<'a> VtableMetadataComputer<'a> {
         // The drop shim function reference should use the same generic arguments as the impl_ref
         // plus one region for the receiver lifetime
         let mut generics = *self.impl_ref.generics.clone();
+        println!("DEBUG: create_drop_shim_function_generics - impl_ref.generics: {:?}", self.impl_ref.generics);
+        println!("DEBUG: impl_ref trait_refs count: {}", generics.trait_refs.elem_count());
         
         // Add one region parameter for the receiver lifetime
-        generics.regions.push_with(|_| Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))));
+        generics.regions.push_with(|_| Region::Erased);
         
         Ok(generics)
     }
