@@ -504,14 +504,9 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut fields = Vec::new();
         
         // Analyze each field in the tuple
-        for (field_index, field_ty) in tuple_generics.iter().enumerate() {
+        for field_ty in tuple_generics.iter() {
             let field_drop_case = self.analyze_drop_case(field_ty)?;
-            
-            // Only include fields that need dropping
-            match field_drop_case {
-                DropCase::Empty => continue, // Skip fields that don't need drop
-                _ => fields.push((field_index, field_ty.clone(), field_drop_case)),
-            }
+            fields.push((field_ty.clone(), field_drop_case))
         }
 
         if fields.is_empty() {
@@ -841,7 +836,7 @@ impl<'a> VtableMetadataComputer<'a> {
         locals: &mut Locals,
         dyn_trait_param_ty: &Ty,
         concrete_ty: &Ty,
-        fields: &[(usize, Ty, DropCase)],
+        fields: &[(Ty, DropCase)],
     ) -> Result<Body, Error> {
         let mut blocks = Vector::new();
 
@@ -956,7 +951,7 @@ enum DropCase {
     },
     /// Case 6: Tuple field-by-field drop (drop each field that needs it)
     Tuple {
-        fields: Vec<(usize, Ty, DropCase)>, // (field_index, field_type, field_drop_case)
+        fields: Vec<(Ty, DropCase)>, // (field_index, field_type, field_drop_case)
     },
 }
 
