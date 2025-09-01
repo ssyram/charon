@@ -1281,14 +1281,9 @@ impl<'a> VtableMetadataComputer<'a> {
     fn create_drop_function_generics(&self, concrete_ty: &Ty) -> Result<Box<GenericArgs>, Error> {
         let mut generics = match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
-                // Debug: print the concrete type to understand what we're working with
-                trace!("Creating drop function generics for type: {:?}", concrete_ty);
-                trace!("Type decl ref id: {:?}", type_decl_ref.id);
-                
                 // Check if this is a Box type (either built-in or ADT)
                 if self.is_box_type(type_decl_ref) {
                     if self.is_builtin_box(type_decl_ref) {
-                        trace!("Detected built-in Box, using simplified generics");
                         // For built-in Box, only use the first type parameter T, ignore allocator A
                         let mut box_generics = GenericArgs::empty();
                         if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
@@ -1297,14 +1292,52 @@ impl<'a> VtableMetadataComputer<'a> {
                         // No trait clauses for built-in Box
                         Box::new(box_generics)
                     } else {
-                        trace!("Detected ADT Box, need to extract element type and allocator");
-                        // For ADT Box, we need to provide both T and A parameters
-                        // The concrete type is like: alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]
-                        // We need to extract the element type (i64) and the allocator (Global)
-                        self.create_adt_box_generics(type_decl_ref)?
+                        // For ADT Box, manually construct the generics with both T and A
+                        let mut box_generics = GenericArgs::empty();
+                        
+                        // Add element type T
+                        if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
+                            box_generics.types.push_with(|_| element_ty.clone());
+                        }
+                        
+                        // Add Global allocator type A
+                        // Find the Global type by looking for lang_item "global_alloc_ty"
+                        let mut found_global = false;
+                        for (type_id, type_decl) in self.ctx.translated.type_decls.iter() {
+                            if type_decl.item_meta.lang_item.as_deref() == Some("global_alloc_ty") {
+                                // Found Global - create the type reference
+                                let global_ty = TyKind::Adt(TypeDeclRef {
+                                    id: TypeId::Adt(type_id),
+                                    generics: Box::new(GenericArgs::empty()),
+                                }).into_ty();
+                                box_generics.types.push_with(|_| global_ty);
+                                found_global = true;
+                                break;
+                            }
+                        }
+                        
+                        if !found_global {
+                            // Fallback: extract from trait clauses if Global not found
+                            for trait_ref in &type_decl_ref.generics.trait_refs {
+                                let trait_decl_ref_inner = &trait_ref.trait_decl_ref.skip_binder;
+                                if let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_decl_ref_inner.id) {
+                                    if trait_decl.item_meta.lang_item.as_deref() == Some("sized") {
+                                        if let Some(allocator_ty) = trait_decl_ref_inner.generics.types.get(TypeVarId::new(0)) {
+                                            box_generics.types.push_with(|_| allocator_ty.clone());
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Add the trait clauses 
+                        box_generics.trait_refs = type_decl_ref.generics.trait_refs.clone();
+                        
+                        Box::new(box_generics)
                     }
                 } else {
-                    trace!("Using full generics for non-Box type");
+                    eprintln!("DEBUG: Not a Box type, using full generics");
                     // For non-Box types, use all generics normally
                     type_decl_ref.generics.clone()
                 }
@@ -1316,98 +1349,6 @@ impl<'a> VtableMetadataComputer<'a> {
         // Add proper region binder instead of Erased
         generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0))));
         Ok(generics)
-    }
-
-    /// Create generics for ADT Box<T, A> by extracting both the element type and allocator
-    /// From concrete type like: alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]
-    fn create_adt_box_generics(&self, type_decl_ref: &TypeDeclRef) -> Result<Box<GenericArgs>, Error> {
-        let mut box_generics = GenericArgs::empty();
-        
-        // Extract element type T (first type parameter)  
-        if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
-            box_generics.types.push_with(|_| element_ty.clone());
-            trace!("Added element type to Box generics: {:?}", element_ty);
-        }
-        
-        // For Box<T, A>, we need to manually create the Global allocator type
-        // Based on the output, Global appears to be the second parameter
-        // Let's look for it in the trait refs or create it
-        let mut found_allocator = false;
-        
-        // Look for Global type in trait clauses
-        for trait_ref in &type_decl_ref.generics.trait_refs {
-            if let TraitRefKind::TraitImpl(impl_ref) = &trait_ref.kind {
-                // Check if this trait ref has Global in its generics
-                for ty in &impl_ref.generics.types {
-                    if let TyKind::Adt(adt_ref) = ty.kind() {
-                        if let TypeId::Adt(adt_id) = &adt_ref.id {
-                            if let Some(adt_decl) = self.ctx.translated.type_decls.get(*adt_id) {
-                                if adt_decl.item_meta.name.name.iter().any(|elem| match elem {
-                                    PathElem::Ident(name, _) => name == "Global",
-                                    _ => false,
-                                }) {
-                                    box_generics.types.push_with(|_| ty.clone());
-                                    trace!("Added Global allocator type to Box generics: {:?}", ty);
-                                    found_allocator = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if found_allocator { break; }
-            }
-        }
-        
-        // Add the required trait clauses for ADT Box
-        box_generics.trait_refs = type_decl_ref.generics.trait_refs.clone();
-        
-        Ok(Box::new(box_generics))
-    }
-
-    /// Check if a type declaration reference represents a Box type (either built-in or ADT)
-    fn is_box_type(&self, type_decl_ref: &TypeDeclRef) -> bool {
-        match &type_decl_ref.id {
-            TypeId::Builtin(BuiltinTy::Box) => true,
-            TypeId::Adt(adt_id) => {
-                // Check if this ADT represents a Box type by checking lang_item or name
-                if let Some(type_decl) = self.ctx.translated.type_decls.get(*adt_id) {
-                    type_decl.item_meta.lang_item.as_deref() == Some("owned_box") ||
-                    type_decl.item_meta.name.name.iter().any(|elem| match elem {
-                        PathElem::Ident(name, _) => name == "Box",
-                        _ => false,
-                    })
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
-    }
-
-    /// Check if a type declaration reference represents a built-in Box
-    fn is_builtin_box(&self, type_decl_ref: &TypeDeclRef) -> bool {
-        trace!("Checking if builtin box for type decl ref id: {:?}, raw_boxes: {}", type_decl_ref.id, self.ctx.translated.options.raw_boxes);
-        match &type_decl_ref.id {
-            TypeId::Builtin(BuiltinTy::Box) => {
-                let is_builtin = !self.ctx.translated.options.raw_boxes;
-                trace!("Box builtin check result: {}", is_builtin);
-                is_builtin
-            }
-            TypeId::Adt(adt_id) => {
-                // Check if this ADT represents a Box type by checking lang_item
-                if let Some(type_decl) = self.ctx.translated.type_decls.get(*adt_id) {
-                    let is_box_lang_item = type_decl.item_meta.lang_item.as_deref() == Some("owned_box");
-                    let is_builtin = is_box_lang_item && !self.ctx.translated.options.raw_boxes;
-                    trace!("ADT Box check: lang_item={:?}, raw_boxes={}, is_builtin={}", 
-                          type_decl.item_meta.lang_item, self.ctx.translated.options.raw_boxes, is_builtin);
-                    is_builtin
-                } else {
-                    false
-                }
-            }
-            _ => false,
-        }
     }
 
     /// Create the generic arguments for referencing the drop shim function itself
