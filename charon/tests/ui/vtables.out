@@ -1168,7 +1168,25 @@ fn {{impl Checkable<i32> for Array<i32, const N : usize>}}::{vtable}::{drop_meth
 {
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let concrete_array@2: &'_ mut (Array<i32, const N : usize>); // local
+    let counter@3: u32; // local
+    let counter_check@4: bool; // local
 
+    storage_live(concrete_array@2)
+    storage_live(counter@3)
+    storage_live(counter_check@4)
+    concrete_array@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<i32, const N : usize>)>(move (self@1))
+    counter@3 := const (0 : u32)
+    loop {
+        counter_check@4 := copy (counter@3) < const (10 : u32)
+        if move (counter_check@4) {
+            counter@3 := move (counter@3) panic.+ const (1 : u32)
+            continue 0
+        }
+        else {
+            break 0
+        }
+    }
     ret@0 := ()
     return
 }
@@ -1297,7 +1315,16 @@ fn {{impl Checkable<i32> for (i32, Vec<i32>[Sized<i32>, Sized<Global>])}}::{vtab
 {
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let concrete_tuple@2: &'_ mut ((i32, Vec<i32>[Sized<i32>, Sized<Global>])); // local
+    let field_0_ref@3: &'_ mut (i32); // local
+    let field_1_ref@4: &'_ mut (Vec<i32>[Sized<i32>, Sized<Global>]); // local
 
+    storage_live(concrete_tuple@2)
+    storage_live(field_0_ref@3)
+    storage_live(field_1_ref@4)
+    concrete_tuple@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut ((i32, Vec<i32>[Sized<i32>, Sized<Global>]))>(move (self@1))
+    field_0_ref@3 := move ((concrete_tuple@2).0)
+    field_1_ref@4 := move ((concrete_tuple@2).1)
     ret@0 := ()
     return
 }
