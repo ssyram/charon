@@ -196,7 +196,7 @@ impl Clone for String {
 // Full name: alloc::string::{impl Display for String}::fmt
 pub fn {impl Display for String}::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter<'_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>]
 
-fn {vtable_drop_shim_call_23_adt_Adt(2)}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)))
+fn {{impl Display for String}}::{vtable}::{drop_method}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)))
 {
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)); // arg #1
@@ -231,7 +231,7 @@ fn {impl Display for String}::{vtable}() -> core::fmt::Display::{vtable}
 {
     let ret@0: core::fmt::Display::{vtable}; // return
 
-    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const (@Fun24), method_fmt: const ({vtable_method}<'_, '_, '_>) }
+    ret@0 := core::fmt::Display::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const ({{impl Display for String}}::{vtable}::{drop_method}), method_fmt: const ({vtable_method}<'_, '_, '_>) }
     return
 }
 

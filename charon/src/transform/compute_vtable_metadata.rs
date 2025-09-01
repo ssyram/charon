@@ -209,36 +209,12 @@ impl<'a> VtableMetadataComputer<'a> {
         // Analyze what kind of drop functionality this type has
         let drop_case = self.analyze_drop_case(concrete_ty)?;
 
-        match &drop_case {
-            DropCase::Direct(fun_ref) => {
-                // Case 1: Direct drop function found - call it
-                self.create_drop_shim(fun_ref, concrete_ty, &drop_case)
-            }
-            DropCase::Empty => {
-                // Case 2: No drop function needed - generate empty shim
-                self.create_drop_shim_empty(concrete_ty, &drop_case)
-            }
-            DropCase::Panic(msg) => {
-                // Case 3: Drop function not translated - generate panic shim + register error
-                register_error!(
-                    self.ctx,
-                    self.span,
-                    "Drop function for type {} not found or not translated: {}",
-                    self.type_to_string(concrete_ty),
-                    msg
-                );
-                self.create_drop_shim_empty(concrete_ty, &drop_case)
-            }
-            DropCase::Unknown(msg) => Ok(Operand::opaque(msg.clone(), self.get_drop_field_ty()?.clone())),
-            DropCase::Array { element_ty: _, element_drop: _ } => {
-                // Case 5: Array traversal drop
-                self.create_drop_shim_empty(concrete_ty, &drop_case)
-            }
-            DropCase::Tuple { fields: _ } => {
-                // Case 6: Tuple field drop
-                self.create_drop_shim_empty(concrete_ty, &drop_case)
-            }
-        }
+        trace!(
+            "[DropShim] Generating drop shim for type: {}",
+            concrete_ty.with_ctx(&self.ctx.into_fmt())
+        );
+
+        self.create_drop_shim(concrete_ty, &drop_case)
     }
 
     fn get_drop_field_ty(&self) -> Result<&Ty, Error> {
@@ -248,82 +224,24 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Create drop shim function for the given case
-    fn create_drop_shim(&mut self, fun_ref: &FunDeclRef, concrete_ty: &Ty, drop_case: &DropCase) -> Result<Operand, Error> {
-        let shim_name = match drop_case {
-            DropCase::Direct(_) => format!(
-                "{{vtable_drop_shim_call_{}_{}}}",
-                fun_ref.id.index(),
-                self.type_to_string(concrete_ty)
-            ),
-            _ => format!(
-                "{{vtable_drop_shim_{}}}",
-                self.type_to_string(concrete_ty)
-            )
-        };
+    /// Create a drop shim function for the given case
+    fn create_drop_shim(
+        &mut self,
+        concrete_ty: &Ty,
+        drop_case: &DropCase,
+    ) -> Result<Operand, Error> {
+        // shortcut return for Unknown as opaque
+        match drop_case {
+            DropCase::Unknown(reason) => {
+                return Ok(Operand::opaque(
+                    format!("Unknown drop case: {}", reason),
+                    self.get_drop_field_ty()?.clone(),
+                ));
+            }
+            _ => {}
+        }
 
-        // Create the drop shim function
-        let shim_id = self.create_drop_shim_function(
-            &shim_name,
-            fun_ref.clone(),
-            drop_case,
-            concrete_ty,
-        )?;
-
-        // Create function reference as operand
-        let dyn_trait_param_ty = self.get_drop_receiver()?;
-        let fn_sig = RegionBinder::empty((vec![dyn_trait_param_ty], Ty::mk_unit()));
-        let drop_fn_type = TyKind::FnPtr(fn_sig).into_ty();
-
-        let shim_const = ConstantExpr {
-            value: RawConstantExpr::FnPtr(FnPtr::from(FunDeclRef {
-                id: shim_id,
-                generics: Box::new(self.create_drop_shim_function_generics()?),
-            })),
-            ty: drop_fn_type,
-        };
-        Ok(Operand::Const(Box::new(shim_const)))
-    }
-
-    /// Create an empty drop shim for types that don't need drop or for complex cases
-    fn create_drop_shim_empty(&mut self, concrete_ty: &Ty, drop_case: &DropCase) -> Result<Operand, Error> {
-        let shim_name = match drop_case {
-            DropCase::Empty => format!(
-                "{{vtable_drop_shim_empty_{}}}",
-                self.type_to_string(concrete_ty)
-            ),
-            DropCase::Panic(msg) => format!(
-                "{{vtable_drop_shim_panic_{}_{}}}",
-                self.type_to_string(concrete_ty),
-                msg.chars().take(20).collect::<String>()
-            ),
-            DropCase::Array { element_ty, .. } => format!(
-                "{{vtable_drop_shim_array_{}_elem_{}}}",
-                self.type_to_string(concrete_ty),
-                self.type_to_string(element_ty)
-            ),
-            DropCase::Tuple { fields } => format!(
-                "{{vtable_drop_shim_tuple_{}_fields_{}}}",
-                self.type_to_string(concrete_ty),
-                fields.len()
-            ),
-            _ => format!(
-                "{{vtable_drop_shim_{}}}",
-                self.type_to_string(concrete_ty)
-            ),
-        };
-
-        // Create the drop shim function
-        let dummy_fn_ref = FunDeclRef {
-            id: FunDeclId::new(0), // Dummy ID that won't be used
-            generics: Box::new(GenericArgs::empty()),
-        };
-        let shim_id = self.create_drop_shim_function(
-            &shim_name,
-            dummy_fn_ref,
-            drop_case,
-            concrete_ty,
-        )?;
+        let shim_id = self.create_drop_shim_function(drop_case, concrete_ty)?;
 
         // Create function reference as operand
         let dyn_trait_param_ty = self.get_drop_receiver()?;
@@ -349,7 +267,7 @@ impl<'a> VtableMetadataComputer<'a> {
         // First check if the type needs drop at all
         match concrete_ty.needs_drop(&self.ctx.translated) {
             Ok(false) => return Ok(DropCase::Empty),
-            Ok(true) => {}  // Continue to check for drop implementation
+            Ok(true) => {} // Continue to check for drop implementation
             Err(reason) => return Ok(DropCase::Unknown(reason)),
         }
 
@@ -375,7 +293,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     TypeId::Builtin(builtin_ty) => {
                         match builtin_ty {
                             BuiltinTy::Box => {
-                                // For Box, simply look for Box's Drop implementation  
+                                // For Box, simply look for Box's Drop implementation
                                 if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
                                     Ok(DropCase::Direct(fun_ref))
                                 } else {
@@ -502,7 +420,7 @@ impl<'a> VtableMetadataComputer<'a> {
     fn analyze_tuple_drop(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
         let tuple_generics = &type_decl_ref.generics.types;
         let mut fields = Vec::new();
-        
+
         // Analyze each field in the tuple
         for field_ty in tuple_generics.iter() {
             let field_drop_case = self.analyze_drop_case(field_ty)?;
@@ -531,7 +449,9 @@ impl<'a> VtableMetadataComputer<'a> {
                 }),
             }
         } else {
-            Ok(DropCase::Unknown("Array type missing element type parameter".to_string()))
+            Ok(DropCase::Unknown(
+                "Array type missing element type parameter".to_string(),
+            ))
         }
     }
 
@@ -548,7 +468,9 @@ impl<'a> VtableMetadataComputer<'a> {
                 }),
             }
         } else {
-            Ok(DropCase::Unknown("Slice type missing element type parameter".to_string()))
+            Ok(DropCase::Unknown(
+                "Slice type missing element type parameter".to_string(),
+            ))
         }
     }
 
@@ -561,11 +483,13 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Different kinds of drop shims we need to generate
     fn create_drop_shim_function(
         &mut self,
-        name: &str,
-        _drop_fn_ref: FunDeclRef,
         drop_case: &DropCase,
         concrete_ty: &Ty,
     ) -> Result<FunDeclId, Error> {
+        let shim_name = format!(
+            "{{{}}}::{{vtable}}::{{drop_method}}",
+            self.impl_ref.id.with_ctx(&self.ctx.into_fmt())
+        );
         // Get the generics from the trait impl - drop shims should have the same generics
         let generics = self.get_trait_impl_generics()?;
 
@@ -602,44 +526,68 @@ impl<'a> VtableMetadataComputer<'a> {
         let _ = locals.locals.push_with(|_| ret_local);
         let _ = locals.locals.push_with(|_| self_local);
 
+        trace!(
+            "Generating drop shim for type: {}",
+            concrete_ty.with_ctx(&self.ctx.into_fmt())
+        );
+
         // Create function body based on the drop case
         let body = match drop_case {
             DropCase::Direct(fun_ref) => {
+                trace!("Generating direct drop shim call.");
                 // Generate a call to the drop function with Concretize cast
-                self.create_direct_drop_body(&mut locals, &dyn_trait_param_ty, concrete_ty, fun_ref)?
+                self.create_direct_drop_body(
+                    &mut locals,
+                    &dyn_trait_param_ty,
+                    concrete_ty,
+                    fun_ref,
+                )?
             }
             DropCase::Empty => {
+                trace!("Generating empty drop shim.");
                 // Generate an empty function that just returns
                 self.create_empty_drop_body(&locals)?
             }
             DropCase::Panic(msg) => {
+                trace!("Generating panic drop shim.");
                 // Generate a function that panics
                 self.create_panic_drop_body(&locals, msg)?
             }
-            DropCase::Array { element_ty, element_drop } => {
+            DropCase::Array {
+                element_ty,
+                element_drop,
+            } => {
+                trace!("Generating array drop shim.");
                 // Generate array traversal drop logic placeholder
-                self.create_array_drop_body(&mut locals, &dyn_trait_param_ty, concrete_ty, element_ty, element_drop)?
+                self.create_array_drop_body(
+                    &mut locals,
+                    &dyn_trait_param_ty,
+                    concrete_ty,
+                    element_ty,
+                    element_drop,
+                )?
             }
             DropCase::Tuple { fields } => {
+                trace!("Generating tuple drop shim.");
                 // Generate tuple field-by-field drop logic placeholder
                 self.create_tuple_drop_body(&mut locals, &dyn_trait_param_ty, concrete_ty, fields)?
             }
             DropCase::Unknown(_) => {
-                // Generate an empty function for unknown cases
-                self.create_empty_drop_body(&locals)?
+                unreachable!()
             }
         };
 
         // Create item meta
         let item_meta = ItemMeta {
             span: self.span,
-            name: Name::from_path(&[name]),
+            name: Name::from_path(&[&shim_name]),
             source_text: None,
             attr_info: AttrInfo::default(),
             is_local: true,
             opacity: ItemOpacity::Transparent, // Mark as transparent so the name shows up
             lang_item: None,
         };
+        let shim_name = item_meta.name.clone();
 
         // Create and add function declaration
         let shim_id = self.ctx.translated.fun_decls.push_with(|id| FunDecl {
@@ -650,6 +598,10 @@ impl<'a> VtableMetadataComputer<'a> {
             is_global_initializer: None,
             body: Ok(body),
         });
+        self.ctx
+            .translated
+            .item_names
+            .insert(AnyTransId::Fun(shim_id), shim_name);
 
         Ok(shim_id)
     }
@@ -665,7 +617,8 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut blocks = Vector::new();
 
         // Create the concrete type (mutable reference to the concrete type)
-        let concrete_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+        let concrete_ref_ty =
+            TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
 
         let concrete_local = Local {
             index: LocalId::new(2),
@@ -787,7 +740,8 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut blocks = Vector::new();
 
         // Create a concretize cast from dyn trait to concrete array type
-        let concrete_array_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+        let concrete_array_ref_ty =
+            TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
 
         // Add local for the concretized array
         let concrete_local = Local {
@@ -810,14 +764,23 @@ impl<'a> VtableMetadataComputer<'a> {
                     Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
                 ),
             ),
-            comments_before: vec![format!("Concretize to concrete array type - element type: {:?}", element_ty)],
+            comments_before: vec![format!(
+                "Concretize to concrete array type - element type: {:?}",
+                element_ty
+            )],
         };
 
         // Get array length from the concrete type (for [T; N], N is the const generic)
         let array_length = if let TyKind::Adt(type_decl_ref) = concrete_ty.kind() {
-            if let Some(const_val) = type_decl_ref.generics.const_generics.get(ConstGenericVarId::new(0)) {
+            if let Some(const_val) = type_decl_ref
+                .generics
+                .const_generics
+                .get(ConstGenericVarId::new(0))
+            {
                 // Extract the const value - for array length this should be a literal
-                if let ConstGeneric::Value(Literal::Scalar(ScalarValue::Unsigned(_, length))) = const_val {
+                if let ConstGeneric::Value(Literal::Scalar(ScalarValue::Unsigned(_, length))) =
+                    const_val
+                {
                     *length as u32
                 } else {
                     raise_error!(
@@ -828,10 +791,19 @@ impl<'a> VtableMetadataComputer<'a> {
                     )
                 }
             } else {
-                raise_error!(self.ctx, self.span, "Array type missing length const generic")
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Array type missing length const generic"
+                )
             }
         } else {
-            raise_error!(self.ctx, self.span, "Expected array type, found: {:?}", concrete_ty)
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Expected array type, found: {:?}",
+                concrete_ty
+            )
         };
 
         match element_drop {
@@ -862,9 +834,14 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter_init_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(counter_local_id, TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty()),
+                        Place::new(
+                            counter_local_id,
+                            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                        ),
                         Rvalue::Use(Operand::Const(Box::new(ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::U32, 0))),
+                            value: RawConstantExpr::Literal(Literal::Scalar(
+                                ScalarValue::Unsigned(UIntTy::U32, 0),
+                            )),
                             ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
                         }))),
                     ),
@@ -887,12 +864,20 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter_check_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(counter_check_local_id, TyKind::Literal(LiteralTy::Bool).into_ty()),
+                        Place::new(
+                            counter_check_local_id,
+                            TyKind::Literal(LiteralTy::Bool).into_ty(),
+                        ),
                         Rvalue::BinaryOp(
                             BinOp::Lt,
-                            Operand::Copy(Place::new(counter_local_id, TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty())),
+                            Operand::Copy(Place::new(
+                                counter_local_id,
+                                TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                            )),
                             Operand::Const(Box::new(ConstantExpr {
-                                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::U32, array_length as u128))),
+                                value: RawConstantExpr::Literal(Literal::Scalar(
+                                    ScalarValue::Unsigned(UIntTy::U32, array_length as u128),
+                                )),
                                 ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
                             })),
                         ),
@@ -910,7 +895,10 @@ impl<'a> VtableMetadataComputer<'a> {
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Switch {
-                            discr: Operand::Move(Place::new(counter_check_local_id, TyKind::Literal(LiteralTy::Bool).into_ty())),
+                            discr: Operand::Move(Place::new(
+                                counter_check_local_id,
+                                TyKind::Literal(LiteralTy::Bool).into_ty(),
+                            )),
                             targets: loop_switch,
                         },
                         comments_before: vec!["Branch based on loop condition".to_string()],
@@ -918,8 +906,9 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 2: Loop body - drop current element
-                let element_ref_ty = TyKind::Ref(Region::Erased, element_ty.clone(), RefKind::Mut).into_ty();
-                
+                let element_ref_ty =
+                    TyKind::Ref(Region::Erased, element_ty.clone(), RefKind::Mut).into_ty();
+
                 let element_local = Local {
                     index: LocalId::new(5), // ret=0, self=1, concrete=2, counter=3, counter_check=4, element=5
                     name: Some("element_ref".to_string()),
@@ -929,13 +918,16 @@ impl<'a> VtableMetadataComputer<'a> {
 
                 // Create array index projection
                 let index_projection = ProjectionElem::Index {
-                    offset: Box::new(Operand::Copy(Place::new(counter_local_id, TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty()))),
+                    offset: Box::new(Operand::Copy(Place::new(
+                        counter_local_id,
+                        TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                    ))),
                     from_end: false,
                 };
-                
+
                 let projected_place = Place::new(concrete_local_id, concrete_array_ref_ty.clone())
                     .project(index_projection, element_ref_ty.clone());
-                
+
                 let element_proj_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
@@ -972,12 +964,20 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter_increment_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
-                        Place::new(counter_local_id, TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty()),
+                        Place::new(
+                            counter_local_id,
+                            TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                        ),
                         Rvalue::BinaryOp(
                             BinOp::Add(OverflowMode::Panic),
-                            Operand::Move(Place::new(counter_local_id, TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty())),
+                            Operand::Move(Place::new(
+                                counter_local_id,
+                                TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                            )),
                             Operand::Const(Box::new(ConstantExpr {
-                                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(UIntTy::U32, 1))),
+                                value: RawConstantExpr::Literal(Literal::Scalar(
+                                    ScalarValue::Unsigned(UIntTy::U32, 1),
+                                )),
                                 ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
                             })),
                         ),
@@ -1006,9 +1006,14 @@ impl<'a> VtableMetadataComputer<'a> {
                     span: self.span,
                     content: RawStatement::Assign(
                         Place::new(LocalId::new(0), Ty::mk_unit()),
-                        Rvalue::Use(Operand::opaque(format!("panic: array element drop not translated: {}", msg), Ty::mk_unit())),
+                        Rvalue::Use(Operand::opaque(
+                            format!("panic: array element drop not translated: {}", msg),
+                            Ty::mk_unit(),
+                        )),
                     ),
-                    comments_before: vec!["Panic for array element drop not translated".to_string()],
+                    comments_before: vec![
+                        "Panic for array element drop not translated".to_string(),
+                    ],
                 };
 
                 let _ = blocks.push_with(|_| BlockData {
@@ -1027,7 +1032,9 @@ impl<'a> VtableMetadataComputer<'a> {
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
-                        comments_before: vec!["Array drop - unhandled element drop case".to_string()],
+                        comments_before: vec![
+                            "Array drop - unhandled element drop case".to_string(),
+                        ],
                     },
                 });
             }
@@ -1052,7 +1059,8 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut blocks = Vector::new();
 
         // Create a concretize cast from dyn trait to concrete tuple type
-        let concrete_tuple_ref_ty = TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
+        let concrete_tuple_ref_ty =
+            TyKind::Ref(Region::Erased, concrete_ty.clone(), RefKind::Mut).into_ty();
 
         // Add local for the concretized tuple
         let concrete_local = Local {
@@ -1075,7 +1083,10 @@ impl<'a> VtableMetadataComputer<'a> {
                     Operand::Move(Place::new(LocalId::new(1), dyn_trait_param_ty.clone())),
                 ),
             ),
-            comments_before: vec![format!("Concretize to concrete tuple type - {} fields", fields.len())],
+            comments_before: vec![format!(
+                "Concretize to concrete tuple type - {} fields",
+                fields.len()
+            )],
         };
 
         // Find fields that actually need dropping
@@ -1086,9 +1097,9 @@ impl<'a> VtableMetadataComputer<'a> {
             .collect();
 
         if fields_needing_drop.is_empty() {
-            // No fields need dropping - just concretize and return
+            // No fields need dropping - not even need to concretize
             let _ = blocks.push_with(|_| BlockData {
-                statements: vec![concretize_stmt],
+                statements: vec![],
                 terminator: Terminator {
                     span: self.span,
                     content: RawTerminator::Return,
@@ -1109,7 +1120,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 statements: vec![concretize_stmt],
                 terminator: Terminator::goto(self.span, next_block),
             });
-            
+
             let mut block_id = next_block;
 
             // Create drop blocks for each field that needs dropping
@@ -1128,9 +1139,10 @@ impl<'a> VtableMetadataComputer<'a> {
                             FieldProjKind::Tuple(fields.len()),
                             FieldId::new(*field_idx),
                         );
-                        
-                        let field_ref_ty = TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
-                        
+
+                        let field_ref_ty =
+                            TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
+
                         // Add local for field reference
                         let field_local = Local {
                             index: LocalId::new(3 + i), // Start from 3 (after ret=0, self=1, concrete=2)
@@ -1140,9 +1152,10 @@ impl<'a> VtableMetadataComputer<'a> {
                         let field_local_id = locals.locals.push_with(|_| field_local);
 
                         // Create field projection statement
-                        let projected_place = Place::new(concrete_local_id, concrete_tuple_ref_ty.clone())
-                            .project(field_projection, field_ref_ty.clone());
-                        
+                        let projected_place =
+                            Place::new(concrete_local_id, concrete_tuple_ref_ty.clone())
+                                .project(field_projection, field_ref_ty.clone());
+
                         let field_proj_stmt = Statement {
                             span: self.span,
                             content: RawStatement::Assign(
@@ -1183,9 +1196,15 @@ impl<'a> VtableMetadataComputer<'a> {
                             span: self.span,
                             content: RawStatement::Assign(
                                 Place::new(LocalId::new(0), Ty::mk_unit()),
-                                Rvalue::Use(Operand::opaque("panic: drop not translated".to_string(), Ty::mk_unit())),
+                                Rvalue::Use(Operand::opaque(
+                                    "panic: drop not translated".to_string(),
+                                    Ty::mk_unit(),
+                                )),
                             ),
-                            comments_before: vec![format!("Panic for field {} drop not translated", field_idx)],
+                            comments_before: vec![format!(
+                                "Panic for field {} drop not translated",
+                                field_idx
+                            )],
                         };
 
                         let _ = blocks.push_with(|_| BlockData {
@@ -1256,11 +1275,18 @@ impl<'a> VtableMetadataComputer<'a> {
         let mut generics = match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => type_decl_ref.generics.clone(),
             _ => {
-                raise_error!(self.ctx, self.span, "Expected ADT type as concrete type for drop function generics, found: {:?}", concrete_ty);
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Expected ADT type as concrete type for drop function generics, found: {:?}",
+                    concrete_ty
+                );
             }
         };
         // it refers to the first lifetime of the shim drop method
-        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Erased);
+        generics
+            .regions
+            .insert_and_shift_ids(RegionId::ZERO, Region::Erased);
         Ok(generics)
     }
 

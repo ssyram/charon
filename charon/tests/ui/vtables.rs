@@ -20,13 +20,13 @@ impl Checkable<i32> for i32 {
 fn use_checkable(x: &dyn Checkable<i32, Output = i32>) -> bool {
     x.check()
 }
-impl Super<i32> for Box<i64> {
+impl Super<i32> for String {
     type Output = i32;
     fn super_method(&self, arg: i32) -> i32 {
-        **self as i32 + arg
+        self.len() as i32 + arg
     }
 }
-impl Checkable<i32> for Box<i64> {
+impl Checkable<i32> for String {
     fn check(&self) -> bool {
         self.super_method(0) >= 0
     }
@@ -44,26 +44,26 @@ impl<const N: usize> Checkable<i32> for [i32; N] {
     }
 }
 
-impl Super<i32> for (i32, Box<i32>) {
+impl Super<i32> for (i32, Vec<i32>) {
     type Output = i32;
     fn super_method(&self, arg: i32) -> i32 {
-        self.0 + *self.1 + arg
+        self.0 + self.1.iter().copied().sum::<i32>() + arg
     }
 }
-impl Checkable<i32> for (i32, Box<i32>) {
+impl Checkable<i32> for (i32, Vec<i32>) {
     fn check(&self) -> bool {
         self.super_method(0) > 0
     }
 }
 
 fn extra_checks() {
-    let b : Box<i64> = Box::new(5);
+    let b : String = String::from("Hello");
     assert!(use_checkable(&b as &dyn Checkable<i32, Output = i32>));
 
     let arr = [1, 2, 3];
     assert!(use_checkable(&arr as &dyn Checkable<i32, Output = i32>));
 
-    let tup = (10, Box::new(32));
+    let tup = (10, vec![20, 30]);
     assert!(use_checkable(&tup as &dyn Checkable<i32, Output = i32>));
 }
 
