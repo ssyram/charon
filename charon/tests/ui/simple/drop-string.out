@@ -48,25 +48,19 @@ where
     [@TraitClause3]: Drop<T>,
     [@TraitClause4]: Drop<type_error("removed allocator parameter")>,
 
-// Full name: alloc::vec::{impl Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]}::drop
-pub fn {impl Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]}::drop<'_0, T, A>(@1: &'_0 mut (Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]))
+// Full name: alloc::vec::{impl Drop for alloc::boxed::Box<T>}::drop
+pub fn {impl Drop for alloc::boxed::Box<T>}::drop<'_0, T, A>(@1: &'_0 mut (Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]))
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Sized<A>,
     [@TraitClause3]: Drop<T>,
     [@TraitClause4]: Drop<A>,
 
-// Full name: alloc::vec::{impl Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]}
-impl<T, A> Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<A>,
-    [@TraitClause3]: Drop<T>,
-    [@TraitClause4]: Drop<A>,
-{
-    parent_clause0 = MetaSized<Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]>
-    fn drop<'_0> = {impl Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]}::drop<'_0_0, T, A>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]
-    vtable: {impl Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]}::{vtable}<T, A>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]
+// Full name: alloc::vec::{impl Drop for alloc::boxed::Box<T>}
+impl<T> Drop for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T>}::drop<'_0_0, T, missing(@Type1_1)>[missing(@TraitClause1_0), missing(@TraitClause1_1), missing(@TraitClause1_3), missing(@TraitClause1_4)]
+    vtable: {impl Drop for alloc::boxed::Box<T>}::{vtable}<T, missing(@Type0_1)>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_3), missing(@TraitClause0_4)]
 }
 
 // Full name: alloc::string::String
@@ -91,7 +85,7 @@ fn {impl Drop for String}::drop<'_0>(@1: &'_0 mut (String))
 
     storage_live(@2)
     @2 := &mut *(@1)
-    drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1, @TraitClause3, @TraitClause4]}<u8, Global>[Sized<u8>, Sized<Global>, Drop<u8>, {impl Drop for Global}]] (*(@2)).vec
+    drop[{impl Drop for alloc::boxed::Box<T>}<u8, Global>] (*(@2)).vec
     @0 := ()
     return
 }

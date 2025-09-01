@@ -43,7 +43,7 @@ where
     return
 }
 
-pub fn test_crate::{impl BoolTrait for Option<T>[@TraitClause0]}::foo<'_0, T>(@1: &'_0 (Option<T>[@TraitClause0]))
+pub fn test_crate::{impl BoolTrait for alloc::boxed::Box<T>}::foo<'_0, T>(@1: &'_0 (Option<T>[@TraitClause0]))
 where
     [@TraitClause0]: Sized<T>,
 {
@@ -55,14 +55,11 @@ where
     return
 }
 
-// Full name: test_crate::{impl BoolTrait for Option<T>[@TraitClause0]}
-impl<T> BoolTrait for Option<T>[@TraitClause0]
-where
-    [@TraitClause0]: Sized<T>,
-{
-    parent_clause0 = MetaSized<Option<T>[@TraitClause0]>
-    fn foo<'_0> = test_crate::{impl BoolTrait for Option<T>[@TraitClause0]}::foo<'_0_0, T>[@TraitClause0]
-    vtable: {impl BoolTrait for Option<T>[@TraitClause0]}::{vtable}<T>[@TraitClause0]
+// Full name: test_crate::{impl BoolTrait for alloc::boxed::Box<T>}
+impl<T> BoolTrait for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    fn foo<'_0> = test_crate::{impl BoolTrait for alloc::boxed::Box<T>}::foo<'_0_0, T>[missing(@TraitClause1_0)]
+    vtable: {impl BoolTrait for alloc::boxed::Box<T>}::{vtable}<T>[missing(@TraitClause0_0)]
 }
 
 

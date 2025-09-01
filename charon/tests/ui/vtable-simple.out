@@ -127,15 +127,11 @@ where
  = {impl Modifiable<T> for i32}::{vtable}()
 
 // Full name: test_crate::{impl Modifiable<T> for i32}
-impl<T> Modifiable<T> for i32
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Clone<T>,
-{
+impl<T> Modifiable<T> for i32 {
     parent_clause0 = MetaSized<i32>
-    parent_clause1 = @TraitClause0
-    fn modify<'_0, '_1> = {impl Modifiable<T> for i32}::modify<'_0_0, '_0_1, T>[@TraitClause0, @TraitClause1]
-    vtable: {impl Modifiable<T> for i32}::{vtable}<T>[@TraitClause0, @TraitClause1]
+    parent_clause1 = missing(@TraitClause0_0)
+    fn modify<'_0, '_1> = {impl Modifiable<T> for i32}::modify<'_0_0, '_0_1, T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
+    vtable: {impl Modifiable<T> for i32}::{vtable}<T>[missing(@TraitClause0_0), missing(@TraitClause0_1)]
 }
 
 // Full name: test_crate::modify_trait_object
@@ -162,7 +158,7 @@ where
     @5 := const (199 : i32)
     @4 := &mut @5
     @3 := &mut *(@4)
-    x@2 := unsize_cast<&'_ mut (i32), &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), {impl Modifiable<T> for i32}<T>[@TraitClause0, @TraitClause1]>(move (@3))
+    x@2 := unsize_cast<&'_ mut (i32), &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), {impl Modifiable<T> for i32}<T>>(move (@3))
     storage_dead(@3)
     storage_dead(@4)
     storage_live(@6)

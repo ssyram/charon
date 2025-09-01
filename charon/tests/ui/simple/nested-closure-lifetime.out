@@ -20,6 +20,246 @@ error: Found inconsistent generics after translation:
   | |_^
 
 error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_0
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:13
+  |
+3 |     let f = move || move || x;
+  |             ^^^^^^^^^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_1
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:13
+  |
+3 |     let f = move || move || x;
+  |             ^^^^^^^^^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_0
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:13
+  |
+3 |     let f = move || move || x;
+  |             ^^^^^^^^^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_1
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:13
+  |
+3 |     let f = move || move || x;
+  |             ^^^^^^^^^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_0
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: 
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:13
+  |
+3 |     let f = move || move || x;
+  |             ^^^^^^^^^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_1
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: 
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:13
+  |
+3 |     let f = move || move || x;
+  |             ^^^^^^^^^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_0
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: 
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:21
+  |
+3 |     let f = move || move || x;
+  |                     ^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_1
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: 
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:21
+  |
+3 |     let f = move || move || x;
+  |                     ^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_0
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:21
+  |
+3 |     let f = move || move || x;
+  |                     ^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_1
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:21
+  |
+3 |     let f = move || move || x;
+  |                     ^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_0
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:21
+  |
+3 |     let f = move || move || x;
+  |                     ^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
+       Found incorrect clause var: 1_1
+       Visitor stack:
+         charon_lib::ast::types::TraitRef
+         charon_lib::ids::vector::Vector<charon_lib::ast::types::vars::TraitClauseId, charon_lib::ast::types::TraitRef>
+         charon_lib::ast::types::GenericArgs
+         alloc::boxed::Box<charon_lib::ast::types::GenericArgs>
+         charon_lib::ast::gast::FunDeclRef
+         charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>
+         (charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)
+         alloc::vec::Vec<(charon_lib::ast::gast::TraitItemName, charon_lib::ast::types::Binder<charon_lib::ast::gast::FunDeclRef>)>
+         charon_lib::ast::gast::TraitImpl
+       Binding stack (depth 2):
+         0: <'_0>
+         1: <'_0, T>
+ --> tests/ui/simple/nested-closure-lifetime.rs:3:21
+  |
+3 |     let f = move || move || x;
+  |                     ^^^^^^^^^
+
+error: Found inconsistent generics after transformations:
        Mismatched regions:
        target: test_crate::foo::closure::closure
        expected: ['_0]
@@ -40,4 +280,4 @@ error: Found inconsistent generics after transformations:
 5 | | }
   | |_^
 
-ERROR Charon failed to translate this code (2 errors)
+ERROR Charon failed to translate this code (14 errors)

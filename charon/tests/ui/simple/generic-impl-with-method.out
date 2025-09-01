@@ -38,13 +38,10 @@ where
 }
 
 // Full name: test_crate::{impl Trait for T}
-impl<T> Trait for T
-where
-    [@TraitClause0]: Sized<T>,
-{
-    parent_clause0 = @TraitClause0::parent_clause0
-    fn method<'_0> = {impl Trait for T}::method<'_0_0, T>[@TraitClause0]
-    vtable: {impl Trait for T}::{vtable}<T>[@TraitClause0]
+impl<T> Trait for T {
+    parent_clause0 = missing(@TraitClause0_0)::parent_clause0
+    fn method<'_0> = {impl Trait for T}::method<'_0_0, T>[missing(@TraitClause1_0)]
+    vtable: {impl Trait for T}::{vtable}<T>[missing(@TraitClause0_0)]
 }
 
 

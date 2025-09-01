@@ -107,14 +107,11 @@ impl Clone for Struct {
 }
 
 // Full name: test_crate::{impl Trait<T, u32> for Struct}
-impl<T> Trait<T, u32> for Struct
-where
-    [@TraitClause0]: Sized<T>,
-{
+impl<T> Trait<T, u32> for Struct {
     parent_clause0 = MetaSized<Struct>
-    parent_clause1 = @TraitClause0
+    parent_clause1 = missing(@TraitClause0_0)
     parent_clause2 = Sized<u32>
-    vtable: {impl Trait<T, u32> for Struct}::{vtable}<T>[@TraitClause0]
+    vtable: {impl Trait<T, u32> for Struct}::{vtable}<T>[missing(@TraitClause0_0)]
 }
 
 // Full name: test_crate::Alias
@@ -127,18 +124,12 @@ trait Alias<Self, U>
     non-dyn-compatible
 }
 
-// Full name: test_crate::Alias::{impl Alias<U> for Self}
-impl<Self, U> Alias<U> for Self
-where
-    [@TraitClause0]: MetaSized<Self>,
-    [@TraitClause1]: Trait<Self, Option<U>[@TraitClause3], u32>,
-    [@TraitClause2]: Clone<Self>,
-    [@TraitClause3]: Sized<U>,
-{
-    parent_clause0 = @TraitClause0
-    parent_clause1 = @TraitClause1
-    parent_clause2 = @TraitClause2
-    parent_clause3 = @TraitClause3
+// Full name: test_crate::Alias::{impl Alias<missing(@Type0_1)> for Self}
+impl<Self> Alias<missing(@Type0_1)> for Self {
+    parent_clause0 = missing(@TraitClause0_0)
+    parent_clause1 = missing(@TraitClause0_1)
+    parent_clause2 = missing(@TraitClause0_2)
+    parent_clause3 = missing(@TraitClause0_3)
     non-dyn-compatible
 }
 
@@ -176,7 +167,7 @@ fn use_alias()
     storage_live(@1)
     storage_live(@2)
     @2 := Struct {  }
-    @1 := takes_alias<Struct>[Sized<Struct>, {impl Alias<U> for Self}<Struct, ()>[MetaSized<Struct>, {impl Trait<T, u32> for Struct}<Option<()>[Sized<()>]>[Sized<Option<()>[Sized<()>]>], {impl Clone for Struct}, Sized<()>]](move (@2))
+    @1 := takes_alias<Struct>[Sized<Struct>, {impl Alias<missing(@Type0_1)> for Self}<Struct, ()>](move (@2))
     storage_dead(@2)
     storage_dead(@1)
     @0 := ()

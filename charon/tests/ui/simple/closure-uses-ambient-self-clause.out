@@ -99,8 +99,8 @@ where
     [@TraitClause0]: Thing<Self>,
 {}
 
-// Full name: test_crate::Thing::foo::{impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call
-fn {impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call<'_0, Self>(@1: &'_0 (closure<Self>[@TraitClause0]), @2: (@TraitClause0::Item))
+// Full name: test_crate::Thing::foo::{impl Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call
+fn {impl Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call<'_0, Self>(@1: &'_0 (closure<Self>[@TraitClause0]), @2: (@TraitClause0::Item))
 where
     [@TraitClause0]: Thing<Self>,
 {
@@ -137,7 +137,7 @@ where
     storage_live(@5)
     @5 := move (i@1)
     @4 := (move (@5))
-    @0 := {impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call<'_, Self>[@TraitClause0](move (@2), move (@4))
+    @0 := {impl Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call<'_, Self>[@TraitClause0](move (@2), move (@4))
     drop[Drop<@TraitClause0::Item>] @5
     storage_dead(@5)
     storage_dead(@4)
@@ -148,8 +148,8 @@ where
     return
 }
 
-// Full name: test_crate::Thing::foo::{impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_mut
-fn {impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_mut<'_0, Self>(@1: &'_0 mut (closure<Self>[@TraitClause0]), @2: (@TraitClause0::Item))
+// Full name: test_crate::Thing::foo::{impl FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_mut
+fn {impl FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_mut<'_0, Self>(@1: &'_0 mut (closure<Self>[@TraitClause0]), @2: (@TraitClause0::Item))
 where
     [@TraitClause0]: Thing<Self>,
 {
@@ -160,13 +160,13 @@ where
 
     storage_live(@3)
     @3 := &*(state@1)
-    @0 := {impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call<'_, Self>[@TraitClause0](move (@3), move (args@2))
+    @0 := {impl Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call<'_, Self>[@TraitClause0](move (@3), move (args@2))
     @0 := ()
     return
 }
 
-// Full name: test_crate::Thing::foo::{impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_once
-fn {impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_once<Self>(@1: closure<Self>[@TraitClause0], @2: (@TraitClause0::Item))
+// Full name: test_crate::Thing::foo::{impl FnOnce<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_once
+fn {impl FnOnce<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_once<Self>(@1: closure<Self>[@TraitClause0], @2: (@TraitClause0::Item))
 where
     [@TraitClause0]: Thing<Self>,
 {
@@ -177,49 +177,40 @@ where
 
     storage_live(@3)
     @3 := &mut @1
-    @0 := {impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_mut<'_, Self>[@TraitClause0](move (@3), move (@2))
+    @0 := {impl FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_mut<'_, Self>[@TraitClause0](move (@3), move (@2))
     drop[Drop<closure<Self>[@TraitClause0]>] @1
     @0 := ()
     return
 }
 
-// Full name: test_crate::Thing::foo::{impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}
-impl<Self> FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]
-where
-    [@TraitClause0]: Thing<Self>,
-{
-    parent_clause0 = MetaSized<closure<Self>[@TraitClause0]>
-    parent_clause1 = Sized<(@TraitClause0::Item)>
-    parent_clause2 = Tuple<(@TraitClause0::Item)>
+// Full name: test_crate::Thing::foo::{impl FnOnce<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}
+impl<Self> FnOnce<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<Self>>
+    parent_clause1 = Sized<(missing(@TraitClause1_0)::Item)>
+    parent_clause2 = Tuple<(missing(@TraitClause1_0)::Item)>
     parent_clause3 = Sized<()>
     type Output = ()
-    fn call_once = {impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_once<Self>[@TraitClause0]
+    fn call_once = {impl FnOnce<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_once<Self>[missing(@TraitClause1_0)]
     non-dyn-compatible
 }
 
-// Full name: test_crate::Thing::foo::{impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}
-impl<Self> FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]
-where
-    [@TraitClause0]: Thing<Self>,
-{
-    parent_clause0 = MetaSized<closure<Self>[@TraitClause0]>
-    parent_clause1 = {impl FnOnce<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}<Self>[@TraitClause0]
-    parent_clause2 = Sized<(@TraitClause0::Item)>
-    parent_clause3 = Tuple<(@TraitClause0::Item)>
-    fn call_mut<'_0> = {impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call_mut<'_0_0, Self>[@TraitClause0]
+// Full name: test_crate::Thing::foo::{impl FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}
+impl<Self> FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<Self>>
+    parent_clause1 = {impl FnOnce<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}<Self>
+    parent_clause2 = Sized<(missing(@TraitClause1_0)::Item)>
+    parent_clause3 = Tuple<(missing(@TraitClause1_0)::Item)>
+    fn call_mut<'_0> = {impl FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call_mut<'_0_0, Self>[missing(@TraitClause1_0)]
     non-dyn-compatible
 }
 
-// Full name: test_crate::Thing::foo::{impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}
-impl<Self> Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]
-where
-    [@TraitClause0]: Thing<Self>,
-{
-    parent_clause0 = MetaSized<closure<Self>[@TraitClause0]>
-    parent_clause1 = {impl FnMut<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}<Self>[@TraitClause0]
-    parent_clause2 = Sized<(@TraitClause0::Item)>
-    parent_clause3 = Tuple<(@TraitClause0::Item)>
-    fn call<'_0> = {impl Fn<(@TraitClause0::Item)> for closure<Self>[@TraitClause0]}::call<'_0_0, Self>[@TraitClause0]
+// Full name: test_crate::Thing::foo::{impl Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}
+impl<Self> Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<Self>>
+    parent_clause1 = {impl FnMut<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}<Self>
+    parent_clause2 = Sized<(missing(@TraitClause1_0)::Item)>
+    parent_clause3 = Tuple<(missing(@TraitClause1_0)::Item)>
+    fn call<'_0> = {impl Fn<(missing(@TraitClause0_0)::Item)> for alloc::boxed::Box<Self>}::call<'_0_0, Self>[missing(@TraitClause1_0)]
     non-dyn-compatible
 }
 

@@ -123,8 +123,8 @@ where
     return
 }
 
-// Full name: test_crate::foo::{impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once
-fn {impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>(@1: test_crate::foo::closure<T>[@TraitClause0, @TraitClause1], @2: ())
+// Full name: test_crate::foo::{impl FnOnce<()> for alloc::boxed::Box<T>}::call_once
+fn {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>(@1: test_crate::foo::closure<T>[@TraitClause0, @TraitClause1], @2: ())
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Drop<T>,
@@ -143,21 +143,17 @@ where
     return
 }
 
-// Full name: test_crate::foo::{impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}
-impl<T> FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Drop<T>,
-{
-    parent_clause0 = MetaSized<test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]>
+// Full name: test_crate::foo::{impl FnOnce<()> for alloc::boxed::Box<T>}
+impl<T> FnOnce<()> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
     parent_clause1 = Sized<()>
     parent_clause2 = Tuple<()>
-    parent_clause3 = Drop<test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]>
+    parent_clause3 = Drop<alloc::boxed::Box<T>>
     parent_clause4 = Drop<()>
     parent_clause5 = Sized<()>
     parent_clause6 = Drop<()>
     type Output = ()
-    fn call_once = {impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>[@TraitClause0, @TraitClause1]
+    fn call_once = {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
     non-dyn-compatible
 }
 

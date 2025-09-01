@@ -122,8 +122,8 @@ where
   T,
 }
 
-// Full name: test_crate::foo::{impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once
-fn {impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>(@1: test_crate::foo::closure<T>[@TraitClause0, @TraitClause1], @2: ()) -> test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]
+// Full name: test_crate::foo::{impl FnOnce<()> for alloc::boxed::Box<T>}::call_once
+fn {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>(@1: test_crate::foo::closure<T>[@TraitClause0, @TraitClause1], @2: ()) -> test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Clone<T>,
@@ -154,30 +154,26 @@ where
     @3 := move (f@2)
     storage_live(@4)
     @4 := ()
-    @0 := {impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>[@TraitClause0, @TraitClause1](move (@3), move (@4))
+    @0 := {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>[@TraitClause0, @TraitClause1](move (@3), move (@4))
     storage_dead(@4)
     storage_dead(@3)
     storage_dead(f@2)
     return
 }
 
-// Full name: test_crate::foo::{impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}
-impl<T> FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Clone<T>,
-{
-    parent_clause0 = MetaSized<test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]>
+// Full name: test_crate::foo::{impl FnOnce<()> for alloc::boxed::Box<T>}
+impl<T> FnOnce<()> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
     parent_clause1 = Sized<()>
     parent_clause2 = Tuple<()>
-    parent_clause3 = Sized<test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]>
-    type Output = test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]
-    fn call_once = {impl FnOnce<()> for test_crate::foo::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>[@TraitClause0, @TraitClause1]
+    parent_clause3 = Sized<alloc::boxed::Box<T>>
+    type Output = alloc::boxed::Box<T>
+    fn call_once = {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
     non-dyn-compatible
 }
 
-// Full name: test_crate::foo::closure::{impl Fn<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call
-fn {impl Fn<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call<'_0, T>(@1: &'_0 (test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]), @2: ()) -> T
+// Full name: test_crate::foo::closure::{impl Fn<()> for alloc::boxed::Box<T>}::call
+fn {impl Fn<()> for alloc::boxed::Box<T>}::call<'_0, T>(@1: &'_0 (test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]), @2: ()) -> T
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Clone<T>,
@@ -194,8 +190,8 @@ where
     return
 }
 
-// Full name: test_crate::foo::closure::{impl FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_mut
-fn {impl FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_mut<'_0, T>(@1: &'_0 mut (test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]), @2: ()) -> T
+// Full name: test_crate::foo::closure::{impl FnMut<()> for alloc::boxed::Box<T>}::call_mut
+fn {impl FnMut<()> for alloc::boxed::Box<T>}::call_mut<'_0, T>(@1: &'_0 mut (test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]), @2: ()) -> T
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Clone<T>,
@@ -207,12 +203,12 @@ where
 
     storage_live(@3)
     @3 := &*(state@1)
-    @0 := {impl Fn<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call<'_, T>[@TraitClause0, @TraitClause1](move (@3), move (args@2))
+    @0 := {impl Fn<()> for alloc::boxed::Box<T>}::call<'_, T>[@TraitClause0, @TraitClause1](move (@3), move (args@2))
     return
 }
 
-// Full name: test_crate::foo::closure::{impl FnOnce<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_once
-fn {impl FnOnce<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>(@1: test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1], @2: ()) -> T
+// Full name: test_crate::foo::closure::{impl FnOnce<()> for alloc::boxed::Box<T>}::call_once
+fn {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>(@1: test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1], @2: ()) -> T
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Clone<T>,
@@ -224,51 +220,39 @@ where
 
     storage_live(@3)
     @3 := &mut @1
-    @0 := {impl FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_mut<'_, T>[@TraitClause0, @TraitClause1](move (@3), move (@2))
+    @0 := {impl FnMut<()> for alloc::boxed::Box<T>}::call_mut<'_, T>[@TraitClause0, @TraitClause1](move (@3), move (@2))
     drop[Drop<test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]>] @1
     return
 }
 
-// Full name: test_crate::foo::closure::{impl FnOnce<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}
-impl<T> FnOnce<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Clone<T>,
-{
-    parent_clause0 = MetaSized<test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]>
+// Full name: test_crate::foo::closure::{impl FnOnce<()> for alloc::boxed::Box<T>}
+impl<T> FnOnce<()> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
     parent_clause1 = Sized<()>
     parent_clause2 = Tuple<()>
-    parent_clause3 = @TraitClause0
+    parent_clause3 = missing(@TraitClause0_0)
     type Output = T
-    fn call_once = {impl FnOnce<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_once<T>[@TraitClause0, @TraitClause1]
+    fn call_once = {impl FnOnce<()> for alloc::boxed::Box<T>}::call_once<T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
     non-dyn-compatible
 }
 
-// Full name: test_crate::foo::closure::{impl FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}
-impl<T> FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Clone<T>,
-{
-    parent_clause0 = MetaSized<test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]>
-    parent_clause1 = {impl FnOnce<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}<T>[@TraitClause0, @TraitClause1]
+// Full name: test_crate::foo::closure::{impl FnMut<()> for alloc::boxed::Box<T>}
+impl<T> FnMut<()> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    parent_clause1 = {impl FnOnce<()> for alloc::boxed::Box<T>}<T>
     parent_clause2 = Sized<()>
     parent_clause3 = Tuple<()>
-    fn call_mut<'_0> = {impl FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call_mut<'_0_0, T>[@TraitClause0, @TraitClause1]
+    fn call_mut<'_0> = {impl FnMut<()> for alloc::boxed::Box<T>}::call_mut<'_0_0, T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
     non-dyn-compatible
 }
 
-// Full name: test_crate::foo::closure::{impl Fn<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}
-impl<T> Fn<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Clone<T>,
-{
-    parent_clause0 = MetaSized<test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]>
-    parent_clause1 = {impl FnMut<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}<T>[@TraitClause0, @TraitClause1]
+// Full name: test_crate::foo::closure::{impl Fn<()> for alloc::boxed::Box<T>}
+impl<T> Fn<()> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    parent_clause1 = {impl FnMut<()> for alloc::boxed::Box<T>}<T>
     parent_clause2 = Sized<()>
     parent_clause3 = Tuple<()>
-    fn call<'_0> = {impl Fn<()> for test_crate::foo::closure::closure<T>[@TraitClause0, @TraitClause1]}::call<'_0_0, T>[@TraitClause0, @TraitClause1]
+    fn call<'_0> = {impl Fn<()> for alloc::boxed::Box<T>}::call<'_0_0, T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
     non-dyn-compatible
 }
 

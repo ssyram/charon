@@ -48,18 +48,15 @@ where
   S,
 }
 
-// Full name: test_crate::HashMap::{impl Drop for HashMap<S>[@TraitClause0]}::drop
-fn {impl Drop for HashMap<S>[@TraitClause0]}::drop<'_0, S>(@1: &'_0 mut (HashMap<S>[@TraitClause0]))
+// Full name: test_crate::HashMap::{impl Drop for alloc::boxed::Box<S>}::drop
+fn {impl Drop for alloc::boxed::Box<S>}::drop<'_0, S>(@1: &'_0 mut (HashMap<S>[@TraitClause0]))
 where
     [@TraitClause0]: Sized<S>,
 
-// Full name: test_crate::HashMap::{impl Drop for HashMap<S>[@TraitClause0]}
-impl<S> Drop for HashMap<S>[@TraitClause0]
-where
-    [@TraitClause0]: Sized<S>,
-{
-    parent_clause0 = MetaSized<HashMap<S>[@TraitClause0]>
-    fn drop<'_0> = {impl Drop for HashMap<S>[@TraitClause0]}::drop<'_0_0, S>[@TraitClause0]
+// Full name: test_crate::HashMap::{impl Drop for alloc::boxed::Box<S>}
+impl<S> Drop for alloc::boxed::Box<S> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<S>>
+    fn drop<'_0> = {impl Drop for alloc::boxed::Box<S>}::drop<'_0_0, S>[missing(@TraitClause1_0)]
     non-dyn-compatible
 }
 
@@ -76,7 +73,7 @@ where
 
     @0 := ()
     drop[Drop<Q>] _k@2
-    drop[{impl Drop for HashMap<S>[@TraitClause0]}<S>[@TraitClause0]] _x@1
+    drop[{impl Drop for alloc::boxed::Box<S>}<S>] _x@1
     @0 := ()
     return
 }
@@ -94,7 +91,7 @@ where
 
     @0 := ()
     drop[Drop<Q>] _k@2
-    drop[{impl Drop for HashMap<S>[@TraitClause0]}<S>[@TraitClause0]] _x@1
+    drop[{impl Drop for alloc::boxed::Box<S>}<S>] _x@1
     @0 := ()
     return
 }

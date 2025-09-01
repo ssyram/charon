@@ -47,38 +47,30 @@ impl Drop for Global {
 // Full name: alloc::alloc::Global::{impl Drop for Global}::drop
 fn {impl Drop for Global}::drop<'_0>(@1: &'_0 mut (Global))
 
-// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop
-fn {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]))
+// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T>}::drop
+fn {impl Drop for alloc::boxed::Box<T>}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]))
 where
     [@TraitClause0]: MetaSized<T>,
     [@TraitClause1]: Sized<A>,
 
-// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}
-impl<T, A> Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: MetaSized<T>,
-    [@TraitClause1]: Sized<A>,
-{
-    parent_clause0 = MetaSized<alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]>
-    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0_0, T, A>[@TraitClause0, @TraitClause1]
+// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T>}
+impl<T> Drop for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T>}::drop<'_0_0, T, missing(@Type1_1)>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
     non-dyn-compatible
 }
 
-// Full name: alloc::boxed::{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop
-pub fn {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]))
+// Full name: alloc::boxed::{impl Drop for alloc::boxed::Box<T>}::drop
+pub fn {impl Drop for alloc::boxed::Box<T>}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]))
 where
     [@TraitClause0]: MetaSized<T>,
     [@TraitClause1]: Sized<A>,
 
-// Full name: alloc::boxed::{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}
-impl<T, A> Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: MetaSized<T>,
-    [@TraitClause1]: Sized<A>,
-{
-    parent_clause0 = MetaSized<alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]>
-    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0_0, T, A>[@TraitClause0, @TraitClause1]
-    vtable: {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::{vtable}<T, A>[@TraitClause0, @TraitClause1]
+// Full name: alloc::boxed::{impl Drop for alloc::boxed::Box<T>}
+impl<T> Drop for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T>}::drop<'_0_0, T, missing(@Type1_1)>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
+    vtable: {impl Drop for alloc::boxed::Box<T>}::{vtable}<T, missing(@Type0_1)>[missing(@TraitClause0_0), missing(@TraitClause0_1)]
 }
 
 // Full name: alloc::string::String
@@ -140,7 +132,7 @@ fn into_inner(@1: alloc::boxed::Box<String>[MetaSized<String>, Sized<Global>])
     storage_dead(_x@2)
     @5 := transmute<NonNull<String>, *const String>(copy ((*(b@1)).0))
     @3 := &mut b@1
-    @4 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_, String, Global>[MetaSized<String>, Sized<Global>](move (@3))
+    @4 := {impl Drop for alloc::boxed::Box<T>}::drop<'_, String, Global>[MetaSized<String>, Sized<Global>](move (@3))
     @0 := ()
     return
 }

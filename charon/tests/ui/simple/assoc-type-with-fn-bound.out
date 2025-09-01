@@ -107,16 +107,12 @@ where
 }
 
 // Full name: test_crate::{impl Trait<F> for F}
-impl<F> Trait<F> for F
-where
-    [@TraitClause0]: Fn<F, (), ()>,
-    [@TraitClause1]: Sized<F>,
-{
-    parent_clause0 = @TraitClause0::parent_clause0
-    parent_clause1 = @TraitClause1
-    parent_clause2 = @TraitClause0
-    fn call<'_0> = {impl Trait<F> for F}::call<'_0_0, F>[@TraitClause0, @TraitClause1]
-    vtable: {impl Trait<F> for F}::{vtable}<F>[@TraitClause0, @TraitClause1]
+impl<F> Trait<F> for F {
+    parent_clause0 = missing(@TraitClause0_0)::parent_clause0
+    parent_clause1 = missing(@TraitClause0_1)
+    parent_clause2 = missing(@TraitClause0_0)
+    fn call<'_0> = {impl Trait<F> for F}::call<'_0_0, F>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
+    vtable: {impl Trait<F> for F}::{vtable}<F>[missing(@TraitClause0_0), missing(@TraitClause0_1)]
 }
 
 // Full name: test_crate::use_foo

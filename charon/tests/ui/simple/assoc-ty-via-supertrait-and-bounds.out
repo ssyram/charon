@@ -50,26 +50,18 @@ where
   T,
 }
 
-// Full name: test_crate::{impl HasOutput<Clause1_Output> for Wrapper<T>[@TraitClause0]}
-impl<T, Clause1_Output> HasOutput<Clause1_Output> for Wrapper<T>[@TraitClause0]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: HasOutput<T, Clause1_Output>,
-{
-    parent_clause0 = MetaSized<Wrapper<T>[@TraitClause0]>
-    parent_clause1 = @TraitClause1::parent_clause1
-    vtable: {impl HasOutput<Clause1_Output> for Wrapper<T>[@TraitClause0]}::{vtable}<T>[@TraitClause0, @TraitClause1]
+// Full name: test_crate::{impl HasOutput<missing(@Type0_1)> for alloc::boxed::Box<T>}
+impl<T> HasOutput<missing(@Type0_1)> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    parent_clause1 = missing(@TraitClause0_1)::parent_clause1
+    vtable: {impl HasOutput<missing(@Type0_1)> for alloc::boxed::Box<T>}::{vtable}<T>[missing(@TraitClause0_0), missing(@TraitClause0_1)]
 }
 
-// Full name: test_crate::{impl HasOutput2<Clause1_Clause1_Output> for Wrapper<T>[@TraitClause0]}
-impl<T, Clause1_Clause1_Output> HasOutput2<Clause1_Clause1_Output> for Wrapper<T>[@TraitClause0]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: HasOutput2<T, Clause1_Clause1_Output>,
-{
-    parent_clause0 = MetaSized<Wrapper<T>[@TraitClause0]>
-    parent_clause1 = {impl HasOutput<Clause1_Output> for Wrapper<T>[@TraitClause0]}<T, Clause1_Clause1_Output>[@TraitClause0, @TraitClause1::parent_clause1]
-    vtable: {impl HasOutput2<Clause1_Clause1_Output> for Wrapper<T>[@TraitClause0]}::{vtable}<T>[@TraitClause0, @TraitClause1]
+// Full name: test_crate::{impl HasOutput2<missing(@Type0_1)> for alloc::boxed::Box<T>}
+impl<T> HasOutput2<missing(@Type0_1)> for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    parent_clause1 = {impl HasOutput<missing(@Type0_1)> for alloc::boxed::Box<T>}<T, missing(@Type0_1)>
+    vtable: {impl HasOutput2<missing(@Type0_1)> for alloc::boxed::Box<T>}::{vtable}<T>[missing(@TraitClause0_0), missing(@TraitClause0_1)]
 }
 
 // Full name: test_crate::take
@@ -90,7 +82,7 @@ fn main()
 {
     let @0: (); // return
 
-    @0 := take<Wrapper<()>[Sized<()>], ()>[Sized<Wrapper<()>[Sized<()>]>, {impl HasOutput2<Clause1_Clause1_Output> for Wrapper<T>[@TraitClause0]}<(), ()>[Sized<()>, {impl HasOutput2<()> for ()}]]()
+    @0 := take<Wrapper<()>[Sized<()>], ()>[Sized<Wrapper<()>[Sized<()>]>, {impl HasOutput2<missing(@Type0_1)> for alloc::boxed::Box<T>}<(), ()>]()
     @0 := ()
     return
 }

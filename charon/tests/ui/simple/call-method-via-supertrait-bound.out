@@ -68,14 +68,10 @@ where
 }
 
 // Full name: test_crate::{impl HasMethod for T}
-impl<T> HasMethod for T
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: OtherTrait<T>,
-{
-    parent_clause0 = @TraitClause0::parent_clause0
-    fn method<'_0> = {impl HasMethod for T}::method<'_0_0, T>[@TraitClause0, @TraitClause1]
-    vtable: {impl HasMethod for T}::{vtable}<T>[@TraitClause0, @TraitClause1]
+impl<T> HasMethod for T {
+    parent_clause0 = missing(@TraitClause0_0)::parent_clause0
+    fn method<'_0> = {impl HasMethod for T}::method<'_0_0, T>[missing(@TraitClause1_0), missing(@TraitClause1_1)]
+    vtable: {impl HasMethod for T}::{vtable}<T>[missing(@TraitClause0_0), missing(@TraitClause0_1)]
 }
 
 // Full name: test_crate::call_method

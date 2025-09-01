@@ -51,7 +51,7 @@ where
     return
 }
 
-fn test_crate::{impl HasMethod for Option<T>[@TraitClause0]}::method<T, Clause1_Type>()
+fn test_crate::{impl HasMethod for alloc::boxed::Box<T>}::method<T, Clause1_Type>()
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: HasType<Option<T>[@TraitClause0], Clause1_Type>,
@@ -63,13 +63,10 @@ where
     return
 }
 
-// Full name: test_crate::{impl HasMethod for Option<T>[@TraitClause0]}
-impl<T> HasMethod for Option<T>[@TraitClause0]
-where
-    [@TraitClause0]: Sized<T>,
-{
-    parent_clause0 = MetaSized<Option<T>[@TraitClause0]>
-    fn method<Clause0_Type, [@TraitClause0]: HasType<Option<T>[@TraitClause0], Clause0_Type>> = test_crate::{impl HasMethod for Option<T>[@TraitClause0]}::method<T, Clause0_Type>[@TraitClause0, @TraitClause0_0]
+// Full name: test_crate::{impl HasMethod for alloc::boxed::Box<T>}
+impl<T> HasMethod for alloc::boxed::Box<T> {
+    parent_clause0 = MetaSized<alloc::boxed::Box<T>>
+    fn method<Clause0_Type, [@TraitClause0]: HasType<alloc::boxed::Box<T>, Clause0_Type>> = test_crate::{impl HasMethod for alloc::boxed::Box<T>}::method<T, Clause0_Type>[missing(@TraitClause1_0), @TraitClause0_0]
     non-dyn-compatible
 }
 

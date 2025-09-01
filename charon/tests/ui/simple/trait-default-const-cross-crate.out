@@ -38,12 +38,9 @@ where
  = FOO()
 
 // Full name: trait_default_const::{impl Trait for T}
-impl<T> Trait for T
-where
-    [@TraitClause0]: Sized<T>,
-{
-    parent_clause0 = @TraitClause0::parent_clause0
-    const FOO = FOO<T>[{impl Trait for T}<T>[@TraitClause0]]
+impl<T> Trait for T {
+    parent_clause0 = missing(@TraitClause0_0)::parent_clause0
+    const FOO = FOO<T>[{impl Trait for T}<T>]
     non-dyn-compatible
 }
 
@@ -54,7 +51,7 @@ where
 {
     let @0: usize; // return
 
-    @0 := const ({impl Trait for T}<T>[@TraitClause0]::FOO)
+    @0 := const ({impl Trait for T}<T>::FOO)
     return
 }
 
