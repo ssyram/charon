@@ -891,6 +891,66 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
+    /// Create a constant expression with value 0 of the same type as the array length
+    fn create_zero_constant_like(&self, array_length_ty: &Ty) -> Result<ConstantExpr, Error> {
+        match array_length_ty.kind() {
+            TyKind::Literal(LiteralTy::UInt(uint_ty)) => {
+                Ok(ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::Unsigned(*uint_ty, 0)
+                    )),
+                    ty: array_length_ty.clone(),
+                })
+            }
+            TyKind::Literal(LiteralTy::Int(int_ty)) => {
+                Ok(ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::Signed(*int_ty, 0)
+                    )),
+                    ty: array_length_ty.clone(),
+                })
+            }
+            _ => {
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Array length type should be integer, found: {:?}",
+                    array_length_ty
+                )
+            }
+        }
+    }
+
+    /// Create a constant expression with value 1 of the same type as the array length
+    fn create_one_constant_like(&self, array_length_ty: &Ty) -> Result<ConstantExpr, Error> {
+        match array_length_ty.kind() {
+            TyKind::Literal(LiteralTy::UInt(uint_ty)) => {
+                Ok(ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::Unsigned(*uint_ty, 1)
+                    )),
+                    ty: array_length_ty.clone(),
+                })
+            }
+            TyKind::Literal(LiteralTy::Int(int_ty)) => {
+                Ok(ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::Signed(*int_ty, 1)
+                    )),
+                    ty: array_length_ty.clone(),
+                })
+            }
+            _ => {
+                raise_error!(
+                    self.ctx,
+                    self.span,
+                    "Array length type should be integer, found: {:?}",
+                    array_length_ty
+                )
+            }
+        }
+    }
+
     /// Create function body for array drop functions (placeholder)
     fn create_array_drop_body(
         &self,
@@ -939,23 +999,24 @@ impl<'a> VtableMetadataComputer<'a> {
                 // Elements don't need dropping, but still generate traversal logic for demonstration
                 // Create loop structure that iterates through elements but doesn't call drop
 
+                // Get the type from array_length_expr for counter
+                let counter_ty = &array_length_expr.ty;
+
                 // Add counter local for loop iteration using utility method
                 let counter = locals.new_var(
                     Some("counter".to_string()),
-                    TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                    counter_ty.clone(),
                 );
+
+                // Create zero constant with the same type as array length
+                let zero_constant = self.create_zero_constant_like(counter_ty)?;
 
                 // Block 0: Setup - concretize and initialize counter
                 let counter_init_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
                         counter.clone(),
-                        Rvalue::Use(Operand::Const(Box::new(ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(
-                                ScalarValue::Unsigned(UIntTy::U32, 0),
-                            )),
-                            ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                        }))),
+                        Rvalue::Use(Operand::Const(Box::new(zero_constant))),
                     ),
                     comments_before: vec![
                         "Initialize counter to 0 (elements don't need drop)".to_string(),
@@ -1008,6 +1069,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 2: Loop body - just increment counter (no drop call)
+                let one_constant = self.create_one_constant_like(counter_ty)?;
+
                 let counter_incr_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
@@ -1015,12 +1078,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         Rvalue::BinaryOp(
                             BinOp::Add(OverflowMode::Panic),
                             Operand::Move(counter.clone()),
-                            Operand::Const(Box::new(ConstantExpr {
-                                value: RawConstantExpr::Literal(Literal::Scalar(
-                                    ScalarValue::Unsigned(UIntTy::U32, 1),
-                                )),
-                                ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            })),
+                            Operand::Const(Box::new(one_constant)),
                         ),
                     ),
                     comments_before: vec![
@@ -1049,23 +1107,24 @@ impl<'a> VtableMetadataComputer<'a> {
                 // Elements need direct drop function calls
                 // Create loop structure to drop each element
 
+                // Get the type from array_length_expr for counter
+                let counter_ty = &array_length_expr.ty;
+
                 // Add counter local for loop iteration using utility method
                 let counter = locals.new_var(
                     Some("counter".to_string()),
-                    TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
+                    counter_ty.clone(),
                 );
+
+                // Create zero constant with the same type as array length
+                let zero_constant = self.create_zero_constant_like(counter_ty)?;
 
                 // Block 0: Setup - concretize and initialize counter
                 let counter_init_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
                         counter.clone(),
-                        Rvalue::Use(Operand::Const(Box::new(ConstantExpr {
-                            value: RawConstantExpr::Literal(Literal::Scalar(
-                                ScalarValue::Unsigned(UIntTy::U32, 0),
-                            )),
-                            ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                        }))),
+                        Rvalue::Use(Operand::Const(Box::new(zero_constant))),
                     ),
                     comments_before: vec!["Initialize counter to 0".to_string()],
                 };
@@ -1162,6 +1221,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 3: Increment counter and loop back
+                let one_constant = self.create_one_constant_like(counter_ty)?;
+
                 let counter_increment_stmt = Statement {
                     span: self.span,
                     content: RawStatement::Assign(
@@ -1169,12 +1230,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         Rvalue::BinaryOp(
                             BinOp::Add(OverflowMode::Panic),
                             Operand::Move(counter.clone()),
-                            Operand::Const(Box::new(ConstantExpr {
-                                value: RawConstantExpr::Literal(Literal::Scalar(
-                                    ScalarValue::Unsigned(UIntTy::U32, 1),
-                                )),
-                                ty: TyKind::Literal(LiteralTy::UInt(UIntTy::U32)).into_ty(),
-                            })),
+                            Operand::Const(Box::new(one_constant)),
                         ),
                     ),
                     comments_before: vec!["Increment counter".to_string()],

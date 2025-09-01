@@ -1169,18 +1169,18 @@ fn {{impl Checkable<i32> for Array<i32, const N : usize>}}::{vtable}::{drop_meth
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
     let concrete_array@2: &'_ mut (Array<i32, const N : usize>); // local
-    let counter@3: u32; // local
+    let counter@3: usize; // local
     let counter_check@4: bool; // local
 
     storage_live(concrete_array@2)
     storage_live(counter@3)
     storage_live(counter_check@4)
     concrete_array@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<i32, const N : usize>)>(move (self@1))
-    counter@3 := const (0 : u32)
+    counter@3 := const (0 : usize)
     loop {
         counter_check@4 := copy (counter@3) < const (const N : usize)
         if move (counter_check@4) {
-            counter@3 := move (counter@3) panic.+ const (1 : u32)
+            counter@3 := move (counter@3) panic.+ const (1 : usize)
             continue 0
         }
         else {
