@@ -213,7 +213,9 @@ impl From<Literal> for ConstantExpr {
     fn from(lit: Literal) -> Self {
         let ty = match &lit {
             Literal::Scalar(scalar) => match scalar {
-                ScalarValue::Signed(int_ty, _) => TyKind::Literal(LiteralTy::Int(*int_ty)).into_ty(),
+                ScalarValue::Signed(int_ty, _) => {
+                    TyKind::Literal(LiteralTy::Int(*int_ty)).into_ty()
+                }
                 ScalarValue::Unsigned(uint_ty, _) => {
                     TyKind::Literal(LiteralTy::UInt(*uint_ty)).into_ty()
                 }
@@ -221,7 +223,10 @@ impl From<Literal> for ConstantExpr {
             Literal::Float(float) => TyKind::Literal(LiteralTy::Float(float.ty)).into_ty(),
             Literal::Bool(_) => TyKind::Literal(LiteralTy::Bool).into_ty(),
             Literal::Char(_) => TyKind::Literal(LiteralTy::Char).into_ty(),
-            _ => panic!("Only scalar literals can be converted to ConstantExpr, got {:?}", lit)
+            _ => panic!(
+                "Only scalar literals can be converted to ConstantExpr, got {:?}",
+                lit
+            ),
         };
         ConstantExpr {
             value: RawConstantExpr::Literal(lit),

@@ -520,10 +520,25 @@ impl<'a> VtableMetadataComputer<'a> {
             trace!("[TUPLE] Empty tuple, no fields need dropping");
             Ok(DropCase::Empty)
         } else {
-            trace!("[TUPLE] Creating tuple drop with {} fields", fields.len());
-            // Always generate tuple drop logic, even if no fields need dropping,
-            // to demonstrate the field-by-field logic
-            Ok(DropCase::Tuple { fields })
+            // Check if any field actually needs dropping
+            let has_drops = fields
+                .iter()
+                .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
+
+            if !has_drops {
+                trace!("[TUPLE] No fields need dropping, using empty drop");
+                Ok(DropCase::Empty)
+            } else {
+                trace!(
+                    "[TUPLE] Creating tuple drop with {} fields, {} need drops",
+                    fields.len(),
+                    fields
+                        .iter()
+                        .filter(|(_, dc)| !matches!(dc, DropCase::Empty))
+                        .count()
+                );
+                Ok(DropCase::Tuple { fields })
+            }
         }
     }
 
@@ -537,16 +552,26 @@ impl<'a> VtableMetadataComputer<'a> {
             let element_drop_case = self.analyze_drop_case(element_ty)?;
             trace!("[ARRAY] Element drop case: {:?}", element_drop_case);
 
+            // Check if array length is 0 - if so, no drops needed
+            if let Some(const_val) = type_decl_ref
+                .generics
+                .const_generics
+                .get(ConstGenericVarId::new(0))
+            {
+                if let ConstGeneric::Value(literal) = const_val {
+                    if let Literal::Scalar(ScalarValue::Unsigned(_, 0))
+                    | Literal::Scalar(ScalarValue::Signed(_, 0)) = literal
+                    {
+                        trace!("[ARRAY] Array has length 0, no drops needed");
+                        return Ok(DropCase::Empty);
+                    }
+                }
+            }
+
             match element_drop_case {
                 DropCase::Empty => {
-                    trace!(
-                        "[ARRAY] Element doesn't need drop, but creating array traversal anyway"
-                    );
-                    // Even if elements don't need drop, we create array traversal for demonstration
-                    Ok(DropCase::Array {
-                        element_ty: element_ty.clone(),
-                        element_drop: Box::new(element_drop_case),
-                    })
+                    trace!("[ARRAY] Element doesn't need drop, array drop is empty");
+                    Ok(DropCase::Empty)
                 }
                 _ => {
                     trace!("[ARRAY] Element needs drop, creating array traversal");
@@ -715,6 +740,35 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(shim_id)
     }
 
+    /// Create a drop function call statement and terminator - abstracted from direct drop logic
+    fn create_drop_call(
+        &self,
+        locals: &Locals,
+        fun_ref: &FunDeclRef,
+        operand: Operand,
+        target_block: BlockId,
+        concrete_ty: &Ty,
+    ) -> Result<Terminator, Error> {
+        let call = Call {
+            func: FnOperand::Regular(FnPtr::from(FunDeclRef {
+                id: fun_ref.id,
+                generics: self.create_drop_function_generics(concrete_ty)?,
+            })),
+            args: vec![operand],
+            dest: locals.return_place(),
+        };
+
+        Ok(Terminator {
+            span: self.span,
+            content: RawTerminator::Call {
+                call,
+                target: target_block,
+                on_unwind: target_block, // Simple unwind handling
+            },
+            comments_before: vec!["Call drop function".to_string()],
+        })
+    }
+
     /// Create function body for direct drop calls
     fn create_direct_drop_body(
         &self,
@@ -772,7 +826,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 target: BlockId::new(1),
                 on_unwind: BlockId::new(1), // Same as target for simplicity
             },
-            comments_before: vec![],
+            comments_before: vec!["Call drop function on concretized value".to_string()],
         };
 
         let _ = blocks.push_with(|_| BlockData {
@@ -867,12 +921,20 @@ impl<'a> VtableMetadataComputer<'a> {
                         let DeBruijnVar::Bound(_, var_id) = de_bruijn_var else {
                             unreachable!()
                         };
-                        let ty = self.generics.const_generics.get(*var_id).unwrap().ty.clone().into();
-                        Ok(ConstantExpr { value: RawConstantExpr::Var(de_bruijn_var.clone()), ty })
-                    },
-                    ConstGeneric::Value(literal) => {
-                        Ok(literal.clone().into())
-                    },
+                        let ty = self
+                            .generics
+                            .const_generics
+                            .get(*var_id)
+                            .unwrap()
+                            .ty
+                            .clone()
+                            .into();
+                        Ok(ConstantExpr {
+                            value: RawConstantExpr::Var(de_bruijn_var.clone()),
+                            ty,
+                        })
+                    }
+                    ConstGeneric::Value(literal) => Ok(literal.clone().into()),
                 }
             } else {
                 raise_error!(
@@ -894,22 +956,16 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Create a constant expression with value 0 of the same type as the array length
     fn create_zero_constant_like(&self, array_length_ty: &Ty) -> Result<ConstantExpr, Error> {
         match array_length_ty.kind() {
-            TyKind::Literal(LiteralTy::UInt(uint_ty)) => {
-                Ok(ConstantExpr {
-                    value: RawConstantExpr::Literal(Literal::Scalar(
-                        ScalarValue::Unsigned(*uint_ty, 0)
-                    )),
-                    ty: array_length_ty.clone(),
-                })
-            }
-            TyKind::Literal(LiteralTy::Int(int_ty)) => {
-                Ok(ConstantExpr {
-                    value: RawConstantExpr::Literal(Literal::Scalar(
-                        ScalarValue::Signed(*int_ty, 0)
-                    )),
-                    ty: array_length_ty.clone(),
-                })
-            }
+            TyKind::Literal(LiteralTy::UInt(uint_ty)) => Ok(ConstantExpr {
+                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(
+                    *uint_ty, 0,
+                ))),
+                ty: array_length_ty.clone(),
+            }),
+            TyKind::Literal(LiteralTy::Int(int_ty)) => Ok(ConstantExpr {
+                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Signed(*int_ty, 0))),
+                ty: array_length_ty.clone(),
+            }),
             _ => {
                 raise_error!(
                     self.ctx,
@@ -924,22 +980,16 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Create a constant expression with value 1 of the same type as the array length
     fn create_one_constant_like(&self, array_length_ty: &Ty) -> Result<ConstantExpr, Error> {
         match array_length_ty.kind() {
-            TyKind::Literal(LiteralTy::UInt(uint_ty)) => {
-                Ok(ConstantExpr {
-                    value: RawConstantExpr::Literal(Literal::Scalar(
-                        ScalarValue::Unsigned(*uint_ty, 1)
-                    )),
-                    ty: array_length_ty.clone(),
-                })
-            }
-            TyKind::Literal(LiteralTy::Int(int_ty)) => {
-                Ok(ConstantExpr {
-                    value: RawConstantExpr::Literal(Literal::Scalar(
-                        ScalarValue::Signed(*int_ty, 1)
-                    )),
-                    ty: array_length_ty.clone(),
-                })
-            }
+            TyKind::Literal(LiteralTy::UInt(uint_ty)) => Ok(ConstantExpr {
+                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(
+                    *uint_ty, 1,
+                ))),
+                ty: array_length_ty.clone(),
+            }),
+            TyKind::Literal(LiteralTy::Int(int_ty)) => Ok(ConstantExpr {
+                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Signed(*int_ty, 1))),
+                ty: array_length_ty.clone(),
+            }),
             _ => {
                 raise_error!(
                     self.ctx,
@@ -995,114 +1045,6 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         match element_drop {
-            DropCase::Empty => {
-                // Elements don't need dropping, but still generate traversal logic for demonstration
-                // Create loop structure that iterates through elements but doesn't call drop
-
-                // Get the type from array_length_expr for counter
-                let counter_ty = &array_length_expr.ty;
-
-                // Add counter local for loop iteration using utility method
-                let counter = locals.new_var(
-                    Some("counter".to_string()),
-                    counter_ty.clone(),
-                );
-
-                // Create zero constant with the same type as array length
-                let zero_constant = self.create_zero_constant_like(counter_ty)?;
-
-                // Block 0: Setup - concretize and initialize counter
-                let counter_init_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        counter.clone(),
-                        Rvalue::Use(Operand::Const(Box::new(zero_constant))),
-                    ),
-                    comments_before: vec![
-                        "Initialize counter to 0 (elements don't need drop)".to_string(),
-                    ],
-                };
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![concretize_stmt, counter_init_stmt],
-                    terminator: Terminator::goto(self.span, BlockId::new(1)), // Go to loop condition
-                });
-
-                // Block 1: Loop condition check
-                let counter_check = locals.new_var(
-                    Some("counter_check".to_string()),
-                    TyKind::Literal(LiteralTy::Bool).into_ty(),
-                );
-
-                let counter_check_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        counter_check.clone(),
-                        Rvalue::BinaryOp(
-                            BinOp::Lt,
-                            Operand::Copy(counter.clone()),
-                            Operand::Const(Box::new(array_length_expr.clone())),
-                        ),
-                    ),
-                    comments_before: vec![format!(
-                        "Check if counter < array length (no drops needed)"
-                    )],
-                };
-
-                let loop_switch = SwitchTargets::If(
-                    BlockId::new(2), // true: go to loop body (no-op)
-                    BlockId::new(3), // false: go to return
-                );
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![counter_check_stmt],
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Switch {
-                            discr: Operand::Move(counter_check.clone()),
-                            targets: loop_switch,
-                        },
-                        comments_before: vec![
-                            "Branch based on loop condition (no drops needed)".to_string(),
-                        ],
-                    },
-                });
-
-                // Block 2: Loop body - just increment counter (no drop call)
-                let one_constant = self.create_one_constant_like(counter_ty)?;
-
-                let counter_incr_stmt = Statement {
-                    span: self.span,
-                    content: RawStatement::Assign(
-                        counter.clone(),
-                        Rvalue::BinaryOp(
-                            BinOp::Add(OverflowMode::Panic),
-                            Operand::Move(counter.clone()),
-                            Operand::Const(Box::new(one_constant)),
-                        ),
-                    ),
-                    comments_before: vec![
-                        "Increment counter (element doesn't need drop)".to_string(),
-                    ],
-                };
-
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![counter_incr_stmt],
-                    terminator: Terminator::goto(self.span, BlockId::new(1)), // Go back to condition check
-                });
-
-                // Block 3: Return
-                let _ = blocks.push_with(|_| BlockData {
-                    statements: vec![],
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Return,
-                        comments_before: vec![
-                            "Array traversal complete (no drops needed)".to_string(),
-                        ],
-                    },
-                });
-            }
             DropCase::Direct(fun_ref) => {
                 // Elements need direct drop function calls
                 // Create loop structure to drop each element
@@ -1111,10 +1053,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter_ty = &array_length_expr.ty;
 
                 // Add counter local for loop iteration using utility method
-                let counter = locals.new_var(
-                    Some("counter".to_string()),
-                    counter_ty.clone(),
-                );
+                let counter = locals.new_var(Some("counter".to_string()), counter_ty.clone());
 
                 // Create zero constant with the same type as array length
                 let zero_constant = self.create_zero_constant_like(counter_ty)?;
@@ -1174,10 +1113,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 let element_ref_ty =
                     TyKind::Ref(Region::Erased, element_ty.clone(), RefKind::Mut).into_ty();
 
-                let element_ref = locals.new_var(
-                    Some("element_ref".to_string()),
-                    element_ref_ty.clone(),
-                );
+                let element_ref =
+                    locals.new_var(Some("element_ref".to_string()), element_ref_ty.clone());
 
                 // Create array index projection
                 let index_projection = ProjectionElem::Index {
@@ -1185,8 +1122,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     from_end: false,
                 };
 
-                let projected_place = concrete
-                    .project(index_projection, element_ref_ty.clone());
+                let projected_place = concrete.project(index_projection, element_ref_ty.clone());
 
                 let element_proj_stmt = Statement {
                     span: self.span,
@@ -1197,27 +1133,18 @@ impl<'a> VtableMetadataComputer<'a> {
                     comments_before: vec!["Project to current array element".to_string()],
                 };
 
-                // Create drop function call
-                let call = Call {
-                    func: FnOperand::Regular(FnPtr::from(FunDeclRef {
-                        id: fun_ref.id,
-                        generics: self.create_drop_function_generics(concrete_ty)?,
-                    })),
-                    args: vec![Operand::Move(element_ref.clone())],
-                    dest: locals.return_place(),
-                };
+                // Create drop function call using the abstracted helper
+                let drop_terminator = self.create_drop_call(
+                    locals,
+                    fun_ref,
+                    Operand::Move(element_ref.clone()),
+                    BlockId::new(3), // Go to counter increment
+                    element_ty,      // Pass element type for generics
+                )?;
 
                 let _ = blocks.push_with(|_| BlockData {
                     statements: vec![element_proj_stmt],
-                    terminator: Terminator {
-                        span: self.span,
-                        content: RawTerminator::Call {
-                            call,
-                            target: BlockId::new(3), // Go to counter increment
-                            on_unwind: BlockId::new(3), // Simple unwind handling
-                        },
-                        comments_before: vec!["Drop current array element".to_string()],
-                    },
+                    terminator: drop_terminator,
                 });
 
                 // Block 3: Increment counter and loop back
@@ -1277,14 +1204,14 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
             }
             _ => {
-                // Other cases - just concretize and return
+                // Other cases (including nested arrays/tuples) - handle recursively
                 let _ = blocks.push_with(|_| BlockData {
                     statements: vec![concretize_stmt],
                     terminator: Terminator {
                         span: self.span,
                         content: RawTerminator::Return,
                         comments_before: vec![
-                            "Array drop - unhandled element drop case".to_string(),
+                            "Array drop - nested case not yet implemented".to_string(),
                         ],
                     },
                 });
@@ -1352,179 +1279,170 @@ impl<'a> VtableMetadataComputer<'a> {
                 },
             });
         } else {
-            // Always generate field-by-field drop logic, even if no fields need dropping,
-            // to demonstrate the field access mechanism
+            // Filter out fields that don't need dropping to avoid unnecessary field access
+            let fields_needing_drop: Vec<_> = fields
+                .iter()
+                .enumerate()
+                .filter(|(_, (_, drop_case))| !matches!(drop_case, DropCase::Empty))
+                .collect();
 
             // First block: concretize
             let _ = blocks.push_with(|_| BlockData {
                 statements: vec![concretize_stmt],
-                terminator: Terminator::goto(self.span, BlockId::new(1)), // Go to field processing
-            });
-
-            let mut block_id = BlockId::new(1);
-
-            // Create drop blocks for each field (even if it doesn't need dropping)
-            for (i, (field_ty, drop_case)) in fields.iter().enumerate() {
-                let is_last_field = i == fields.len() - 1;
-                let next_block_id = if is_last_field {
-                    BlockId::new(block_id.index() + 1) // Return block
+                terminator: if fields_needing_drop.is_empty() {
+                    // No fields need dropping - go directly to return
+                    Terminator {
+                        span: self.span,
+                        content: RawTerminator::Return,
+                        comments_before: vec!["No tuple fields need dropping".to_string()],
+                    }
                 } else {
-                    BlockId::new(block_id.index() + 1) // Next field block
-                };
-
-                match drop_case {
-                    DropCase::Direct(fun_ref) => {
-                        // Create field reference with proper projection
-                        let field_projection = ProjectionElem::Field(
-                            FieldProjKind::Tuple(fields.len()),
-                            FieldId::new(i),
-                        );
-
-                        let field_ref_ty =
-                            TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
-
-                        // Add local for field reference using utility method
-                        let field_ref = locals.new_var(
-                            Some(format!("field_{}_ref", i)),
-                            field_ref_ty.clone(),
-                        );
-
-                        // Create field projection statement
-                        let projected_place = concrete.clone()
-                            .project(field_projection, field_ref_ty.clone());
-
-                        let field_assign_stmt = Statement {
-                            span: self.span,
-                            content: RawStatement::Assign(
-                                field_ref.clone(),
-                                Rvalue::Use(Operand::Move(projected_place)),
-                            ),
-                            comments_before: vec![format!("Get reference to tuple field {}", i)],
-                        };
-
-                        // Create drop call statement
-                        let call = Call {
-                            func: FnOperand::Regular(FnPtr::from(fun_ref.clone())),
-                            args: vec![Operand::Move(field_ref)],
-                            dest: locals.return_place(),
-                        };
-
-                        let terminator = Terminator {
-                            span: self.span,
-                            content: RawTerminator::Call {
-                                call,
-                                target: next_block_id,
-                                on_unwind: next_block_id,
-                            },
-                            comments_before: vec![format!("Drop tuple field {}", i)],
-                        };
-
-                        let _ = blocks.push_with(|block_id| {
-                            let _ = block_id;
-                            BlockData {
-                                statements: vec![field_assign_stmt],
-                                terminator,
-                            }
-                        });
-                    }
-                    DropCase::Empty => {
-                        // Field doesn't need dropping - just generate field access for demonstration
-                        let field_projection = ProjectionElem::Field(
-                            FieldProjKind::Tuple(fields.len()),
-                            FieldId::new(i),
-                        );
-
-                        let field_ref_ty =
-                            TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
-
-                        // Add local for field reference using utility method
-                        let field_ref = locals.new_var(
-                            Some(format!("field_{}_ref", i)),
-                            field_ref_ty.clone(),
-                        );
-
-                        // Create field projection statement
-                        let projected_place = concrete.clone()
-                            .project(field_projection, field_ref_ty.clone());
-
-                        let field_assign_stmt = Statement {
-                            span: self.span,
-                            content: RawStatement::Assign(
-                                field_ref,
-                                Rvalue::Use(Operand::Move(projected_place)),
-                            ),
-                            comments_before: vec![format!(
-                                "Access tuple field {} (no drop needed)",
-                                i
-                            )],
-                        };
-
-                        let terminator = Terminator::goto(self.span, next_block_id);
-
-                        let _ = blocks.push_with(|block_id| {
-                            let _ = block_id;
-                            BlockData {
-                                statements: vec![field_assign_stmt],
-                                terminator,
-                            }
-                        });
-                    }
-                    DropCase::Panic(msg) => {
-                        // Field drop is not translated - create panic
-                        let panic_stmt = Statement {
-                            span: self.span,
-                            content: RawStatement::Assign(
-                                locals.return_place(),
-                                Rvalue::Use(Operand::opaque(
-                                    format!(
-                                        "panic: tuple field {} drop not translated: {}",
-                                        i, msg
-                                    ),
-                                    Ty::mk_unit(),
-                                )),
-                            ),
-                            comments_before: vec![format!(
-                                "Panic for tuple field {} drop not translated",
-                                i
-                            )],
-                        };
-
-                        let terminator = Terminator::goto(self.span, next_block_id);
-
-                        let _ = blocks.push_with(|block_id| {
-                            let _ = block_id;
-                            BlockData {
-                                statements: vec![panic_stmt],
-                                terminator,
-                            }
-                        });
-                    }
-                    _ => {
-                        // Other cases - just go to next field
-                        let terminator = Terminator::goto(self.span, next_block_id);
-
-                        let _ = blocks.push_with(|block_id| {
-                            let _ = block_id;
-                            BlockData {
-                                statements: vec![],
-                                terminator,
-                            }
-                        });
-                    }
-                }
-
-                block_id = next_block_id;
-            }
-
-            // Return block
-            let _ = blocks.push_with(|_| BlockData {
-                statements: vec![],
-                terminator: Terminator {
-                    span: self.span,
-                    content: RawTerminator::Return,
-                    comments_before: vec!["Tuple drop complete".to_string()],
+                    // Go to field processing
+                    Terminator::goto(self.span, BlockId::new(1))
                 },
             });
+
+            if !fields_needing_drop.is_empty() {
+                let mut block_id = BlockId::new(1);
+
+                // Create drop blocks only for fields that need dropping
+                for (idx, (field_idx, (field_ty, drop_case))) in
+                    fields_needing_drop.iter().enumerate()
+                {
+                    let is_last_field = idx == fields_needing_drop.len() - 1;
+                    let next_block_id = if is_last_field {
+                        BlockId::new(block_id.index() + 1) // Return block
+                    } else {
+                        BlockId::new(block_id.index() + 1) // Next field block
+                    };
+
+                    match drop_case {
+                        DropCase::Direct(fun_ref) => {
+                            // Create field reference with proper projection
+                            let field_projection = ProjectionElem::Field(
+                                FieldProjKind::Tuple(fields.len()),
+                                FieldId::new(*field_idx),
+                            );
+
+                            let field_ref_ty =
+                                TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut)
+                                    .into_ty();
+
+                            // Add local for field reference using utility method
+                            let field_ref = locals.new_var(
+                                Some(format!("field_{}_ref", field_idx)),
+                                field_ref_ty.clone(),
+                            );
+
+                            // Create field projection statement
+                            let projected_place = concrete
+                                .clone()
+                                .project(field_projection, field_ref_ty.clone());
+
+                            let field_assign_stmt = Statement {
+                                span: self.span,
+                                content: RawStatement::Assign(
+                                    field_ref.clone(),
+                                    Rvalue::Ref(projected_place, BorrowKind::Mut),
+                                ),
+                                comments_before: vec![format!(
+                                    "Get reference to tuple field {}",
+                                    field_idx
+                                )],
+                            };
+
+                            // Create drop call statement using the abstracted helper
+                            let drop_terminator = self.create_drop_call(
+                                locals,
+                                fun_ref,
+                                Operand::Move(field_ref),
+                                next_block_id,
+                                field_ty, // Pass field type for generics
+                            )?;
+
+                            let _ = blocks.push_with(|block_id| {
+                                let _ = block_id;
+                                BlockData {
+                                    statements: vec![field_assign_stmt],
+                                    terminator: drop_terminator,
+                                }
+                            });
+                        }
+                        DropCase::Panic(msg) => {
+                            // Field drop is not translated - create panic
+                            let panic_stmt = Statement {
+                                span: self.span,
+                                content: RawStatement::Assign(
+                                    locals.return_place(),
+                                    Rvalue::Use(Operand::opaque(
+                                        format!(
+                                            "panic: tuple field {} drop not translated: {}",
+                                            field_idx, msg
+                                        ),
+                                        Ty::mk_unit(),
+                                    )),
+                                ),
+                                comments_before: vec![format!(
+                                    "Panic for tuple field {} drop not translated",
+                                    field_idx
+                                )],
+                            };
+
+                            let terminator = Terminator::goto(self.span, next_block_id);
+
+                            let _ = blocks.push_with(|block_id| {
+                                let _ = block_id;
+                                BlockData {
+                                    statements: vec![panic_stmt],
+                                    terminator,
+                                }
+                            });
+                        }
+                        _ => {
+                            // Other cases - not implemented yet
+                            let comment_stmt = Statement {
+                                span: self.span,
+                                content: RawStatement::Assign(
+                                    locals.return_place(),
+                                    Rvalue::Use(Operand::opaque(
+                                        format!(
+                                            "nested drop not implemented for field {}",
+                                            field_idx
+                                        ),
+                                        Ty::mk_unit(),
+                                    )),
+                                ),
+                                comments_before: vec![format!(
+                                    "Nested drop case for tuple field {} not implemented",
+                                    field_idx
+                                )],
+                            };
+
+                            let terminator = Terminator::goto(self.span, next_block_id);
+
+                            let _ = blocks.push_with(|block_id| {
+                                let _ = block_id;
+                                BlockData {
+                                    statements: vec![comment_stmt],
+                                    terminator,
+                                }
+                            });
+                        }
+                    }
+
+                    block_id = next_block_id;
+                }
+
+                // Return block
+                let _ = blocks.push_with(|_| BlockData {
+                    statements: vec![],
+                    terminator: Terminator {
+                        span: self.span,
+                        content: RawTerminator::Return,
+                        comments_before: vec!["Tuple drop complete".to_string()],
+                    },
+                });
+            }
         }
 
         Ok(Body::Unstructured(ExprBody {
