@@ -1084,20 +1084,50 @@ impl<'a> VtableMetadataComputer<'a> {
                 // Process each field that needs dropping
                 for (field_index, field_ty, field_drop_case) in &fields {
                     match field_drop_case {
-                        DropCase::Found(DropFound::Direct(_)) => {
+                        DropCase::Found(DropFound::Direct(fun_ref)) => {
+                            // Generate field access and direct drop call
+                            // Create field projection to access tuple field
+                            let field_place = Place {
+                                kind: PlaceKind::Projection(
+                                    Box::new(Place::new(concrete_local_id, concrete_tuple_ref_ty.clone())),
+                                    ProjectionElem::Field(
+                                        FieldProjKind::Tuple(fields.len()),
+                                        FieldId::new(*field_index)
+                                    )
+                                ),
+                                ty: field_ty.clone(),
+                            };
+                            
+                            // Create a local for the field reference 
+                            let field_ref_ty = TyKind::Ref(Region::Erased, field_ty.clone(), RefKind::Mut).into_ty();
+                            let field_local = Local {
+                                index: LocalId::new(3 + *field_index), // ret=0, self=1, concrete=2, field_N=3+N
+                                name: Some(format!("field_{}", field_index)),
+                                ty: field_ref_ty.clone(),
+                            };
+                            let field_local_id = locals.locals.push_with(|_| field_local);
+                            
+                            // Create assignment to get mutable reference to the field
+                            let field_assign_stmt = Statement {
+                                span: self.span,
+                                content: RawStatement::Assign(
+                                    Place::new(field_local_id, field_ref_ty.clone()),
+                                    Rvalue::Ref(field_place, BorrowKind::Mut)
+                                ),
+                                comments_before: vec![format!("Get mutable reference to field {}", field_index)],
+                            };
+                            
+                            statements.push(field_assign_stmt);
+                            
+                            // Add a placeholder for the drop call - we'll improve this later
                             statements.push(Statement {
                                 span: self.span,
                                 content: RawStatement::Nop,
-                                comments_before: vec![format!("TODO: Drop field {} of type {:?} with direct drop", field_index, field_ty)],
+                                comments_before: vec![format!("TODO: Call drop function {:?} on field {}", fun_ref.id, field_index)],
                             });
                         }
                         DropCase::NotNeeded => {
-                            // Field doesn't need drop - nothing to do
-                            statements.push(Statement {
-                                span: self.span,
-                                content: RawStatement::Nop,
-                                comments_before: vec![format!("Field {} doesn't need drop", field_index)],
-                            });
+                            // Field doesn't need drop - nothing to do, skip
                         }
                         _ => {
                             // Complex drop cases - placeholder for now
