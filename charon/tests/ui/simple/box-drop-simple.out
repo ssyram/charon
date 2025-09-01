@@ -117,13 +117,22 @@ impl Allocator for Global {
     vtable: {impl Allocator for Global}::{vtable}
 }
 
-// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T, A>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_2)]}::drop
-fn {impl Drop for alloc::boxed::Box<T, A>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_2)]}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T, A>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_2)]))
+// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]}::drop
+fn {impl Drop for alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]))
+where
+    [@TraitClause0]: MetaSized<T>,
+    [@TraitClause1]: Sized<A>,
+    [@TraitClause2]: Allocator<A>,
 
-// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T, A>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_2)]}
-impl<T, A> Drop for alloc::boxed::Box<T, A>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_2)] {
-    parent_clause0 = MetaSized<alloc::boxed::Box<T, A>[missing(@TraitClause1_0), missing(@TraitClause1_1), missing(@TraitClause1_2)]>
-    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T, A>[missing(@TraitClause0_0), missing(@TraitClause0_1), missing(@TraitClause0_2)]}::drop<'_0_0, T, A>[missing(@TraitClause1_0), missing(@TraitClause1_1), missing(@TraitClause1_2)]
+// Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]}
+impl<T, A> Drop for alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]
+where
+    [@TraitClause0]: MetaSized<T>,
+    [@TraitClause1]: Sized<A>,
+    [@TraitClause2]: Allocator<A>,
+{
+    parent_clause0 = MetaSized<alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]>
+    fn drop<'_0> = {impl Drop for alloc::boxed::Box<T, A>[@TraitClause0, @TraitClause1, @TraitClause2]}::drop<'_0_0, T, A>[@TraitClause0, @TraitClause1, @TraitClause2]
     non-dyn-compatible
 }
 

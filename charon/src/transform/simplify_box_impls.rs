@@ -13,6 +13,8 @@ use crate::{
     ast::*,
     transform::TransformCtx,
 };
+use derive_generic_visitor::*;
+use std::collections::HashMap;
 
 use super::ctx::TransformPass;
 
@@ -27,12 +29,12 @@ impl TransformPass for Transform {
             return;
         }
 
+        trace!("Total trait impls: {}", ctx.translated.trait_impls.elem_count());
+        trace!("Total fun decls: {}", ctx.translated.fun_decls.elem_count());
+        
         // First collect the IDs that need to be simplified to avoid borrowing conflicts
         let mut box_trait_impls_to_simplify = Vec::new();
         let mut box_methods_to_simplify = Vec::new();
-        
-        trace!("Total trait impls: {}", ctx.translated.trait_impls.elem_count());
-        trace!("Total fun decls: {}", ctx.translated.fun_decls.elem_count());
         
         // Traverse all trait implementations to find Box Drop implementations
         for timpl in ctx.translated.trait_impls.iter() {
@@ -53,20 +55,52 @@ impl TransformPass for Transform {
         trace!("Box implementations to simplify: {} trait impls, {} methods", 
                box_trait_impls_to_simplify.len(), box_methods_to_simplify.len());
 
-        // Now apply the simplification
-        for impl_id in box_trait_impls_to_simplify {
-            if let Some(timpl) = ctx.translated.trait_impls.get_mut(impl_id) {
-                trace!("Simplifying trait impl: {:?}", timpl.item_meta.name);
-                simplify_generic_params(&mut timpl.generics);
+        // Identify which trait clauses need to be removed from Box implementations
+        let mut trait_clauses_to_remove = HashMap::new();
+        
+        // Collect trait clauses to remove for each Box implementation
+        for impl_id in &box_trait_impls_to_simplify {
+            if let Some(timpl) = ctx.translated.trait_impls.get(*impl_id) {
+                let clauses_to_remove: Vec<TraitClauseId> = timpl.generics.trait_clauses.all_indices().collect();
+                trace!("Trait impl {:?} has {} trait clauses to remove", timpl.item_meta.name, clauses_to_remove.len());
+                trait_clauses_to_remove.insert(*impl_id, clauses_to_remove);
             }
         }
         
-        for method_id in box_methods_to_simplify {
-            if let Some(fun_decl) = ctx.translated.fun_decls.get_mut(method_id) {
-                trace!("Simplifying method: {:?}", fun_decl.item_meta.name);
-                simplify_generic_params(&mut fun_decl.signature.generics);
+        for method_id in &box_methods_to_simplify {
+            if let Some(fun_decl) = ctx.translated.fun_decls.get(*method_id) {
+                let clauses_to_remove: Vec<TraitClauseId> = fun_decl.signature.generics.trait_clauses.all_indices().collect();
+                trace!("Method {:?} has {} trait clauses to remove", fun_decl.item_meta.name, clauses_to_remove.len());
             }
         }
+
+        // TODO: This approach is currently disabled because removing trait clauses
+        // from GenericParams breaks trait clause references throughout the AST.
+        // Need to implement a visitor pattern similar to hide_marker_traits
+        // that also removes trait clause references from GenericArgs everywhere.
+        
+        trace!("Box implementations detected but transformation disabled pending visitor implementation");
+        
+        // // Apply simplification using Vector::remove which leaves empty slots
+        // for impl_id in box_trait_impls_to_simplify {
+        //     if let Some(timpl) = ctx.translated.trait_impls.get_mut(impl_id) {
+        //         trace!("Simplifying trait impl: {:?}", timpl.item_meta.name);
+        //         // Remove ALL trait clauses using Vector::remove (leaves empty slots)
+        //         for clause_id in timpl.generics.trait_clauses.all_indices() {
+        //             timpl.generics.trait_clauses.remove(clause_id);
+        //         }
+        //     }
+        // }
+        
+        // for method_id in box_methods_to_simplify {
+        //     if let Some(fun_decl) = ctx.translated.fun_decls.get_mut(method_id) {
+        //         trace!("Simplifying method: {:?}", fun_decl.item_meta.name);
+        //         // Remove ALL trait clauses using Vector::remove (leaves empty slots) 
+        //         for clause_id in fun_decl.signature.generics.trait_clauses.all_indices() {
+        //             fun_decl.signature.generics.trait_clauses.remove(clause_id);
+        //         }
+        //     }
+        // }
     }
 }
 
@@ -124,13 +158,5 @@ fn is_box_type(ty: &Ty, ctx: &TransformCtx) -> bool {
             }
         }
         _ => false,
-    }
-}
-
-/// Simply modify GenericParams to remove all trait clauses
-fn simplify_generic_params(generics: &mut GenericParams) {
-    // Remove ALL trait clauses as requested
-    while generics.trait_clauses.elem_count() > 0 {
-        generics.trait_clauses.remove_and_shift_ids(TraitClauseId::new(0));
     }
 }
