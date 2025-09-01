@@ -32,6 +32,7 @@ pub mod remove_unused_locals;
 pub mod remove_unused_methods;
 pub mod remove_unused_self_clause;
 pub mod reorder_decls;
+pub mod simplify_box_impls;
 pub mod simplify_constants;
 pub mod skip_trait_refs_when_known;
 pub mod transform_dyn_trait_calls;
@@ -80,6 +81,9 @@ pub static ULLBC_PASSES: &[Pass] = &[
     // Transform dyn trait method calls to vtable function pointer calls
     // This should be early to handle the calls before other transformations
     UnstructuredBody(&transform_dyn_trait_calls::Transform),
+    // Simplify Box implementations when not in raw-boxes mode
+    // This should happen right after dyn trait calls transform
+    NonBody(&simplify_box_impls::Transform),
     // Inline promoted consts into their parent bodies.
     UnstructuredBody(&inline_promoted_consts::Transform),
     // # Micro-pass: merge single-origin gotos into their parent. This drastically reduces the
