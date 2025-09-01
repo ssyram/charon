@@ -694,7 +694,7 @@ impl<'a> VtableMetadataComputer<'a> {
         let call = Call {
             func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                 id: fun_ref.id,
-                generics: Box::new(self.create_drop_function_generics()?),
+                generics: self.create_drop_function_generics(concrete_ty)?,
             })),
             args: vec![Operand::Move(Place::new(
                 concrete_local_id,
@@ -949,7 +949,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 let call = Call {
                     func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                         id: fun_ref.id,
-                        generics: Box::new(self.create_drop_function_generics()?),
+                        generics: self.create_drop_function_generics(concrete_ty)?,
                     })),
                     args: vec![Operand::Move(Place::new(element_local_id, element_ref_ty))],
                     dest: Place::new(LocalId::new(0), Ty::mk_unit()),
@@ -1156,7 +1156,7 @@ impl<'a> VtableMetadataComputer<'a> {
                         let call = Call {
                             func: FnOperand::Regular(FnPtr::from(FunDeclRef {
                                 id: fun_ref.id,
-                                generics: Box::new(self.create_drop_function_generics()?),
+                                generics: self.create_drop_function_generics(concrete_ty)?,
                             })),
                             args: vec![Operand::Move(Place::new(field_local_id, field_ref_ty))],
                             dest: Place::new(LocalId::new(0), Ty::mk_unit()),
@@ -1249,19 +1249,19 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Create the generic arguments to be used when calling the drop function
-    /// This should match the generics from the drop function signature (typically just one lifetime)
-    fn create_drop_function_generics(&self) -> Result<GenericArgs, Error> {
-        // Drop functions typically have a signature like: fn drop<'a>(&'a mut self)
-        // So they expect exactly one region parameter for the mutable reference lifetime
-        let drop_generics = GenericArgs {
-            regions: Vector::from_iter(vec![Region::Erased]), // One erased region for the &mut self lifetime
-            types: Vector::new(), // Drop functions don't take type parameters
-            const_generics: Vector::new(), // Drop functions don't take const generics
-            trait_refs: Vector::new(), // Drop functions don't take trait references
+    /// Generic args for the drop call: reuse the concrete type's generics.
+    /// For `impl<Args> Drop for T<Args'>` Rustc ensures Args == Args' match, so we just forward them.
+    /// Additionally, we should add the lifetime as the first region argument for the `&mut self` receiver.
+    fn create_drop_function_generics(&self, concrete_ty: &Ty) -> Result<Box<GenericArgs>, Error> {
+        let mut generics = match concrete_ty.kind() {
+            TyKind::Adt(type_decl_ref) => type_decl_ref.generics.clone(),
+            _ => {
+                raise_error!(self.ctx, self.span, "Expected ADT type as concrete type for drop function generics, found: {:?}", concrete_ty);
+            }
         };
-
-        Ok(drop_generics)
+        // it refers to the first lifetime of the shim drop method
+        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Erased);
+        Ok(generics)
     }
 
     /// Create the generic arguments for referencing the drop shim function itself

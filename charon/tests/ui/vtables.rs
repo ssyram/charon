@@ -44,13 +44,13 @@ impl<const N: usize> Checkable<i32> for [i32; N] {
     }
 }
 
-impl<'a> Super<i32> for (i32, Box<i32>) {
+impl Super<i32> for (i32, Box<i32>) {
     type Output = i32;
     fn super_method(&self, arg: i32) -> i32 {
         self.0 + *self.1 + arg
     }
 }
-impl<'a> Checkable<i32> for (i32, Box<i32>) {
+impl Checkable<i32> for (i32, Box<i32>) {
     fn check(&self) -> bool {
         self.super_method(0) > 0
     }
