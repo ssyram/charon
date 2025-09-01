@@ -797,6 +797,11 @@ impl<'_0> From<&'_0 (Str)> for String {
     non-dyn-compatible
 }
 
+pub fn alloc::vec::{Vec<T>[@TraitClause0, @TraitClause1]}::len<'_0, T, A>(@1: &'_0 (Vec<T>[@TraitClause0, @TraitClause1])) -> usize
+where
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Sized<A>,
+
 // Full name: alloc::vec::{impl Deref for Vec<T>[@TraitClause0, @TraitClause1]}::deref
 pub fn {impl Deref for Vec<T>[@TraitClause0, @TraitClause1]}::deref<'_0, T, A>(@1: &'_0 (Vec<T>[@TraitClause0, @TraitClause1])) -> &'_0 (Slice<T>)
 where
@@ -1098,84 +1103,94 @@ impl Checkable<i32> for String {
     vtable: {impl Checkable<i32> for String}::{vtable}
 }
 
-// Full name: test_crate::{impl Super<i32> for Array<i32, const N : usize>}::super_method
-fn {impl Super<i32> for Array<i32, const N : usize>}::super_method<'_0, const N : usize>(@1: &'_0 (Array<i32, const N : usize>), @2: i32) -> i32
+// Full name: test_crate::{impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::super_method
+fn {impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::super_method<'_0, const N : usize>(@1: &'_0 (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>), @2: i32) -> i32
 {
     let @0: i32; // return
-    let self@1: &'_ (Array<i32, const N : usize>); // arg #1
+    let self@1: &'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>); // arg #1
     let arg@2: i32; // arg #2
-    let @3: i32; // anonymous local
-    let @4: Copied<Iter<'_, i32>[Sized<i32>]>[Sized<Iter<'_, i32>[Sized<i32>]>]; // anonymous local
-    let @5: Iter<'_, i32>[Sized<i32>]; // anonymous local
-    let @6: &'_ (Slice<i32>); // anonymous local
-    let @7: &'_ (Array<i32, const N : usize>); // anonymous local
+    let @3: bool; // anonymous local
+    let @4: usize; // anonymous local
+    let @5: &'_ (Vec<i32>[Sized<i32>, Sized<Global>]); // anonymous local
+    let @6: usize; // anonymous local
+    let @7: i32; // anonymous local
     let @8: i32; // anonymous local
-    let @9: i32; // anonymous local
+    let @9: &'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>); // anonymous local
+    let @10: &'_ (Vec<i32>[Sized<i32>, Sized<Global>]); // anonymous local
 
-    storage_live(@9)
+    storage_live(@7)
+    storage_live(@8)
     storage_live(@3)
     storage_live(@4)
     storage_live(@5)
     storage_live(@6)
-    storage_live(@7)
-    @7 := &*(self@1)
-    @6 := @ArrayToSliceShared<'_, i32, const N : usize>(move (@7))
-    storage_dead(@7)
-    @5 := iter<'_, i32>[Sized<i32>](move (@6))
-    storage_dead(@6)
-    @4 := core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::copied<'_, '_, i32, i32>[Sized<i32>, Sized<i32>, Sized<Iter<'_, i32>[Sized<i32>]>, {impl Iterator for Iter<'a, T>[@TraitClause0]}<'_, i32>[Sized<i32>], {impl Copy for i32}](move (@5))
+    @6 := const (0 : usize)
+    storage_live(@9)
+    @9 := &*(self@1)
+    storage_live(@10)
+    @10 := @ArrayIndexShared<'_, Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>(move (@9), copy (@6))
+    @5 := &*(@10)
+    @4 := alloc::vec::{Vec<T>[@TraitClause0, @TraitClause1]}::len<'_, i32, Global>[Sized<i32>, Sized<Global>](move (@5))
     storage_dead(@5)
-    @3 := core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::sum<'_, Iter<'_, i32>[Sized<i32>], i32, i32>[Sized<i32>, {impl Iterator for Iter<'a, T>[@TraitClause0]}<'_, i32>[Sized<i32>], Sized<Iter<'_, i32>[Sized<i32>]>, {impl Copy for i32}, Sized<i32>, Sized<Copied<Iter<'_, i32>[Sized<i32>]>[Sized<Iter<'_, i32>[Sized<i32>]>]>, {impl Sum<i32> for i32}](move (@4))
-    storage_dead(@4)
-    storage_live(@8)
-    @8 := copy (arg@2)
-    @9 := copy (@3) panic.+ copy (@8)
-    @0 := move (@9)
-    storage_dead(@8)
+    @3 := move (@4) > const (const N : usize)
+    if move (@3) {
+        storage_dead(@6)
+        storage_dead(@4)
+        storage_live(@7)
+        @7 := copy (arg@2)
+        @8 := copy (@7) panic.+ const (1 : i32)
+        @0 := move (@8)
+        storage_dead(@7)
+    }
+    else {
+        storage_dead(@6)
+        storage_dead(@4)
+        @0 := copy (arg@2)
+    }
     storage_dead(@3)
     return
 }
 
-// Full name: test_crate::{impl Super<i32> for Array<i32, const N : usize>}
-impl<const N : usize> Super<i32> for Array<i32, const N : usize> {
-    parent_clause0 = MetaSized<Array<i32, const N : usize>>
+// Full name: test_crate::{impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}
+impl<const N : usize> Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize> {
+    parent_clause0 = MetaSized<Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>>
     parent_clause1 = Sized<i32>
     parent_clause2 = Sized<i32>
     type Output = i32
-    fn super_method<'_0> = {impl Super<i32> for Array<i32, const N : usize>}::super_method<'_0_0, const N : usize>
-    vtable: {impl Super<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>
+    fn super_method<'_0> = {impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::super_method<'_0_0, const N : usize>
+    vtable: {impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}<const N : usize>
 }
 
-// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::check
-fn {impl Checkable<i32> for Array<i32, const N : usize>}::check<'_0, const N : usize>(@1: &'_0 (Array<i32, const N : usize>)) -> bool
+// Full name: test_crate::{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check
+fn {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check<'_0, const N : usize>(@1: &'_0 (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>)) -> bool
 {
     let @0: bool; // return
-    let self@1: &'_ (Array<i32, const N : usize>); // arg #1
+    let self@1: &'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>); // arg #1
     let @2: i32; // anonymous local
-    let @3: &'_ (Array<i32, const N : usize>); // anonymous local
+    let @3: &'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>); // anonymous local
 
     storage_live(@2)
     storage_live(@3)
     @3 := &*(self@1)
-    @2 := {impl Super<i32> for Array<i32, const N : usize>}::super_method<'_, const N : usize>(move (@3), const (0 : i32))
+    @2 := {impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::super_method<'_, const N : usize>(move (@3), const (0 : i32))
     storage_dead(@3)
     @0 := move (@2) >= const (0 : i32)
     storage_dead(@2)
     return
 }
 
-fn {{impl Checkable<i32> for Array<i32, const N : usize>}}::{vtable}::{drop_method}<'_0, const N : usize>(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)))
+fn {{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}}::{vtable}::{drop_method}<'_0, const N : usize>(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)))
 {
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
-    let concrete_array@2: &'_ mut (Array<i32, const N : usize>); // local
+    let concrete_array@2: &'_ mut (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>); // local
     let counter@3: usize; // local
     let counter_check@4: bool; // local
 
     storage_live(concrete_array@2)
     storage_live(counter@3)
     storage_live(counter_check@4)
-    concrete_array@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<i32, const N : usize>)>(move (self@1))
+    concrete_array@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>)>(move (self@1))
     counter@3 := const (0 : usize)
     loop {
         counter_check@4 := copy (counter@3) < const (const N : usize)
@@ -1191,43 +1206,43 @@ fn {{impl Checkable<i32> for Array<i32, const N : usize>}}::{vtable}::{drop_meth
     return
 }
 
-// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::check::{vtable_method}
-fn {impl Checkable<i32> for Array<i32, const N : usize>}::check::{vtable_method}<'_0, const N : usize>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
+// Full name: test_crate::{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check::{vtable_method}
+fn {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check::{vtable_method}<'_0, const N : usize>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
 {
     let @0: bool; // return
     let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
-    let @2: &'_0 (Array<i32, const N : usize>); // anonymous local
+    let @2: &'_0 (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>); // anonymous local
 
     storage_live(@0)
     storage_live(@1)
     storage_live(@2)
-    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_0 (Array<i32, const N : usize>)>(move (@1))
-    @0 := {impl Checkable<i32> for Array<i32, const N : usize>}::check<'_0, const N : usize>(move (@2))
+    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_0 (Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>)>(move (@1))
+    @0 := {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check<'_0, const N : usize>(move (@2))
     return
 }
 
-// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}
-fn {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>() -> test_crate::Checkable::{vtable}<i32, i32>
+// Full name: test_crate::{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}
+fn {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}<const N : usize>() -> test_crate::Checkable::{vtable}<i32, i32>
 {
     let ret@0: test_crate::Checkable::{vtable}<i32, i32>; // return
     let @1: &'static (test_crate::Super::{vtable}<i32, Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>::parent_clause1::Output>); // anonymous local
 
     storage_live(@1)
-    @1 := &{impl Super<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>
-    ret@0 := test_crate::Checkable::{vtable} { size: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_0)), align: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_0)), drop: const ({{impl Checkable<i32> for Array<i32, const N : usize>}}::{vtable}::{drop_method}<'_, const N : usize>), method_check: const ({impl Checkable<i32> for Array<i32, const N : usize>}::check::{vtable_method}<'_, const N : usize>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
+    @1 := &{impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}<const N : usize>
+    ret@0 := test_crate::Checkable::{vtable} { size: const (Opaque(Layout not available: Layout not available for ADT)), align: const (Opaque(Layout not available: Layout not available for ADT)), drop: const ({{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}}::{vtable}::{drop_method}<'_, const N : usize>), method_check: const ({impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check::{vtable_method}<'_, const N : usize>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
     return
 }
 
-// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}
-static {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>: test_crate::Checkable::{vtable}<i32, i32> = {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}()
+// Full name: test_crate::{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}
+static {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}<const N : usize>: test_crate::Checkable::{vtable}<i32, i32> = {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}()
 
-// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}
-impl<const N : usize> Checkable<i32> for Array<i32, const N : usize> {
-    parent_clause0 = MetaSized<Array<i32, const N : usize>>
-    parent_clause1 = {impl Super<i32> for Array<i32, const N : usize>}<const N : usize>
+// Full name: test_crate::{impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}
+impl<const N : usize> Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize> {
+    parent_clause0 = MetaSized<Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>>
+    parent_clause1 = {impl Super<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}<const N : usize>
     parent_clause2 = Sized<i32>
-    fn check<'_0> = {impl Checkable<i32> for Array<i32, const N : usize>}::check<'_0_0, const N : usize>
-    vtable: {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>
+    fn check<'_0> = {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::check<'_0_0, const N : usize>
+    vtable: {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}::{vtable}<const N : usize>
 }
 
 // Full name: test_crate::{impl Super<i32> for (i32, Vec<i32>[Sized<i32>, Sized<Global>])}::super_method
@@ -1380,29 +1395,41 @@ fn extra_checks()
     let @6: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
     let @7: &'_ (String); // anonymous local
     let @8: &'_ (String); // anonymous local
-    let arr@9: Array<i32, 3 : usize>; // local
-    let @10: (); // anonymous local
-    let @11: bool; // anonymous local
-    let @12: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
-    let @13: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
-    let @14: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
-    let @15: &'_ (Array<i32, 3 : usize>); // anonymous local
-    let @16: &'_ (Array<i32, 3 : usize>); // anonymous local
-    let tup@17: (i32, Vec<i32>[Sized<i32>, Sized<Global>]); // local
-    let @18: Vec<i32>[Sized<i32>, Sized<Global>]; // anonymous local
-    let @19: alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>]; // anonymous local
-    let @20: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
-    let @21: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
-    let @22: (); // anonymous local
-    let @23: bool; // anonymous local
-    let @24: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
-    let @25: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
-    let @26: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
-    let @27: &'_ ((i32, Vec<i32>[Sized<i32>, Sized<Global>])); // anonymous local
-    let @28: &'_ ((i32, Vec<i32>[Sized<i32>, Sized<Global>])); // anonymous local
-    let @29: Array<i32, 2 : usize>; // anonymous local
+    let arr@9: Array<Vec<i32>[Sized<i32>, Sized<Global>], 2 : usize>; // local
+    let @10: Vec<i32>[Sized<i32>, Sized<Global>]; // anonymous local
+    let @11: alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>]; // anonymous local
+    let @12: alloc::boxed::Box<Array<i32, 1 : usize>>[MetaSized<Array<i32, 1 : usize>>, Sized<Global>]; // anonymous local
+    let @13: alloc::boxed::Box<Array<i32, 1 : usize>>[MetaSized<Array<i32, 1 : usize>>, Sized<Global>]; // anonymous local
+    let @14: Vec<i32>[Sized<i32>, Sized<Global>]; // anonymous local
+    let @15: alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>]; // anonymous local
+    let @16: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
+    let @17: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
+    let @18: (); // anonymous local
+    let @19: bool; // anonymous local
+    let @20: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @21: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @22: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @23: &'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], 2 : usize>); // anonymous local
+    let @24: &'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], 2 : usize>); // anonymous local
+    let tup@25: (i32, Vec<i32>[Sized<i32>, Sized<Global>]); // local
+    let @26: Vec<i32>[Sized<i32>, Sized<Global>]; // anonymous local
+    let @27: alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>]; // anonymous local
+    let @28: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
+    let @29: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
+    let @30: (); // anonymous local
+    let @31: bool; // anonymous local
+    let @32: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @33: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @34: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @35: &'_ ((i32, Vec<i32>[Sized<i32>, Sized<Global>])); // anonymous local
+    let @36: &'_ ((i32, Vec<i32>[Sized<i32>, Sized<Global>])); // anonymous local
+    let @37: Array<i32, 1 : usize>; // anonymous local
+    let @38: Array<i32, 2 : usize>; // anonymous local
+    let @39: Array<i32, 2 : usize>; // anonymous local
 
-    storage_live(@29)
+    storage_live(@37)
+    storage_live(@38)
+    storage_live(@39)
     storage_live(b@1)
     b@1 := {impl From<&'_0 (Str)> for String}::from<'_>(const ("Hello"))
     storage_live(@2)
@@ -1434,84 +1461,117 @@ fn extra_checks()
     storage_dead(@3)
     storage_dead(@2)
     storage_live(arr@9)
-    arr@9 := [const (1 : i32), const (2 : i32), const (3 : i32)]
     storage_live(@10)
     storage_live(@11)
     storage_live(@12)
+    @37 := [const (0 : i32)]
     storage_live(@13)
+    @13 := @BoxNew<Array<i32, 1 : usize>>[MetaSized<Array<i32, 1 : usize>>, Sized<Global>](move (@37))
+    @12 := move (@13)
+    @11 := unsize_cast<alloc::boxed::Box<Array<i32, 1 : usize>>[MetaSized<Array<i32, 1 : usize>>, Sized<Global>], alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>], 1 : usize>(move (@12))
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 1 : usize>, Global>[MetaSized<Array<i32, 1 : usize>>, Sized<Global>]] @12
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 1 : usize>, Global>[MetaSized<Array<i32, 1 : usize>>, Sized<Global>]] @13
+    storage_dead(@13)
+    storage_dead(@12)
+    @10 := into_vec<i32, Global>[Sized<i32>, Sized<Global>](move (@11))
+    storage_dead(@11)
     storage_live(@14)
     storage_live(@15)
     storage_live(@16)
-    @16 := &arr@9
-    @15 := &*(@16)
-    @14 := unsize_cast<&'_ (Array<i32, 3 : usize>), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for Array<i32, const N : usize>}<3 : usize>>(move (@15))
-    storage_dead(@15)
-    @13 := &*(@14)
-    @12 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@13))
-    storage_dead(@13)
-    @11 := use_checkable<'_>(move (@12))
-    if move (@11) {
-    }
-    else {
-        storage_dead(@12)
-        storage_dead(@16)
-        storage_dead(@14)
-        panic(core::panicking::panic)
-    }
-    storage_dead(@12)
+    @38 := [const (2 : i32), const (3 : i32)]
+    storage_live(@17)
+    @17 := @BoxNew<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>](move (@38))
+    @16 := move (@17)
+    @15 := unsize_cast<alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>], alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>], 2 : usize>(move (@16))
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @16
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @17
+    storage_dead(@17)
     storage_dead(@16)
+    @14 := into_vec<i32, Global>[Sized<i32>, Sized<Global>](move (@15))
+    storage_dead(@15)
+    arr@9 := [move (@10), move (@14)]
+    drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}<i32, Global>[Sized<i32>, Sized<Global>]] @14
     storage_dead(@14)
-    storage_dead(@11)
+    drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}<i32, Global>[Sized<i32>, Sized<Global>]] @10
     storage_dead(@10)
-    storage_live(tup@17)
     storage_live(@18)
     storage_live(@19)
     storage_live(@20)
-    @29 := [const (20 : i32), const (30 : i32)]
     storage_live(@21)
-    @21 := @BoxNew<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>](move (@29))
-    @20 := move (@21)
-    @19 := unsize_cast<alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>], alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>], 2 : usize>(move (@20))
-    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @20
-    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @21
-    storage_dead(@21)
-    storage_dead(@20)
-    @18 := into_vec<i32, Global>[Sized<i32>, Sized<Global>](move (@19))
-    storage_dead(@19)
-    tup@17 := (const (10 : i32), move (@18))
-    drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}<i32, Global>[Sized<i32>, Sized<Global>]] @18
-    storage_dead(@18)
     storage_live(@22)
     storage_live(@23)
     storage_live(@24)
-    storage_live(@25)
+    @24 := &arr@9
+    @23 := &*(@24)
+    @22 := unsize_cast<&'_ (Array<Vec<i32>[Sized<i32>, Sized<Global>], 2 : usize>), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for Array<Vec<i32>[Sized<i32>, Sized<Global>], const N : usize>}<2 : usize>>(move (@23))
+    storage_dead(@23)
+    @21 := &*(@22)
+    @20 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@21))
+    storage_dead(@21)
+    @19 := use_checkable<'_>(move (@20))
+    if move (@19) {
+    }
+    else {
+        storage_dead(@20)
+        storage_dead(@24)
+        storage_dead(@22)
+        panic(core::panicking::panic)
+    }
+    storage_dead(@20)
+    storage_dead(@24)
+    storage_dead(@22)
+    storage_dead(@19)
+    storage_dead(@18)
+    storage_live(tup@25)
     storage_live(@26)
     storage_live(@27)
     storage_live(@28)
-    @28 := &tup@17
-    @27 := &*(@28)
-    @26 := unsize_cast<&'_ ((i32, Vec<i32>[Sized<i32>, Sized<Global>])), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for (i32, Vec<i32>[Sized<i32>, Sized<Global>])}>(move (@27))
+    @39 := [const (20 : i32), const (30 : i32)]
+    storage_live(@29)
+    @29 := @BoxNew<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>](move (@39))
+    @28 := move (@29)
+    @27 := unsize_cast<alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>], alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>], 2 : usize>(move (@28))
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @28
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @29
+    storage_dead(@29)
+    storage_dead(@28)
+    @26 := into_vec<i32, Global>[Sized<i32>, Sized<Global>](move (@27))
     storage_dead(@27)
-    @25 := &*(@26)
-    @24 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@25))
-    storage_dead(@25)
-    @23 := use_checkable<'_>(move (@24))
-    if move (@23) {
+    tup@25 := (const (10 : i32), move (@26))
+    drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}<i32, Global>[Sized<i32>, Sized<Global>]] @26
+    storage_dead(@26)
+    storage_live(@30)
+    storage_live(@31)
+    storage_live(@32)
+    storage_live(@33)
+    storage_live(@34)
+    storage_live(@35)
+    storage_live(@36)
+    @36 := &tup@25
+    @35 := &*(@36)
+    @34 := unsize_cast<&'_ ((i32, Vec<i32>[Sized<i32>, Sized<Global>])), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for (i32, Vec<i32>[Sized<i32>, Sized<Global>])}>(move (@35))
+    storage_dead(@35)
+    @33 := &*(@34)
+    @32 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@33))
+    storage_dead(@33)
+    @31 := use_checkable<'_>(move (@32))
+    if move (@31) {
     }
     else {
-        storage_dead(@24)
-        storage_dead(@28)
-        storage_dead(@26)
+        storage_dead(@32)
+        storage_dead(@36)
+        storage_dead(@34)
         panic(core::panicking::panic)
     }
-    storage_dead(@24)
-    storage_dead(@28)
-    storage_dead(@26)
-    storage_dead(@23)
-    storage_dead(@22)
+    storage_dead(@32)
+    storage_dead(@36)
+    storage_dead(@34)
+    storage_dead(@31)
+    storage_dead(@30)
     @0 := ()
-    drop[Drop<(i32, Vec<i32>[Sized<i32>, Sized<Global>])>] tup@17
-    storage_dead(tup@17)
+    drop[Drop<(i32, Vec<i32>[Sized<i32>, Sized<Global>])>] tup@25
+    storage_dead(tup@25)
+    drop[Drop<Array<Vec<i32>[Sized<i32>, Sized<Global>], 2 : usize>>] arr@9
     storage_dead(arr@9)
     drop[{impl Drop for String}] b@1
     storage_dead(b@1)
