@@ -1371,14 +1371,10 @@ impl<'a> VtableMetadataComputer<'a> {
         // The drop shim function reference should use the same generic arguments as the impl_ref
         // but also include the region parameter for the receiver
         let mut generics = *self.impl_ref.generics.clone();
-        
-        // Add the region parameter for the receiver if not already present
-        if generics.regions.is_empty() {
-            let _ = generics.regions.push_with(|id| Region::Var(DeBruijnVar::bound(
-                DeBruijnId::new(0),
-                id
-            )));
-        }
+
+        // We create the function pointer there, which is `fn<'a>(&'a mut dyn Trait<...>)`
+        // But the shim itself should have erased region for this
+        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Erased);
         
         Ok(generics)
     }
