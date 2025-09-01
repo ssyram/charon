@@ -23,11 +23,11 @@ pub struct Transform;
 impl TransformPass for Transform {
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
         // Temporarily disable all conditions to test if transform runs
-        // if ctx.options.raw_boxes {
-        //     // Don't simplify when raw-boxes is enabled
-        //     return;
-        // }
-        // 
+        if ctx.options.raw_boxes {
+            // Don't simplify when raw-boxes is enabled
+            return;
+        }
+        
         // if !ctx.options.hide_allocator {
         //     // Only simplify when hide_allocator is enabled (similar to hide_allocator_param)
         //     return;
