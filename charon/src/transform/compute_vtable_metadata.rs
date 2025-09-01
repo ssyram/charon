@@ -296,18 +296,28 @@ impl<'a> VtableMetadataComputer<'a> {
 
         if !should_analyze_composite {
             // First check if the type needs drop at all (for non-composite types)
-            match concrete_ty.needs_drop(&self.ctx.translated) {
-                Ok(false) => {
-                    trace!("[ANALYZE] Type doesn't need drop, returning Empty");
-                    return Ok(DropCase::Empty);
+            // However, for ADT types, we should always check for drop implementations
+            // because types like Vec<T> need drop even if T doesn't need drop
+            let bypass_needs_drop_check = matches!(concrete_ty.kind(), TyKind::Adt(_));
+
+            if !bypass_needs_drop_check {
+                match concrete_ty.needs_drop(&self.ctx.translated) {
+                    Ok(false) => {
+                        trace!("[ANALYZE] Type doesn't need drop, returning Empty");
+                        return Ok(DropCase::Empty);
+                    }
+                    Ok(true) => {
+                        trace!("[ANALYZE] Type needs drop, continuing with analysis");
+                    } // Continue to check for drop implementation
+                    Err(reason) => {
+                        trace!("[ANALYZE] Error checking needs_drop: {}", reason);
+                        return Ok(DropCase::Unknown(reason));
+                    }
                 }
-                Ok(true) => {
-                    trace!("[ANALYZE] Type needs drop, continuing with analysis");
-                } // Continue to check for drop implementation
-                Err(reason) => {
-                    trace!("[ANALYZE] Error checking needs_drop: {}", reason);
-                    return Ok(DropCase::Unknown(reason));
-                }
+            } else {
+                trace!(
+                    "[ANALYZE] ADT type - bypassing needs_drop check, looking for drop impl directly"
+                );
             }
         }
 
@@ -445,12 +455,33 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Check if two types match for the purpose of drop implementation lookup
     fn types_match(&self, ty1: &Ty, ty2: &Ty) -> bool {
         match (ty1.kind(), ty2.kind()) {
-            // ADT types - match by ID
-            (TyKind::Adt(ref1), TyKind::Adt(ref2)) => ref1.id == ref2.id,
+            // ADT types - match by ID, ignore generics for now (they should be handled by substitution)
+            (TyKind::Adt(ref1), TyKind::Adt(ref2)) => {
+                trace!(
+                    "[TYPE_MATCH] Comparing ADT types: {:?} vs {:?}",
+                    ref1.id, ref2.id
+                );
+                let match_result = ref1.id == ref2.id;
+                trace!("[TYPE_MATCH] ADT match result: {}", match_result);
+                match_result
+            }
             // Literal types - exact match
-            (TyKind::Literal(lit1), TyKind::Literal(lit2)) => lit1 == lit2,
+            (TyKind::Literal(lit1), TyKind::Literal(lit2)) => {
+                trace!(
+                    "[TYPE_MATCH] Comparing literal types: {:?} vs {:?}",
+                    lit1, lit2
+                );
+                lit1 == lit2
+            }
             // For other types, use structural equality
-            _ => ty1 == ty2,
+            _ => {
+                trace!(
+                    "[TYPE_MATCH] Comparing other types structurally: {:?} vs {:?}",
+                    ty1.kind(),
+                    ty2.kind()
+                );
+                ty1 == ty2
+            }
         }
     }
 
@@ -477,6 +508,11 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Find direct drop implementation for a concrete type
     fn find_direct_drop_impl(&self, concrete_ty: &Ty) -> Result<Option<FunDeclRef>, Error> {
+        trace!(
+            "[FIND_DROP] Looking for drop implementation for type: {:?}",
+            concrete_ty
+        );
+
         // Look for drop implementations for this type
         for trait_impl in self.ctx.translated.trait_impls.iter() {
             // Check if this is a drop implementation for our type
@@ -484,20 +520,39 @@ impl<'a> VtableMetadataComputer<'a> {
 
             // Check if this implements the Drop trait
             if self.is_drop_trait(&trait_decl_ref.id) {
+                trace!("[FIND_DROP] Found Drop trait impl: {:?}", trait_impl.def_id);
+
                 // Check if the self type matches our concrete type
                 if let Some(self_ty) = self.get_impl_self_type(trait_impl) {
+                    trace!("[FIND_DROP] Impl self type: {:?}", self_ty);
+                    trace!("[FIND_DROP] Concrete type: {:?}", concrete_ty);
+
                     if self.types_match(concrete_ty, &self_ty) {
+                        trace!("[FIND_DROP] Types match! Looking for drop method");
+
                         // Found drop implementation - create function reference
                         if let Some(drop_method) =
                             trait_impl.methods.iter().find(|(name, _)| name.0 == "drop")
                         {
                             let fun_ref = drop_method.1.skip_binder.clone();
+                            trace!("[FIND_DROP] Found drop method: {:?}", fun_ref);
                             return Ok(Some(fun_ref));
+                        } else {
+                            trace!("[FIND_DROP] Drop trait impl found but no drop method");
                         }
+                    } else {
+                        trace!("[FIND_DROP] Types don't match");
                     }
+                } else {
+                    trace!("[FIND_DROP] Could not get self type from trait impl");
                 }
             }
         }
+
+        trace!(
+            "[FIND_DROP] No drop implementation found for type: {:?}",
+            concrete_ty
+        );
         Ok(None)
     }
 
