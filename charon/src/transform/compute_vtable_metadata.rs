@@ -357,6 +357,36 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
+    /// Check if a type is a Box type (either built-in or ADT Box)
+    fn is_box_type(&self, ty: &Ty) -> bool {
+        match ty.kind() {
+            TyKind::Adt(type_decl_ref) => match &type_decl_ref.id {
+                TypeId::Builtin(BuiltinTy::Box) => true,
+                TypeId::Adt(type_decl_id) => {
+                    // Check if this ADT is a Box by looking at its name or structure
+                    if let Some(type_decl) = self.ctx.translated.type_decls.get(*type_decl_id) {
+                        // Check if the name contains "Box" - this is a heuristic
+                        type_decl.item_meta.name.name.iter().any(|elem| {
+                            match elem {
+                                PathElem::Ident(name, _) => name.contains("Box"),
+                                _ => false,
+                            }
+                        })
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    /// Check if this is a built-in Box type (vs ADT Box)
+    fn is_builtin_box(&self, type_id: &TypeId) -> bool {
+        matches!(type_id, TypeId::Builtin(BuiltinTy::Box))
+    }
+
     /// Check if two types match for the purpose of drop implementation lookup
     fn types_match(&self, ty1: &Ty, ty2: &Ty) -> bool {
         match (ty1.kind(), ty2.kind()) {
@@ -1253,7 +1283,18 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         // Drop shim functions should have the same generic parameters as the trait impl
-        Ok(trait_impl.generics.clone())
+        // but with at least one region binder for the receiver
+        let mut generics = trait_impl.generics.clone();
+        
+        // Ensure we have at least one region for the receiver parameter
+        if generics.regions.is_empty() {
+            let _ = generics.regions.push_with(|id| RegionVar {
+                index: id,
+                name: None,
+            });
+        }
+        
+        Ok(generics)
     }
 
     /// The `&'_ mut (dyn Trait<...>)` receiver, where the lifetime is erased
@@ -1273,7 +1314,27 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Additionally, we should add the lifetime as the first region argument for the `&mut self` receiver.
     fn create_drop_function_generics(&self, concrete_ty: &Ty) -> Result<Box<GenericArgs>, Error> {
         let mut generics = match concrete_ty.kind() {
-            TyKind::Adt(type_decl_ref) => type_decl_ref.generics.clone(),
+            TyKind::Adt(type_decl_ref) => {
+                let mut generic_args = type_decl_ref.generics.clone();
+                
+                // Special handling for Box types
+                if self.is_box_type(concrete_ty) {
+                    // Check if this is a built-in Box
+                    if self.is_builtin_box(&type_decl_ref.id) {
+                        // For built-in Box, ignore the allocator parameter and trait constraints
+                        // Keep only the element type T, remove allocator A and trait clauses
+                        if let Some(element_ty) = generic_args.types.get(TypeVarId::new(0)) {
+                            // Create new generics with only the element type T
+                            let mut new_generics = GenericArgs::empty();
+                            let _ = new_generics.types.push_with(|_| element_ty.clone());
+                            // No trait clauses for built-in Box
+                            generic_args = Box::new(new_generics);
+                        }
+                    }
+                }
+                
+                generic_args
+            }
             _ => {
                 raise_error!(
                     self.ctx,
@@ -1283,10 +1344,12 @@ impl<'a> VtableMetadataComputer<'a> {
                 );
             }
         };
-        // it refers to the first lifetime of the shim drop method
+        
+        // Use proper region variable instead of Region::Erased
+        let region_var = Region::Var(DeBruijnVar::bound(DeBruijnId::new(0), RegionId::new(0)));
         generics
             .regions
-            .insert_and_shift_ids(RegionId::ZERO, Region::Erased);
+            .insert_and_shift_ids(RegionId::ZERO, region_var);
         Ok(generics)
     }
 
