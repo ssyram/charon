@@ -189,43 +189,18 @@ impl Display for Str {
     vtable: {impl Display for Str}::{vtable}
 }
 
-// Full name: core::iter::adapters::map::Map
-pub opaque type Map<I, F>
+// Full name: core::iter::adapters::copied::Copied
+pub opaque type Copied<I>
 where
     [@TraitClause0]: Sized<I>,
-    [@TraitClause1]: Sized<F>,
 
-// Full name: core::marker::Tuple
-#[lang_item("tuple_trait")]
-pub trait Tuple<Self>
+// Full name: core::marker::Copy
+#[lang_item("copy")]
+pub trait Copy<Self>
 {
     parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    vtable: core::marker::Tuple::{vtable}
-}
-
-// Full name: core::ops::function::FnOnce
-#[lang_item("fn_once")]
-pub trait FnOnce<Self, Args>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: Sized<Args>
-    parent_clause2 : [@TraitClause2]: Tuple<Args>
-    parent_clause3 : [@TraitClause3]: Sized<Self::Output>
-    type Output
-    fn call_once = core::ops::function::FnOnce::call_once<Self, Args>[Self]
-    vtable: core::ops::function::FnOnce::{vtable}<Args, Self::Output>
-}
-
-// Full name: core::ops::function::FnMut
-#[lang_item("fn_mut")]
-pub trait FnMut<Self, Args>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: FnOnce<Self, Args>
-    parent_clause2 : [@TraitClause2]: Sized<Args>
-    parent_clause3 : [@TraitClause3]: Tuple<Args>
-    fn call_mut<'_0> = core::ops::function::FnMut::call_mut<'_0_0, Self, Args>[Self]
-    vtable: core::ops::function::FnMut::{vtable}<Args, Self::parent_clause1::Output>
+    parent_clause1 : [@TraitClause1]: Clone<Self>
+    non-dyn-compatible
 }
 
 // Full name: core::iter::traits::iterator::Iterator
@@ -236,7 +211,7 @@ pub trait Iterator<Self>
     parent_clause1 : [@TraitClause1]: Sized<Self::Item>
     type Item
     fn next<'_0> = core::iter::traits::iterator::Iterator::next<'_0_0, Self>[Self]
-    fn map<B, F, [@TraitClause0]: Sized<B>, [@TraitClause1]: Sized<F>, [@TraitClause2]: Sized<Self>, [@TraitClause3]: FnMut<F, (Self::Item)>, @TraitClause1_3::parent_clause1::Output = B> = map<Self, B, F>[Self, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2, @TraitClause0_3]
+    fn copied<'a, T, [@TraitClause0]: Sized<T>, [@TraitClause1]: Sized<Self>, [@TraitClause2]: Iterator<Self>, [@TraitClause3]: Copy<T>, T : 'a, Self::Item = &'a (T)> = copied<'a, Self, T>[Self, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2, @TraitClause0_3]
     fn sum<S, [@TraitClause0]: Sized<S>, [@TraitClause1]: Sized<Self>, [@TraitClause2]: Sum<S, Self::Item>> = core::iter::traits::iterator::Iterator::sum<Self, S>[Self, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2]
     vtable: core::iter::traits::iterator::Iterator::{vtable}<Self::Item>
 }
@@ -250,60 +225,61 @@ pub trait Sum<Self, A>
     non-dyn-compatible
 }
 
-// Full name: core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::next
-pub fn {impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::next<'_0, B, I, F>(@1: &'_0 mut (Map<I, F>[@TraitClause0, @TraitClause1])) -> Option<B>[@TraitClause4]
+// Full name: core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::next
+pub fn {impl Iterator for Copied<I>[@TraitClause2]}::next<'a, '_1, I, T>(@1: &'_1 mut (Copied<I>[@TraitClause2])) -> Option<T>[@TraitClause0]
 where
-    [@TraitClause0]: Sized<I>,
-    [@TraitClause1]: Sized<F>,
-    [@TraitClause2]: Iterator<I>,
-    [@TraitClause3]: FnMut<F, (@TraitClause2::Item)>,
-    [@TraitClause4]: Sized<B>,
-    @TraitClause3::parent_clause1::Output = B,
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Iterator<I>,
+    [@TraitClause2]: Sized<I>,
+    [@TraitClause3]: Copy<T>,
+    T : 'a,
+    @TraitClause1::Item = &'a (T),
 
-#[lang_item("IteratorMap")]
-pub fn core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::map<B, I, F, B, F>(@1: Map<I, F>[@TraitClause0, @TraitClause1], @2: F) -> Map<Map<I, F>[@TraitClause0, @TraitClause1], F>[@TraitClause7, @TraitClause6]
+#[lang_item("iter_copied")]
+pub fn core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::copied<'a, 'a, I, T, T>(@1: Copied<I>[@TraitClause2]) -> Copied<Copied<I>[@TraitClause2]>[@TraitClause5]
 where
-    [@TraitClause0]: Sized<I>,
-    [@TraitClause1]: Sized<F>,
-    [@TraitClause2]: Iterator<I>,
-    [@TraitClause3]: FnMut<F, (@TraitClause2::Item)>,
-    [@TraitClause4]: Sized<B>,
-    [@TraitClause5]: Sized<B>,
-    [@TraitClause6]: Sized<F>,
-    [@TraitClause7]: Sized<Map<I, F>[@TraitClause0, @TraitClause1]>,
-    [@TraitClause8]: FnMut<F, (B)>,
-    @TraitClause3::parent_clause1::Output = B,
-    @TraitClause8::parent_clause1::Output = B,
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Iterator<I>,
+    [@TraitClause2]: Sized<I>,
+    [@TraitClause3]: Copy<T>,
+    [@TraitClause4]: Sized<T>,
+    [@TraitClause5]: Sized<Copied<I>[@TraitClause2]>,
+    [@TraitClause6]: Iterator<Copied<I>[@TraitClause2]>,
+    [@TraitClause7]: Copy<T>,
+    T : 'a,
+    T : 'a,
+    @TraitClause1::Item = &'a (T),
+    {impl Iterator for Copied<I>[@TraitClause2]}<'a, I, T>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]::Item = &'a (T),
 
-pub fn core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::sum<B, I, F, S>(@1: Map<I, F>[@TraitClause0, @TraitClause1]) -> S
+pub fn core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::sum<'a, I, T, S>(@1: Copied<I>[@TraitClause2]) -> S
 where
-    [@TraitClause0]: Sized<I>,
-    [@TraitClause1]: Sized<F>,
-    [@TraitClause2]: Iterator<I>,
-    [@TraitClause3]: FnMut<F, (@TraitClause2::Item)>,
-    [@TraitClause4]: Sized<B>,
-    [@TraitClause5]: Sized<S>,
-    [@TraitClause6]: Sized<Map<I, F>[@TraitClause0, @TraitClause1]>,
-    [@TraitClause7]: Sum<S, B>,
-    @TraitClause3::parent_clause1::Output = B,
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Iterator<I>,
+    [@TraitClause2]: Sized<I>,
+    [@TraitClause3]: Copy<T>,
+    [@TraitClause4]: Sized<S>,
+    [@TraitClause5]: Sized<Copied<I>[@TraitClause2]>,
+    [@TraitClause6]: Sum<S, T>,
+    T : 'a,
+    @TraitClause1::Item = &'a (T),
 
-// Full name: core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}
-impl<B, I, F> Iterator for Map<I, F>[@TraitClause0, @TraitClause1]
+// Full name: core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}
+impl<'a, I, T> Iterator for Copied<I>[@TraitClause2]
 where
-    [@TraitClause0]: Sized<I>,
-    [@TraitClause1]: Sized<F>,
-    [@TraitClause2]: Iterator<I>,
-    [@TraitClause3]: FnMut<F, (@TraitClause2::Item)>,
-    [@TraitClause4]: Sized<B>,
-    @TraitClause3::parent_clause1::Output = B,
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Iterator<I>,
+    [@TraitClause2]: Sized<I>,
+    [@TraitClause3]: Copy<T>,
+    T : 'a,
+    @TraitClause1::Item = &'a (T),
 {
-    parent_clause0 = MetaSized<Map<I, F>[@TraitClause0, @TraitClause1]>
-    parent_clause1 = @TraitClause4
-    type Item = B
-    fn next<'_0> = {impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::next<'_0_0, B, I, F>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3, @TraitClause4]
-    fn map<B, F, [@TraitClause0]: Sized<B>, [@TraitClause1]: Sized<F>, [@TraitClause2]: Sized<Map<I, F>[@TraitClause0, @TraitClause1]>, [@TraitClause3]: FnMut<F, (B)>, @TraitClause1_3::parent_clause1::Output = B> = core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::map<B, I, F, B, F>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3, @TraitClause4, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2, @TraitClause0_3]
-    fn sum<S, [@TraitClause0]: Sized<S>, [@TraitClause1]: Sized<Map<I, F>[@TraitClause0, @TraitClause1]>, [@TraitClause2]: Sum<S, B>> = core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::sum<B, I, F, S>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3, @TraitClause4, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2]
-    vtable: {impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::{vtable}<B, I, F>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3, @TraitClause4]
+    parent_clause0 = MetaSized<Copied<I>[@TraitClause2]>
+    parent_clause1 = @TraitClause0
+    type Item = T
+    fn next<'_0> = {impl Iterator for Copied<I>[@TraitClause2]}::next<'a, '_0_0, I, T>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]
+    fn copied<'a, T, [@TraitClause0]: Sized<T>, [@TraitClause1]: Sized<Copied<I>[@TraitClause2]>, [@TraitClause2]: Iterator<Copied<I>[@TraitClause2]>, [@TraitClause3]: Copy<T>, T : 'a, {impl Iterator for Copied<I>[@TraitClause2]}<'a, I, T>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]::Item = &'a (T)> = core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::copied<'a, 'a, I, T, T>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2, @TraitClause0_3]
+    fn sum<S, [@TraitClause0]: Sized<S>, [@TraitClause1]: Sized<Copied<I>[@TraitClause2]>, [@TraitClause2]: Sum<S, T>> = core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::sum<'a, I, T, S>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2]
+    vtable: {impl Iterator for Copied<I>[@TraitClause2]}::{vtable}<'a, I, T>[@TraitClause0, @TraitClause1, @TraitClause2, @TraitClause3]
 }
 
 // Full name: core::iter::adapters::zip::TrustedRandomAccessNoCoerce
@@ -337,18 +313,18 @@ where
     [@TraitClause2]: Iterator<I>,
     @TraitClause2::Item = A,
 
-// Full name: core::iter::traits::accum::{impl Sum<usize> for usize}::sum
-pub fn {impl Sum<usize> for usize}::sum<I>(@1: I) -> usize
+// Full name: core::iter::traits::accum::{impl Sum<i32> for i32}::sum
+pub fn {impl Sum<i32> for i32}::sum<I>(@1: I) -> i32
 where
     [@TraitClause0]: Sized<I>,
     [@TraitClause1]: Iterator<I>,
-    @TraitClause1::Item = usize,
+    @TraitClause1::Item = i32,
 
-// Full name: core::iter::traits::accum::{impl Sum<usize> for usize}
-impl Sum<usize> for usize {
-    parent_clause0 = Sized<usize>
-    parent_clause1 = Sized<usize>
-    fn sum<I, [@TraitClause0]: Sized<I>, [@TraitClause1]: Iterator<I>, @TraitClause1_1::Item = usize> = {impl Sum<usize> for usize}::sum<I>[@TraitClause0_0, @TraitClause0_1]
+// Full name: core::iter::traits::accum::{impl Sum<i32> for i32}
+impl Sum<i32> for i32 {
+    parent_clause0 = Sized<i32>
+    parent_clause1 = Sized<i32>
+    fn sum<I, [@TraitClause0]: Sized<I>, [@TraitClause1]: Iterator<I>, @TraitClause1_1::Item = i32> = {impl Sum<i32> for i32}::sum<I>[@TraitClause0_0, @TraitClause0_1]
     non-dyn-compatible
 }
 
@@ -438,16 +414,17 @@ pub fn core::iter::traits::iterator::Iterator::next<'_0, Self>(@1: &'_0 mut (Sel
 where
     [@TraitClause0]: Iterator<Self>,
 
-// Full name: core::iter::traits::iterator::Iterator::map
-#[lang_item("IteratorMap")]
-pub fn map<Self, B, F>(@1: Self, @2: F) -> Map<Self, F>[@TraitClause3, @TraitClause2]
+// Full name: core::iter::traits::iterator::Iterator::copied
+#[lang_item("iter_copied")]
+pub fn copied<'a, Self, T>(@1: Self) -> Copied<Self>[@TraitClause2]
 where
     [@TraitClause0]: Iterator<Self>,
-    [@TraitClause1]: Sized<B>,
-    [@TraitClause2]: Sized<F>,
-    [@TraitClause3]: Sized<Self>,
-    [@TraitClause4]: FnMut<F, (@TraitClause0::Item)>,
-    @TraitClause4::parent_clause1::Output = B,
+    [@TraitClause1]: Sized<T>,
+    [@TraitClause2]: Sized<Self>,
+    [@TraitClause3]: Iterator<Self>,
+    [@TraitClause4]: Copy<T>,
+    T : 'a,
+    @TraitClause0::Item = &'a (T),
 
 pub fn core::iter::traits::iterator::Iterator::sum<Self, S>(@1: Self) -> S
 where
@@ -456,12 +433,10 @@ where
     [@TraitClause2]: Sized<Self>,
     [@TraitClause3]: Sum<S, @TraitClause0::Item>,
 
-// Full name: core::marker::Copy
-#[lang_item("copy")]
-pub trait Copy<Self>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    parent_clause1 : [@TraitClause1]: Clone<Self>
+// Full name: core::marker::{impl Copy for i32}
+impl Copy for i32 {
+    parent_clause0 = MetaSized<i32>
+    parent_clause1 = {impl Clone for i32}
     non-dyn-compatible
 }
 
@@ -471,6 +446,14 @@ pub trait Destruct<Self>
 {
     parent_clause0 : [@TraitClause0]: MetaSized<Self>
     vtable: core::marker::Destruct::{vtable}
+}
+
+// Full name: core::marker::Tuple
+#[lang_item("tuple_trait")]
+pub trait Tuple<Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    vtable: core::marker::Tuple::{vtable}
 }
 
 // Full name: core::ops::control_flow::ControlFlow
@@ -488,11 +471,38 @@ pub fn core::ops::drop::Drop::drop<'_0, Self>(@1: &'_0 mut (Self))
 where
     [@TraitClause0]: Drop<Self>,
 
-pub fn core::ops::function::FnMut::call_mut<'_0, Self, Args>(@1: &'_0 mut (Self), @2: Args) -> @TraitClause0::parent_clause1::Output
+// Full name: core::ops::function::FnOnce
+#[lang_item("fn_once")]
+pub trait FnOnce<Self, Args>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    parent_clause1 : [@TraitClause1]: Sized<Args>
+    parent_clause2 : [@TraitClause2]: Tuple<Args>
+    parent_clause3 : [@TraitClause3]: Sized<Self::Output>
+    type Output
+    fn call_once = call_once<Self, Args>[Self]
+    vtable: core::ops::function::FnOnce::{vtable}<Args, Self::Output>
+}
+
+// Full name: core::ops::function::FnMut
+#[lang_item("fn_mut")]
+pub trait FnMut<Self, Args>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    parent_clause1 : [@TraitClause1]: FnOnce<Self, Args>
+    parent_clause2 : [@TraitClause2]: Sized<Args>
+    parent_clause3 : [@TraitClause3]: Tuple<Args>
+    fn call_mut<'_0> = call_mut<'_0_0, Self, Args>[Self]
+    vtable: core::ops::function::FnMut::{vtable}<Args, Self::parent_clause1::Output>
+}
+
+// Full name: core::ops::function::FnMut::call_mut
+pub fn call_mut<'_0, Self, Args>(@1: &'_0 mut (Self), @2: Args) -> @TraitClause0::parent_clause1::Output
 where
     [@TraitClause0]: FnMut<Self, Args>,
 
-pub fn core::ops::function::FnOnce::call_once<Self, Args>(@1: Self, @2: Args) -> @TraitClause0::Output
+// Full name: core::ops::function::FnOnce::call_once
+pub fn call_once<Self, Args>(@1: Self, @2: Args) -> @TraitClause0::Output
 where
     [@TraitClause0]: FnOnce<Self, Args>,
 
@@ -583,15 +593,16 @@ pub fn {impl Iterator for Iter<'a, T>[@TraitClause0]}::next<'a, '_1, T>(@1: &'_1
 where
     [@TraitClause0]: Sized<T>,
 
-#[lang_item("IteratorMap")]
-pub fn core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::map<'a, T, B, F>(@1: Iter<'a, T>[@TraitClause0], @2: F) -> Map<Iter<'a, T>[@TraitClause0], F>[@TraitClause3, @TraitClause2]
+#[lang_item("iter_copied")]
+pub fn core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::copied<'a, 'a, T, T>(@1: Iter<'a, T>[@TraitClause0]) -> Copied<Iter<'a, T>[@TraitClause0]>[@TraitClause2]
 where
     [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<B>,
-    [@TraitClause2]: Sized<F>,
-    [@TraitClause3]: Sized<Iter<'a, T>[@TraitClause0]>,
-    [@TraitClause4]: FnMut<F, (&'a (T))>,
-    @TraitClause4::parent_clause1::Output = B,
+    [@TraitClause1]: Sized<T>,
+    [@TraitClause2]: Sized<Iter<'a, T>[@TraitClause0]>,
+    [@TraitClause3]: Iterator<Iter<'a, T>[@TraitClause0]>,
+    [@TraitClause4]: Copy<T>,
+    T : 'a,
+    {impl Iterator for Iter<'a, T>[@TraitClause0]}<'a, T>[@TraitClause0]::Item = &'a (T),
 
 pub fn core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::sum<'a, T, S>(@1: Iter<'a, T>[@TraitClause0]) -> S
 where
@@ -609,7 +620,7 @@ where
     parent_clause1 = Sized<&'_ (T)>
     type Item = &'a (T)
     fn next<'_0> = {impl Iterator for Iter<'a, T>[@TraitClause0]}::next<'a, '_0_0, T>[@TraitClause0]
-    fn map<B, F, [@TraitClause0]: Sized<B>, [@TraitClause1]: Sized<F>, [@TraitClause2]: Sized<Iter<'a, T>[@TraitClause0]>, [@TraitClause3]: FnMut<F, (&'a (T))>, @TraitClause1_3::parent_clause1::Output = B> = core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::map<'a, T, B, F>[@TraitClause0, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2, @TraitClause0_3]
+    fn copied<'a, T, [@TraitClause0]: Sized<T>, [@TraitClause1]: Sized<Iter<'a, T>[@TraitClause0]>, [@TraitClause2]: Iterator<Iter<'a, T>[@TraitClause0]>, [@TraitClause3]: Copy<T>, T : 'a, {impl Iterator for Iter<'a, T>[@TraitClause0]}<'a, T>[@TraitClause0]::Item = &'a (T)> = core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::copied<'a, 'a, T, T>[@TraitClause0, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2, @TraitClause0_3]
     fn sum<S, [@TraitClause0]: Sized<S>, [@TraitClause1]: Sized<Iter<'a, T>[@TraitClause0]>, [@TraitClause2]: Sum<S, &'a (T)>> = core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::sum<'a, T, S>[@TraitClause0, @TraitClause0_0, @TraitClause0_1, @TraitClause0_2]
     vtable: {impl Iterator for Iter<'a, T>[@TraitClause0]}::{vtable}<'a, T>[@TraitClause0]
 }
@@ -633,10 +644,6 @@ impl Drop for Global {
 
 // Full name: alloc::alloc::Global::{impl Drop for Global}::drop
 fn {impl Drop for Global}::drop<'_0>(@1: &'_0 mut (Global))
-
-// Full name: alloc::alloc::exchange_malloc
-#[lang_item("exchange_malloc")]
-unsafe fn exchange_malloc(@1: usize, @2: usize) -> *mut u8
 
 // Full name: alloc::boxed::Box::{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop
 fn {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0, T, A>(@1: &'_0 mut (alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]))
@@ -672,20 +679,6 @@ where
     vtable: {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::{vtable}<T, A>[@TraitClause0, @TraitClause1]
 }
 
-// Full name: alloc::vec::Vec
-#[lang_item("Vec")]
-pub opaque type Vec<T>
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<type_error("removed allocator parameter")>,
-
-// Full name: alloc::slice::{Slice<T>}::into_vec
-#[lang_item("slice_into_vec")]
-pub fn into_vec<T, A>(@1: alloc::boxed::Box<Slice<T>>[MetaSized<Slice<T>>, @TraitClause1]) -> Vec<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<A>,
-
 // Full name: alloc::string::String
 #[lang_item("String")]
 pub opaque type String
@@ -699,8 +692,6 @@ impl Drop for String {
 
 // Full name: alloc::string::String::{impl Drop for String}::drop
 fn {impl Drop for String}::drop<'_0>(@1: &'_0 mut (String))
-
-pub fn alloc::string::{String}::len<'_0>(@1: &'_0 (String)) -> usize
 
 pub fn alloc::string::{String}::is_empty<'_0>(@1: &'_0 (String)) -> bool
 
@@ -745,48 +736,28 @@ where
     vtable: {impl ToString for T}::{vtable}<T>[@TraitClause0, @TraitClause1]
 }
 
-pub fn alloc::vec::{Vec<T>[@TraitClause0, @TraitClause1]}::len<'_0, T, A>(@1: &'_0 (Vec<T>[@TraitClause0, @TraitClause1])) -> usize
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<A>,
-
-// Full name: alloc::vec::{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}::drop
-pub fn {impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}::drop<'_0, T, A>(@1: &'_0 mut (Vec<T>[@TraitClause0, @TraitClause1]))
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<A>,
-
-// Full name: alloc::vec::{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}
-impl<T, A> Drop for Vec<T>[@TraitClause0, @TraitClause1]
-where
-    [@TraitClause0]: Sized<T>,
-    [@TraitClause1]: Sized<A>,
-{
-    parent_clause0 = MetaSized<Vec<T>[@TraitClause0, @TraitClause1]>
-    fn drop<'_0> = {impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}::drop<'_0_0, T, A>[@TraitClause0, @TraitClause1]
-    vtable: {impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}::{vtable}<T, A>[@TraitClause0, @TraitClause1]
-}
-
 // Full name: test_crate::Super
 trait Super<Self, T>
 {
     parent_clause0 : [@TraitClause0]: MetaSized<Self>
     parent_clause1 : [@TraitClause1]: Sized<T>
+    parent_clause2 : [@TraitClause2]: Sized<Self::Output>
+    type Output
     fn super_method<'_0> = test_crate::Super::super_method<'_0_0, Self, T>[Self]
-    vtable: test_crate::Super::{vtable}<T>
+    vtable: test_crate::Super::{vtable}<T, Self::Output>
 }
 
-fn test_crate::Super::super_method<'_0, Self, T>(@1: &'_0 (Self), @2: T) -> i32
+fn test_crate::Super::super_method<'_0, Self, T>(@1: &'_0 (Self), @2: T) -> @TraitClause0::Output
 where
     [@TraitClause0]: Super<Self, T>,
 
-struct test_crate::Checkable::{vtable}<T> {
+struct test_crate::Checkable::{vtable}<T, Ty0> {
   size: usize,
   align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, T> + _dyn : '_))),
-  method_check: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, T> + _dyn : '_))) -> bool,
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, T> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0))),
+  method_check: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, T> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0))) -> bool,
   super_trait_0: &'static (core::marker::MetaSized::{vtable}),
-  super_trait_1: &'static (test_crate::Super::{vtable}<T>),
+  super_trait_1: &'static (test_crate::Super::{vtable}<T, Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, T> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0), T>::parent_clause1::Output>),
 }
 
 // Full name: test_crate::Checkable
@@ -796,7 +767,7 @@ trait Checkable<Self, T>
     parent_clause1 : [@TraitClause1]: Super<Self, T>
     parent_clause2 : [@TraitClause2]: Sized<T>
     fn check<'_0> = test_crate::Checkable::check<'_0_0, Self, T>[Self]
-    vtable: test_crate::Checkable::{vtable}<T>
+    vtable: test_crate::Checkable::{vtable}<T, Self::parent_clause1::Output>
 }
 
 fn test_crate::Checkable::check<'_0, Self, T>(@1: &'_0 (Self)) -> bool
@@ -829,6 +800,8 @@ fn {impl Super<i32> for i32}::super_method<'_0>(@1: &'_0 (i32), @2: i32) -> i32
 impl Super<i32> for i32 {
     parent_clause0 = MetaSized<i32>
     parent_clause1 = Sized<i32>
+    parent_clause2 = Sized<i32>
+    type Output = i32
     fn super_method<'_0> = {impl Super<i32> for i32}::super_method<'_0_0>
     vtable: {impl Super<i32> for i32}::{vtable}
 }
@@ -851,44 +824,44 @@ fn {impl Checkable<i32> for i32}::check<'_0>(@1: &'_0 (i32)) -> bool
     return
 }
 
-fn {vtable_drop_shim_empty_i32}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)))
+fn {vtable_drop_shim_empty_i32}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)))
 {
     let ret@0: (); // return
-    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)); // arg #1
+    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
 
     ret@0 := ()
     return
 }
 
 // Full name: test_crate::{impl Checkable<i32> for i32}::check::{vtable_method}
-fn {impl Checkable<i32> for i32}::check::{vtable_method}<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_))) -> bool
+fn {impl Checkable<i32> for i32}::check::{vtable_method}<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
 {
     let @0: bool; // return
-    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)); // arg #1
+    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
     let @2: &'_0 (i32); // anonymous local
 
     storage_live(@0)
     storage_live(@1)
     storage_live(@2)
-    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)), &'_0 (i32)>(move (@1))
+    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_0 (i32)>(move (@1))
     @0 := {impl Checkable<i32> for i32}::check<'_0>(move (@2))
     return
 }
 
 // Full name: test_crate::{impl Checkable<i32> for i32}::{vtable}
-fn {impl Checkable<i32> for i32}::{vtable}() -> test_crate::Checkable::{vtable}<i32>
+fn {impl Checkable<i32> for i32}::{vtable}() -> test_crate::Checkable::{vtable}<i32, i32>
 {
-    let ret@0: test_crate::Checkable::{vtable}<i32>; // return
-    let @1: &'static (test_crate::Super::{vtable}<i32>); // anonymous local
+    let ret@0: test_crate::Checkable::{vtable}<i32, i32>; // return
+    let @1: &'static (test_crate::Super::{vtable}<i32, Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>::parent_clause1::Output>); // anonymous local
 
     storage_live(@1)
     @1 := &{impl Super<i32> for i32}::{vtable}
-    ret@0 := test_crate::Checkable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun210), method_check: const ({impl Checkable<i32> for i32}::check::{vtable_method}<'_>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
+    ret@0 := test_crate::Checkable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun215), method_check: const ({impl Checkable<i32> for i32}::check::{vtable_method}<'_>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
     return
 }
 
 // Full name: test_crate::{impl Checkable<i32> for i32}::{vtable}
-static {impl Checkable<i32> for i32}::{vtable}: test_crate::Checkable::{vtable}<i32> = {impl Checkable<i32> for i32}::{vtable}()
+static {impl Checkable<i32> for i32}::{vtable}: test_crate::Checkable::{vtable}<i32, i32> = {impl Checkable<i32> for i32}::{vtable}()
 
 // Full name: test_crate::{impl Checkable<i32> for i32}
 impl Checkable<i32> for i32 {
@@ -897,6 +870,492 @@ impl Checkable<i32> for i32 {
     parent_clause2 = Sized<i32>
     fn check<'_0> = {impl Checkable<i32> for i32}::check<'_0_0>
     vtable: {impl Checkable<i32> for i32}::{vtable}
+}
+
+// Full name: test_crate::use_checkable
+fn use_checkable<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_0 + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
+{
+    let @0: bool; // return
+    let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let @2: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @3: *const test_crate::Checkable::{vtable}<i32, i32>; // anonymous local
+    let @4: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool; // anonymous local
+
+    storage_live(@2)
+    @2 := &*(x@1)
+    storage_live(@3)
+    storage_live(@4)
+    @3 := ptr_metadata(move (@2))
+    @4 := copy ((*(@3)).3)
+    @0 := (move @4)(move (@2))
+    storage_dead(@2)
+    return
+}
+
+// Full name: test_crate::{impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::super_method
+fn {impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::super_method<'_0>(@1: &'_0 (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]), @2: i32) -> i32
+{
+    let @0: i32; // return
+    let self@1: &'_ (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // arg #1
+    let arg@2: i32; // arg #2
+    let @3: i32; // anonymous local
+    let @4: i32; // anonymous local
+    let @5: i32; // anonymous local
+
+    storage_live(@5)
+    storage_live(@3)
+    @3 := copy (*(*(self@1)))
+    storage_live(@4)
+    @4 := copy (arg@2)
+    @5 := copy (@3) panic.+ copy (@4)
+    @0 := move (@5)
+    storage_dead(@4)
+    storage_dead(@3)
+    return
+}
+
+// Full name: test_crate::{impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}
+impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>] {
+    parent_clause0 = MetaSized<alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]>
+    parent_clause1 = Sized<i32>
+    parent_clause2 = Sized<i32>
+    type Output = i32
+    fn super_method<'_0> = {impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::super_method<'_0_0>
+    vtable: {impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}
+}
+
+// Full name: test_crate::{impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check
+fn {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check<'_0>(@1: &'_0 (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])) -> bool
+{
+    let @0: bool; // return
+    let self@1: &'_ (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // arg #1
+    let @2: i32; // anonymous local
+    let @3: &'_ (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // anonymous local
+
+    storage_live(@2)
+    storage_live(@3)
+    @3 := &*(self@1)
+    @2 := {impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::super_method<'_>(move (@3), const (0 : i32))
+    storage_dead(@3)
+    @0 := move (@2) >= const (0 : i32)
+    storage_dead(@2)
+    return
+}
+
+fn {vtable_drop_shim_call_199_adt_Builtin(Box)}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)))
+{
+    let ret@0: (); // return
+    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let concrete@2: &'_ mut (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // local
+
+    storage_live(concrete@2)
+    concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])>(move (self@1))
+    ret@0 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_>(move (concrete@2))
+    ret@0 := ()
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check::{vtable_method}
+fn {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check::{vtable_method}<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
+{
+    let @0: bool; // return
+    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let @2: &'_0 (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_0 (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])>(move (@1))
+    @0 := {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check<'_0>(move (@2))
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}
+fn {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}() -> test_crate::Checkable::{vtable}<i32, i32>
+{
+    let ret@0: test_crate::Checkable::{vtable}<i32, i32>; // return
+    let @1: &'static (test_crate::Super::{vtable}<i32, Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>::parent_clause1::Output>); // anonymous local
+
+    storage_live(@1)
+    @1 := &{impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}
+    ret@0 := test_crate::Checkable::{vtable} { size: const (Opaque(Layout not available: TODO: handle Box with ptr-metadata)), align: const (Opaque(Layout not available: TODO: handle Box with ptr-metadata)), drop: const (@Fun211), method_check: const ({impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check::{vtable_method}<'_>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}
+static {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}: test_crate::Checkable::{vtable}<i32, i32> = {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}()
+
+// Full name: test_crate::{impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}
+impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>] {
+    parent_clause0 = MetaSized<alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]>
+    parent_clause1 = {impl Super<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}
+    parent_clause2 = Sized<i32>
+    fn check<'_0> = {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::check<'_0_0>
+    vtable: {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}::{vtable}
+}
+
+// Full name: test_crate::{impl Super<i32> for Array<i32, const N : usize>}::super_method
+fn {impl Super<i32> for Array<i32, const N : usize>}::super_method<'_0, const N : usize>(@1: &'_0 (Array<i32, const N : usize>), @2: i32) -> i32
+{
+    let @0: i32; // return
+    let self@1: &'_ (Array<i32, const N : usize>); // arg #1
+    let arg@2: i32; // arg #2
+    let @3: i32; // anonymous local
+    let @4: Copied<Iter<'_, i32>[Sized<i32>]>[Sized<Iter<'_, i32>[Sized<i32>]>]; // anonymous local
+    let @5: Iter<'_, i32>[Sized<i32>]; // anonymous local
+    let @6: &'_ (Slice<i32>); // anonymous local
+    let @7: &'_ (Array<i32, const N : usize>); // anonymous local
+    let @8: i32; // anonymous local
+    let @9: i32; // anonymous local
+
+    storage_live(@9)
+    storage_live(@3)
+    storage_live(@4)
+    storage_live(@5)
+    storage_live(@6)
+    storage_live(@7)
+    @7 := &*(self@1)
+    @6 := @ArrayToSliceShared<'_, i32, const N : usize>(move (@7))
+    storage_dead(@7)
+    @5 := iter<'_, i32>[Sized<i32>](move (@6))
+    storage_dead(@6)
+    @4 := core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::copied<'_, '_, i32, i32>[Sized<i32>, Sized<i32>, Sized<Iter<'_, i32>[Sized<i32>]>, {impl Iterator for Iter<'a, T>[@TraitClause0]}<'_, i32>[Sized<i32>], {impl Copy for i32}](move (@5))
+    storage_dead(@5)
+    @3 := core::iter::adapters::copied::{impl Iterator for Copied<I>[@TraitClause2]}::sum<'_, Iter<'_, i32>[Sized<i32>], i32, i32>[Sized<i32>, {impl Iterator for Iter<'a, T>[@TraitClause0]}<'_, i32>[Sized<i32>], Sized<Iter<'_, i32>[Sized<i32>]>, {impl Copy for i32}, Sized<i32>, Sized<Copied<Iter<'_, i32>[Sized<i32>]>[Sized<Iter<'_, i32>[Sized<i32>]>]>, {impl Sum<i32> for i32}](move (@4))
+    storage_dead(@4)
+    storage_live(@8)
+    @8 := copy (arg@2)
+    @9 := copy (@3) panic.+ copy (@8)
+    @0 := move (@9)
+    storage_dead(@8)
+    storage_dead(@3)
+    return
+}
+
+// Full name: test_crate::{impl Super<i32> for Array<i32, const N : usize>}
+impl<const N : usize> Super<i32> for Array<i32, const N : usize> {
+    parent_clause0 = MetaSized<Array<i32, const N : usize>>
+    parent_clause1 = Sized<i32>
+    parent_clause2 = Sized<i32>
+    type Output = i32
+    fn super_method<'_0> = {impl Super<i32> for Array<i32, const N : usize>}::super_method<'_0_0, const N : usize>
+    vtable: {impl Super<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>
+}
+
+// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::check
+fn {impl Checkable<i32> for Array<i32, const N : usize>}::check<'_0, const N : usize>(@1: &'_0 (Array<i32, const N : usize>)) -> bool
+{
+    let @0: bool; // return
+    let self@1: &'_ (Array<i32, const N : usize>); // arg #1
+    let @2: i32; // anonymous local
+    let @3: &'_ (Array<i32, const N : usize>); // anonymous local
+
+    storage_live(@2)
+    storage_live(@3)
+    @3 := &*(self@1)
+    @2 := {impl Super<i32> for Array<i32, const N : usize>}::super_method<'_, const N : usize>(move (@3), const (0 : i32))
+    storage_dead(@3)
+    @0 := move (@2) >= const (0 : i32)
+    storage_dead(@2)
+    return
+}
+
+fn {vtable_drop_shim_empty_adt_Builtin(Array)}<const N : usize>(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)))
+{
+    let ret@0: (); // return
+    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+
+    ret@0 := ()
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::check::{vtable_method}
+fn {impl Checkable<i32> for Array<i32, const N : usize>}::check::{vtable_method}<'_0, const N : usize>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
+{
+    let @0: bool; // return
+    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let @2: &'_0 (Array<i32, const N : usize>); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_0 (Array<i32, const N : usize>)>(move (@1))
+    @0 := {impl Checkable<i32> for Array<i32, const N : usize>}::check<'_0, const N : usize>(move (@2))
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}
+fn {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>() -> test_crate::Checkable::{vtable}<i32, i32>
+{
+    let ret@0: test_crate::Checkable::{vtable}<i32, i32>; // return
+    let @1: &'static (test_crate::Super::{vtable}<i32, Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>::parent_clause1::Output>); // anonymous local
+
+    storage_live(@1)
+    @1 := &{impl Super<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>
+    ret@0 := test_crate::Checkable::{vtable} { size: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_0)), align: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_0)), drop: const (@Fun212<const N : usize>), method_check: const ({impl Checkable<i32> for Array<i32, const N : usize>}::check::{vtable_method}<'_, const N : usize>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}
+static {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>: test_crate::Checkable::{vtable}<i32, i32> = {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}()
+
+// Full name: test_crate::{impl Checkable<i32> for Array<i32, const N : usize>}
+impl<const N : usize> Checkable<i32> for Array<i32, const N : usize> {
+    parent_clause0 = MetaSized<Array<i32, const N : usize>>
+    parent_clause1 = {impl Super<i32> for Array<i32, const N : usize>}<const N : usize>
+    parent_clause2 = Sized<i32>
+    fn check<'_0> = {impl Checkable<i32> for Array<i32, const N : usize>}::check<'_0_0, const N : usize>
+    vtable: {impl Checkable<i32> for Array<i32, const N : usize>}::{vtable}<const N : usize>
+}
+
+// Full name: test_crate::{impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::super_method
+fn {impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::super_method<'a, '_1>(@1: &'_1 ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])), @2: i32) -> i32
+{
+    let @0: i32; // return
+    let self@1: &'_ ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // arg #1
+    let arg@2: i32; // arg #2
+    let @3: i32; // anonymous local
+    let @4: i32; // anonymous local
+    let @5: i32; // anonymous local
+    let @6: i32; // anonymous local
+    let @7: i32; // anonymous local
+    let @8: i32; // anonymous local
+
+    storage_live(@6)
+    storage_live(@8)
+    storage_live(@3)
+    storage_live(@4)
+    @4 := copy ((*(self@1)).0)
+    storage_live(@5)
+    @5 := copy (*((*(self@1)).1))
+    @6 := copy (@4) panic.+ copy (@5)
+    @3 := move (@6)
+    storage_dead(@5)
+    storage_dead(@4)
+    storage_live(@7)
+    @7 := copy (arg@2)
+    @8 := copy (@3) panic.+ copy (@7)
+    @0 := move (@8)
+    storage_dead(@7)
+    storage_dead(@3)
+    return
+}
+
+// Full name: test_crate::{impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}
+impl<'a> Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]) {
+    parent_clause0 = MetaSized<(i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])>
+    parent_clause1 = Sized<i32>
+    parent_clause2 = Sized<i32>
+    type Output = i32
+    fn super_method<'_0> = {impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::super_method<'a, '_0_0>
+    vtable: {impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}<'a>
+}
+
+// Full name: test_crate::{impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check
+fn {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check<'a, '_1>(@1: &'_1 ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]))) -> bool
+{
+    let @0: bool; // return
+    let self@1: &'_ ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // arg #1
+    let @2: i32; // anonymous local
+    let @3: &'_ ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // anonymous local
+
+    storage_live(@2)
+    storage_live(@3)
+    @3 := &*(self@1)
+    @2 := {impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::super_method<'_, '_>(move (@3), const (0 : i32))
+    storage_dead(@3)
+    @0 := move (@2) > const (0 : i32)
+    storage_dead(@2)
+    return
+}
+
+fn {vtable_drop_shim_tuple_adt_Tuple_fields_2}<'a>(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)))
+{
+    let ret@0: (); // return
+    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let concrete_tuple@2: &'_ mut ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // local
+    let field_1_ref@3: &'_ mut (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // local
+
+    storage_live(concrete_tuple@2)
+    storage_live(field_1_ref@3)
+    concrete_tuple@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]))>(move (self@1))
+    field_1_ref@3 := &mut (concrete_tuple@2).1
+    ret@0 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_>(move (field_1_ref@3))
+    ret@0 := ()
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check::{vtable_method}
+fn {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check::{vtable_method}<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool
+{
+    let @0: bool; // return
+    let @1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
+    let @2: &'_1 ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    @2 := concretize<&'_1 ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_1 ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]))>(move (@1))
+    @0 := {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check<'a, '_1>(move (@2))
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}
+fn {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}<'a>() -> test_crate::Checkable::{vtable}<i32, i32>
+{
+    let ret@0: test_crate::Checkable::{vtable}<i32, i32>; // return
+    let @1: &'static (test_crate::Super::{vtable}<i32, Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>::parent_clause1::Output>); // anonymous local
+
+    storage_live(@1)
+    @1 := &{impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}<'_>
+    ret@0 := test_crate::Checkable::{vtable} { size: const (Opaque(Layout not available: TODO: handle Box with ptr-metadata)), align: const (Opaque(Layout not available: TODO: handle Box with ptr-metadata)), drop: const (@Fun213<'a>), method_check: const ({impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check::{vtable_method}<'_, 'a>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1) }
+    return
+}
+
+// Full name: test_crate::{impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}
+static {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}<'a>: test_crate::Checkable::{vtable}<i32, i32> = {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}()
+
+// Full name: test_crate::{impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}
+impl<'a> Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]) {
+    parent_clause0 = MetaSized<(i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])>
+    parent_clause1 = {impl Super<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}<'_>
+    parent_clause2 = Sized<i32>
+    fn check<'_0> = {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::check<'a, '_0_0>
+    vtable: {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}::{vtable}<'a>
+}
+
+// Full name: test_crate::extra_checks
+fn extra_checks()
+{
+    let @0: (); // return
+    let b@1: alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]; // local
+    let @2: (); // anonymous local
+    let @3: bool; // anonymous local
+    let @4: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @5: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @6: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @7: &'_ (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // anonymous local
+    let @8: &'_ (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // anonymous local
+    let arr@9: Array<i32, 3 : usize>; // local
+    let @10: (); // anonymous local
+    let @11: bool; // anonymous local
+    let @12: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @13: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @14: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @15: &'_ (Array<i32, 3 : usize>); // anonymous local
+    let @16: &'_ (Array<i32, 3 : usize>); // anonymous local
+    let tup@17: (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]); // local
+    let @18: alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]; // anonymous local
+    let @19: (); // anonymous local
+    let @20: bool; // anonymous local
+    let @21: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @22: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @23: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
+    let @24: &'_ ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // anonymous local
+    let @25: &'_ ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])); // anonymous local
+
+    storage_live(b@1)
+    b@1 := @BoxNew<i32>[Sized<i32>](const (5 : i32))
+    storage_live(@2)
+    storage_live(@3)
+    storage_live(@4)
+    storage_live(@5)
+    storage_live(@6)
+    storage_live(@7)
+    storage_live(@8)
+    @8 := &b@1
+    @7 := &*(@8)
+    @6 := unsize_cast<&'_ (alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>]}>(move (@7))
+    storage_dead(@7)
+    @5 := &*(@6)
+    @4 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@5))
+    storage_dead(@5)
+    @3 := use_checkable<'_>(move (@4))
+    if move (@3) {
+    }
+    else {
+        storage_dead(@4)
+        storage_dead(@8)
+        storage_dead(@6)
+        panic(core::panicking::panic)
+    }
+    storage_dead(@4)
+    storage_dead(@8)
+    storage_dead(@6)
+    storage_dead(@3)
+    storage_dead(@2)
+    storage_live(arr@9)
+    arr@9 := [const (1 : i32), const (2 : i32), const (3 : i32)]
+    storage_live(@10)
+    storage_live(@11)
+    storage_live(@12)
+    storage_live(@13)
+    storage_live(@14)
+    storage_live(@15)
+    storage_live(@16)
+    @16 := &arr@9
+    @15 := &*(@16)
+    @14 := unsize_cast<&'_ (Array<i32, 3 : usize>), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for Array<i32, const N : usize>}<3 : usize>>(move (@15))
+    storage_dead(@15)
+    @13 := &*(@14)
+    @12 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@13))
+    storage_dead(@13)
+    @11 := use_checkable<'_>(move (@12))
+    if move (@11) {
+    }
+    else {
+        storage_dead(@12)
+        storage_dead(@16)
+        storage_dead(@14)
+        panic(core::panicking::panic)
+    }
+    storage_dead(@12)
+    storage_dead(@16)
+    storage_dead(@14)
+    storage_dead(@11)
+    storage_dead(@10)
+    storage_live(tup@17)
+    storage_live(@18)
+    @18 := @BoxNew<i32>[Sized<i32>](const (32 : i32))
+    tup@17 := (const (10 : i32), move (@18))
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<i32, Global>[MetaSized<i32>, Sized<Global>]] @18
+    storage_dead(@18)
+    storage_live(@19)
+    storage_live(@20)
+    storage_live(@21)
+    storage_live(@22)
+    storage_live(@23)
+    storage_live(@24)
+    storage_live(@25)
+    @25 := &tup@17
+    @24 := &*(@25)
+    @23 := unsize_cast<&'_ ((i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for (i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])}<'_>>(move (@24))
+    storage_dead(@24)
+    @22 := &*(@23)
+    @21 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), Checkable<(dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32), i32>>(move (@22))
+    storage_dead(@22)
+    @20 := use_checkable<'_>(move (@21))
+    if move (@20) {
+    }
+    else {
+        storage_dead(@21)
+        storage_dead(@25)
+        storage_dead(@23)
+        panic(core::panicking::panic)
+    }
+    storage_dead(@21)
+    storage_dead(@25)
+    storage_dead(@23)
+    storage_dead(@20)
+    storage_dead(@19)
+    @0 := ()
+    drop[Drop<(i32, alloc::boxed::Box<i32>[MetaSized<i32>, Sized<Global>])>] tup@17
+    storage_dead(tup@17)
+    storage_dead(arr@9)
+    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<i32, Global>[MetaSized<i32>, Sized<Global>]] b@1
+    storage_dead(b@1)
+    @0 := ()
+    return
 }
 
 struct test_crate::NoParam::{vtable} {
@@ -1062,7 +1521,7 @@ where
 {
     let ret@0: test_crate::Modifiable::{vtable}<T>; // return
 
-    ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun209<T>[@TraitClause0, @TraitClause1]), method_modify: const ({impl Modifiable<T> for i32}::modify::{vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun214<T>[@TraitClause0, @TraitClause1]), method_modify: const ({impl Modifiable<T> for i32}::modify::{vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
     return
 }
 
@@ -1344,7 +1803,7 @@ fn {impl Both32And64 for i32}::{vtable}() -> test_crate::Both32And64::{vtable}
     storage_live(@2)
     @1 := &{impl BaseOn<i32> for i32}::{vtable}
     @2 := &{impl BaseOn<i64> for i32}::{vtable}
-    ret@0 := test_crate::Both32And64::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun211), method_both_operate: const (Opaque(shim for default methods aren't yet supported)), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1), super_trait_2: move (@2) }
+    ret@0 := test_crate::Both32And64::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun216), method_both_operate: const (Opaque(shim for default methods aren't yet supported)), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: move (@1), super_trait_2: move (@2) }
     return
 }
 
@@ -1510,389 +1969,17 @@ fn use_alias<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn>
     return
 }
 
-struct test_crate::DropTuple::{vtable} {
-  size: usize,
-  align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_))),
-  method_process_tuple: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)), (String, Vec<i32>[Sized<i32>, Sized<Global>])) -> usize,
-  super_trait_0: &'static (core::marker::MetaSized::{vtable}),
-}
-
-// Full name: test_crate::DropTuple
-trait DropTuple<Self>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    fn process_tuple<'_0> = test_crate::DropTuple::process_tuple<'_0_0, Self>[Self]
-    vtable: test_crate::DropTuple::{vtable}
-}
-
-fn test_crate::DropTuple::process_tuple<'_0, Self>(@1: &'_0 (Self), @2: (String, Vec<i32>[Sized<i32>, Sized<Global>])) -> usize
-where
-    [@TraitClause0]: DropTuple<Self>,
-
-// Full name: test_crate::{impl DropTuple for i32}::process_tuple
-fn {impl DropTuple for i32}::process_tuple<'_0>(@1: &'_0 (i32), @2: (String, Vec<i32>[Sized<i32>, Sized<Global>])) -> usize
-{
-    let @0: usize; // return
-    let self@1: &'_ (i32); // arg #1
-    let t@2: (String, Vec<i32>[Sized<i32>, Sized<Global>]); // arg #2
-    let @3: usize; // anonymous local
-    let @4: &'_ (String); // anonymous local
-    let @5: usize; // anonymous local
-    let @6: &'_ (Vec<i32>[Sized<i32>, Sized<Global>]); // anonymous local
-    let @7: usize; // anonymous local
-
-    storage_live(@7)
-    storage_live(@3)
-    storage_live(@4)
-    @4 := &(t@2).0
-    @3 := alloc::string::{String}::len<'_>(move (@4))
-    storage_dead(@4)
-    storage_live(@5)
-    storage_live(@6)
-    @6 := &(t@2).1
-    @5 := alloc::vec::{Vec<T>[@TraitClause0, @TraitClause1]}::len<'_, i32, Global>[Sized<i32>, Sized<Global>](move (@6))
-    storage_dead(@6)
-    @7 := copy (@3) panic.+ copy (@5)
-    @0 := move (@7)
-    storage_dead(@5)
-    storage_dead(@3)
-    drop[Drop<(String, Vec<i32>[Sized<i32>, Sized<Global>])>] t@2
-    return
-}
-
-fn {vtable_drop_shim_empty_i32}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)))
-{
-    let ret@0: (); // return
-    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)); // arg #1
-
-    ret@0 := ()
-    return
-}
-
-// Full name: test_crate::{impl DropTuple for i32}::process_tuple::{vtable_method}
-fn {impl DropTuple for i32}::process_tuple::{vtable_method}<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)), @2: (String, Vec<i32>[Sized<i32>, Sized<Global>])) -> usize
-{
-    let @0: usize; // return
-    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)); // arg #1
-    let @2: (String, Vec<i32>[Sized<i32>, Sized<Global>]); // arg #2
-    let @3: &'_0 (i32); // anonymous local
-
-    storage_live(@0)
-    storage_live(@1)
-    storage_live(@2)
-    storage_live(@3)
-    @3 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)), &'_0 (i32)>(move (@1))
-    @0 := {impl DropTuple for i32}::process_tuple<'_0>(move (@3), move (@2))
-    return
-}
-
-// Full name: test_crate::{impl DropTuple for i32}::{vtable}
-fn {impl DropTuple for i32}::{vtable}() -> test_crate::DropTuple::{vtable}
-{
-    let ret@0: test_crate::DropTuple::{vtable}; // return
-
-    ret@0 := test_crate::DropTuple::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun212), method_process_tuple: const ({impl DropTuple for i32}::process_tuple::{vtable_method}<'_>), super_trait_0: const (Opaque(missing supertrait vtable)) }
-    return
-}
-
-// Full name: test_crate::{impl DropTuple for i32}::{vtable}
-static {impl DropTuple for i32}::{vtable}: test_crate::DropTuple::{vtable} = {impl DropTuple for i32}::{vtable}()
-
-// Full name: test_crate::{impl DropTuple for i32}
-impl DropTuple for i32 {
-    parent_clause0 = MetaSized<i32>
-    fn process_tuple<'_0> = {impl DropTuple for i32}::process_tuple<'_0_0>
-    vtable: {impl DropTuple for i32}::{vtable}
-}
-
-// Full name: test_crate::use_drop_tuple
-fn use_drop_tuple<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_0))) -> usize
-{
-    let @0: usize; // return
-    let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)); // arg #1
-    let @2: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)); // anonymous local
-    let @3: (String, Vec<i32>[Sized<i32>, Sized<Global>]); // anonymous local
-    let @4: String; // anonymous local
-    let @5: &'_ (Str); // anonymous local
-    let @6: &'_ (Str); // anonymous local
-    let @7: Vec<i32>[Sized<i32>, Sized<Global>]; // anonymous local
-    let @8: alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>]; // anonymous local
-    let @9: alloc::boxed::Box<Array<i32, 3 : usize>>[MetaSized<Array<i32, 3 : usize>>, Sized<Global>]; // anonymous local
-    let @10: alloc::boxed::Box<Array<i32, 3 : usize>>[MetaSized<Array<i32, 3 : usize>>, Sized<Global>]; // anonymous local
-    let @11: *const test_crate::DropTuple::{vtable}; // anonymous local
-    let @12: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)), (String, Vec<i32>[Sized<i32>, Sized<Global>])) -> usize; // anonymous local
-    let @13: Array<i32, 3 : usize>; // anonymous local
-
-    storage_live(@13)
-    storage_live(@2)
-    @2 := &*(x@1)
-    storage_live(@3)
-    storage_live(@4)
-    storage_live(@5)
-    storage_live(@6)
-    @6 := const ("hello")
-    @5 := &*(@6)
-    @4 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@5))
-    storage_dead(@5)
-    storage_live(@7)
-    storage_live(@8)
-    storage_live(@9)
-    @13 := [const (1 : i32), const (2 : i32), const (3 : i32)]
-    storage_live(@10)
-    @10 := @BoxNew<Array<i32, 3 : usize>>[MetaSized<Array<i32, 3 : usize>>, Sized<Global>](move (@13))
-    @9 := move (@10)
-    @8 := unsize_cast<alloc::boxed::Box<Array<i32, 3 : usize>>[MetaSized<Array<i32, 3 : usize>>, Sized<Global>], alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>], 3 : usize>(move (@9))
-    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 3 : usize>, Global>[MetaSized<Array<i32, 3 : usize>>, Sized<Global>]] @9
-    drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 3 : usize>, Global>[MetaSized<Array<i32, 3 : usize>>, Sized<Global>]] @10
-    storage_dead(@10)
-    storage_dead(@9)
-    @7 := into_vec<i32, Global>[Sized<i32>, Sized<Global>](move (@8))
-    storage_dead(@8)
-    @3 := (move (@4), move (@7))
-    drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}<i32, Global>[Sized<i32>, Sized<Global>]] @7
-    storage_dead(@7)
-    drop[{impl Drop for String}] @4
-    storage_dead(@4)
-    storage_live(@11)
-    storage_live(@12)
-    @11 := ptr_metadata(move (@2))
-    @12 := copy ((*(@11)).3)
-    @0 := (move @12)(move (@2), move (@3))
-    storage_dead(@3)
-    storage_dead(@2)
-    storage_dead(@6)
-    return
-}
-
-struct test_crate::DropArray::{vtable} {
-  size: usize,
-  align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_))),
-  method_process_array: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)), Array<String, 3 : usize>) -> usize,
-  super_trait_0: &'static (core::marker::MetaSized::{vtable}),
-}
-
-// Full name: test_crate::DropArray
-trait DropArray<Self>
-{
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
-    fn process_array<'_0> = test_crate::DropArray::process_array<'_0_0, Self>[Self]
-    vtable: test_crate::DropArray::{vtable}
-}
-
-fn test_crate::DropArray::process_array<'_0, Self>(@1: &'_0 (Self), @2: Array<String, 3 : usize>) -> usize
-where
-    [@TraitClause0]: DropArray<Self>,
-
-// Full name: test_crate::{impl DropArray for i32}::process_array::closure
-struct closure {}
-
-// Full name: test_crate::{impl DropArray for i32}::process_array::{impl FnMut<(&'_ (String))> for closure}::call_mut
-fn {impl FnMut<(&'_ (String))> for closure}::call_mut<'_0>(@1: &'_0 mut (closure), @2: (&'_ (String))) -> usize
-{
-    let @0: usize; // return
-    let @1: &'_ mut (closure); // arg #1
-    let tupled_args@2: (&'_ (String)); // arg #2
-    let s@3: &'_ (String); // local
-    let @4: &'_ (String); // anonymous local
-
-    storage_live(s@3)
-    s@3 := move ((tupled_args@2).0)
-    storage_live(@4)
-    @4 := &*(s@3)
-    @0 := alloc::string::{String}::len<'_>(move (@4))
-    storage_dead(@4)
-    return
-}
-
-// Full name: test_crate::{impl DropArray for i32}::process_array::{impl FnOnce<(&'_ (String))> for closure}::call_once
-fn {impl FnOnce<(&'_ (String))> for closure}::call_once(@1: closure, @2: (&'_ (String))) -> usize
-{
-    let @0: usize; // return
-    let @1: closure; // arg #1
-    let @2: (&'_ (String)); // arg #2
-    let @3: &'_ mut (closure); // anonymous local
-
-    storage_live(@3)
-    @3 := &mut @1
-    @0 := {impl FnMut<(&'_ (String))> for closure}::call_mut<'_>(move (@3), move (@2))
-    drop[Drop<closure>] @1
-    return
-}
-
-// Full name: test_crate::{impl DropArray for i32}::process_array::{impl FnOnce<(&'_ (String))> for closure}
-impl FnOnce<(&'_ (String))> for closure {
-    parent_clause0 = MetaSized<closure>
-    parent_clause1 = Sized<(&'_ (String))>
-    parent_clause2 = Tuple<(&'_ (String))>
-    parent_clause3 = Sized<usize>
-    type Output = usize
-    fn call_once = {impl FnOnce<(&'_ (String))> for closure}::call_once
-    non-dyn-compatible
-}
-
-// Full name: test_crate::{impl DropArray for i32}::process_array::{impl FnMut<(&'_ (String))> for closure}
-impl FnMut<(&'_ (String))> for closure {
-    parent_clause0 = MetaSized<closure>
-    parent_clause1 = {impl FnOnce<(&'_ (String))> for closure}
-    parent_clause2 = Sized<(&'_ (String))>
-    parent_clause3 = Tuple<(&'_ (String))>
-    fn call_mut<'_0> = {impl FnMut<(&'_ (String))> for closure}::call_mut<'_0_0>
-    non-dyn-compatible
-}
-
-// Full name: test_crate::{impl DropArray for i32}::process_array
-fn {impl DropArray for i32}::process_array<'_0>(@1: &'_0 (i32), @2: Array<String, 3 : usize>) -> usize
-{
-    let @0: usize; // return
-    let self@1: &'_ (i32); // arg #1
-    let arr@2: Array<String, 3 : usize>; // arg #2
-    let @3: Map<Iter<'_, String>[Sized<String>], closure>[Sized<Iter<'_, String>[Sized<String>]>, Sized<closure>]; // anonymous local
-    let @4: Iter<'_, String>[Sized<String>]; // anonymous local
-    let @5: &'_ (Slice<String>); // anonymous local
-    let @6: &'_ (Array<String, 3 : usize>); // anonymous local
-    let @7: closure; // anonymous local
-
-    storage_live(@3)
-    storage_live(@4)
-    storage_live(@5)
-    storage_live(@6)
-    @6 := &arr@2
-    @5 := @ArrayToSliceShared<'_, String, 3 : usize>(move (@6))
-    storage_dead(@6)
-    @4 := iter<'_, String>[Sized<String>](move (@5))
-    storage_dead(@5)
-    storage_live(@7)
-    @7 := closure {  }
-    @3 := core::slice::iter::{impl Iterator for Iter<'a, T>[@TraitClause0]}::map<'_, String, usize, closure>[Sized<String>, Sized<usize>, Sized<closure>, Sized<Iter<'_, String>[Sized<String>]>, {impl FnMut<(&'_ (String))> for closure}](move (@4), move (@7))
-    storage_dead(@7)
-    storage_dead(@4)
-    @0 := core::iter::adapters::map::{impl Iterator for Map<I, F>[@TraitClause0, @TraitClause1]}::sum<usize, Iter<'_, String>[Sized<String>], closure, usize>[Sized<Iter<'_, String>[Sized<String>]>, Sized<closure>, {impl Iterator for Iter<'a, T>[@TraitClause0]}<'_, String>[Sized<String>], {impl FnMut<(&'_ (String))> for closure}, Sized<usize>, Sized<usize>, Sized<Map<Iter<'_, String>[Sized<String>], closure>[Sized<Iter<'_, String>[Sized<String>]>, Sized<closure>]>, {impl Sum<usize> for usize}](move (@3))
-    storage_dead(@3)
-    drop[Drop<Array<String, 3 : usize>>] arr@2
-    return
-}
-
-fn {vtable_drop_shim_empty_i32}(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)))
-{
-    let ret@0: (); // return
-    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)); // arg #1
-
-    ret@0 := ()
-    return
-}
-
-// Full name: test_crate::{impl DropArray for i32}::process_array::{vtable_method}
-fn {impl DropArray for i32}::process_array::{vtable_method}<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)), @2: Array<String, 3 : usize>) -> usize
-{
-    let @0: usize; // return
-    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)); // arg #1
-    let @2: Array<String, 3 : usize>; // arg #2
-    let @3: &'_0 (i32); // anonymous local
-
-    storage_live(@0)
-    storage_live(@1)
-    storage_live(@2)
-    storage_live(@3)
-    @3 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)), &'_0 (i32)>(move (@1))
-    @0 := {impl DropArray for i32}::process_array<'_0>(move (@3), move (@2))
-    return
-}
-
-// Full name: test_crate::{impl DropArray for i32}::{vtable}
-fn {impl DropArray for i32}::{vtable}() -> test_crate::DropArray::{vtable}
-{
-    let ret@0: test_crate::DropArray::{vtable}; // return
-
-    ret@0 := test_crate::DropArray::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const (@Fun213), method_process_array: const ({impl DropArray for i32}::process_array::{vtable_method}<'_>), super_trait_0: const (Opaque(missing supertrait vtable)) }
-    return
-}
-
-// Full name: test_crate::{impl DropArray for i32}::{vtable}
-static {impl DropArray for i32}::{vtable}: test_crate::DropArray::{vtable} = {impl DropArray for i32}::{vtable}()
-
-// Full name: test_crate::{impl DropArray for i32}
-impl DropArray for i32 {
-    parent_clause0 = MetaSized<i32>
-    fn process_array<'_0> = {impl DropArray for i32}::process_array<'_0_0>
-    vtable: {impl DropArray for i32}::{vtable}
-}
-
-// Full name: test_crate::use_drop_array
-fn use_drop_array<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_0))) -> usize
-{
-    let @0: usize; // return
-    let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)); // arg #1
-    let @2: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)); // anonymous local
-    let @3: Array<String, 3 : usize>; // anonymous local
-    let @4: String; // anonymous local
-    let @5: &'_ (Str); // anonymous local
-    let @6: &'_ (Str); // anonymous local
-    let @7: String; // anonymous local
-    let @8: &'_ (Str); // anonymous local
-    let @9: &'_ (Str); // anonymous local
-    let @10: String; // anonymous local
-    let @11: &'_ (Str); // anonymous local
-    let @12: &'_ (Str); // anonymous local
-    let @13: *const test_crate::DropArray::{vtable}; // anonymous local
-    let @14: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)), Array<String, 3 : usize>) -> usize; // anonymous local
-
-    storage_live(@2)
-    @2 := &*(x@1)
-    storage_live(@3)
-    storage_live(@4)
-    storage_live(@5)
-    storage_live(@6)
-    @6 := const ("a")
-    @5 := &*(@6)
-    @4 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@5))
-    storage_dead(@5)
-    storage_live(@7)
-    storage_live(@8)
-    storage_live(@9)
-    @9 := const ("bb")
-    @8 := &*(@9)
-    @7 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@8))
-    storage_dead(@8)
-    storage_live(@10)
-    storage_live(@11)
-    storage_live(@12)
-    @12 := const ("ccc")
-    @11 := &*(@12)
-    @10 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@11))
-    storage_dead(@11)
-    @3 := [move (@4), move (@7), move (@10)]
-    drop[{impl Drop for String}] @10
-    storage_dead(@10)
-    drop[{impl Drop for String}] @7
-    storage_dead(@7)
-    drop[{impl Drop for String}] @4
-    storage_dead(@4)
-    storage_live(@13)
-    storage_live(@14)
-    @13 := ptr_metadata(move (@2))
-    @14 := copy ((*(@13)).3)
-    @0 := (move @14)(move (@2), move (@3))
-    storage_dead(@3)
-    storage_dead(@2)
-    storage_dead(@12)
-    storage_dead(@9)
-    storage_dead(@6)
-    return
-}
-
 // Full name: test_crate::main
 fn main()
 {
     let @0: (); // return
-    let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)); // local
+    let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // local
     let @2: &'_ (i32); // anonymous local
     let @3: &'_ (i32); // anonymous local
     let @4: i32; // anonymous local
     let @5: (); // anonymous local
     let @6: bool; // anonymous local
-    let @7: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)); // anonymous local
+    let @7: &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // anonymous local
     let y@8: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, i32> + _dyn : '_)); // local
     let @9: &'_ mut (i32); // anonymous local
     let @10: &'_ mut (i32); // anonymous local
@@ -1948,83 +2035,14 @@ fn main()
     let @60: &'_ (i64); // anonymous local
     let @61: &'_ (i64); // anonymous local
     let @62: i64; // anonymous local
-    let tuple_handler@63: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)); // local
-    let @64: &'_ (i32); // anonymous local
-    let @65: &'_ (i32); // anonymous local
-    let @66: i32; // anonymous local
-    let @67: (); // anonymous local
-    let @68: (&'_ (usize), &'_ (usize)); // anonymous local
-    let @69: &'_ (usize); // anonymous local
-    let @70: usize; // anonymous local
-    let @71: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)); // anonymous local
-    let @72: (String, Vec<i32>[Sized<i32>, Sized<Global>]); // anonymous local
-    let @73: String; // anonymous local
-    let @74: &'_ (Str); // anonymous local
-    let @75: &'_ (Str); // anonymous local
-    let @76: Vec<i32>[Sized<i32>, Sized<Global>]; // anonymous local
-    let @77: alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>]; // anonymous local
-    let @78: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
-    let @79: alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]; // anonymous local
-    let @80: &'_ (usize); // anonymous local
-    let @81: usize; // anonymous local
-    let left_val@82: &'_ (usize); // local
-    let right_val@83: &'_ (usize); // local
-    let @84: bool; // anonymous local
-    let @85: usize; // anonymous local
-    let @86: usize; // anonymous local
-    let kind@87: AssertKind; // local
-    let @88: AssertKind; // anonymous local
-    let @89: &'_ (usize); // anonymous local
-    let @90: &'_ (usize); // anonymous local
-    let @91: &'_ (usize); // anonymous local
-    let @92: &'_ (usize); // anonymous local
-    let @93: Option<Arguments<'_>>[Sized<Arguments<'_>>]; // anonymous local
-    let array_handler@94: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)); // local
-    let @95: &'_ (i32); // anonymous local
-    let @96: &'_ (i32); // anonymous local
-    let @97: i32; // anonymous local
-    let @98: (); // anonymous local
-    let @99: (&'_ (usize), &'_ (usize)); // anonymous local
-    let @100: &'_ (usize); // anonymous local
-    let @101: usize; // anonymous local
-    let @102: &'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)); // anonymous local
-    let @103: Array<String, 3 : usize>; // anonymous local
-    let @104: String; // anonymous local
-    let @105: &'_ (Str); // anonymous local
-    let @106: &'_ (Str); // anonymous local
-    let @107: String; // anonymous local
-    let @108: &'_ (Str); // anonymous local
-    let @109: &'_ (Str); // anonymous local
-    let @110: String; // anonymous local
-    let @111: &'_ (Str); // anonymous local
-    let @112: &'_ (Str); // anonymous local
-    let @113: &'_ (usize); // anonymous local
-    let @114: usize; // anonymous local
-    let left_val@115: &'_ (usize); // local
-    let right_val@116: &'_ (usize); // local
-    let @117: bool; // anonymous local
-    let @118: usize; // anonymous local
-    let @119: usize; // anonymous local
-    let kind@120: AssertKind; // local
-    let @121: AssertKind; // anonymous local
-    let @122: &'_ (usize); // anonymous local
-    let @123: &'_ (usize); // anonymous local
-    let @124: &'_ (usize); // anonymous local
-    let @125: &'_ (usize); // anonymous local
-    let @126: Option<Arguments<'_>>[Sized<Arguments<'_>>]; // anonymous local
-    let @127: *const test_crate::Checkable::{vtable}<i32>; // anonymous local
-    let @128: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_))) -> bool; // anonymous local
-    let @129: *const test_crate::Modifiable::{vtable}<i32>; // anonymous local
-    let @130: fn(&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, i32> + _dyn : '_)), &'_ (i32)) -> i32; // anonymous local
-    let @131: *const test_crate::NoParam::{vtable}; // anonymous local
-    let @132: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
-    let @133: *const test_crate::Both32And64::{vtable}; // anonymous local
-    let @134: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_ (i32), &'_ (i64)); // anonymous local
-    let @135: *const test_crate::DropTuple::{vtable}; // anonymous local
-    let @136: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)), (String, Vec<i32>[Sized<i32>, Sized<Global>])) -> usize; // anonymous local
-    let @137: *const test_crate::DropArray::{vtable}; // anonymous local
-    let @138: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)), Array<String, 3 : usize>) -> usize; // anonymous local
-    let @139: Array<i32, 2 : usize>; // anonymous local
+    let @63: *const test_crate::Checkable::{vtable}<i32, i32>; // anonymous local
+    let @64: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32))) -> bool; // anonymous local
+    let @65: *const test_crate::Modifiable::{vtable}<i32>; // anonymous local
+    let @66: fn(&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, i32> + _dyn : '_)), &'_ (i32)) -> i32; // anonymous local
+    let @67: *const test_crate::NoParam::{vtable}; // anonymous local
+    let @68: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
+    let @69: *const test_crate::Both32And64::{vtable}; // anonymous local
+    let @70: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: Both32And64<_dyn> + _dyn : '_)), &'_ (i32), &'_ (i64)); // anonymous local
 
     storage_live(@21)
     storage_live(@22)
@@ -2068,81 +2086,12 @@ fn main()
     storage_live(@60)
     storage_live(@61)
     storage_live(@62)
-    storage_live(tuple_handler@63)
-    storage_live(@64)
     storage_live(@65)
     storage_live(@66)
     storage_live(@67)
     storage_live(@68)
     storage_live(@69)
     storage_live(@70)
-    storage_live(@71)
-    storage_live(@72)
-    storage_live(@73)
-    storage_live(@74)
-    storage_live(@75)
-    storage_live(@76)
-    storage_live(@77)
-    storage_live(@78)
-    storage_live(@79)
-    storage_live(@80)
-    storage_live(@81)
-    storage_live(left_val@82)
-    storage_live(right_val@83)
-    storage_live(@84)
-    storage_live(@85)
-    storage_live(@86)
-    storage_live(kind@87)
-    storage_live(@88)
-    storage_live(@89)
-    storage_live(@90)
-    storage_live(@91)
-    storage_live(@92)
-    storage_live(@93)
-    storage_live(array_handler@94)
-    storage_live(@95)
-    storage_live(@96)
-    storage_live(@97)
-    storage_live(@98)
-    storage_live(@99)
-    storage_live(@100)
-    storage_live(@101)
-    storage_live(@102)
-    storage_live(@103)
-    storage_live(@104)
-    storage_live(@105)
-    storage_live(@106)
-    storage_live(@107)
-    storage_live(@108)
-    storage_live(@109)
-    storage_live(@110)
-    storage_live(@111)
-    storage_live(@112)
-    storage_live(@113)
-    storage_live(@114)
-    storage_live(left_val@115)
-    storage_live(right_val@116)
-    storage_live(@117)
-    storage_live(@118)
-    storage_live(@119)
-    storage_live(kind@120)
-    storage_live(@121)
-    storage_live(@122)
-    storage_live(@123)
-    storage_live(@124)
-    storage_live(@125)
-    storage_live(@126)
-    storage_live(@129)
-    storage_live(@130)
-    storage_live(@131)
-    storage_live(@132)
-    storage_live(@133)
-    storage_live(@134)
-    storage_live(@135)
-    storage_live(@136)
-    storage_live(@137)
-    storage_live(@138)
-    storage_live(@139)
     storage_live(x@1)
     storage_live(@2)
     storage_live(@3)
@@ -2150,18 +2099,18 @@ fn main()
     @4 := const (42 : i32)
     @3 := &@4
     @2 := &*(@3)
-    x@1 := unsize_cast<&'_ (i32), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_)), {impl Checkable<i32> for i32}>(move (@2))
+    x@1 := unsize_cast<&'_ (i32), &'_ ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), {impl Checkable<i32> for i32}>(move (@2))
     storage_dead(@2)
     storage_dead(@3)
     storage_live(@5)
     storage_live(@6)
     storage_live(@7)
     @7 := &*(x@1)
-    storage_live(@127)
-    storage_live(@128)
-    @127 := ptr_metadata(move (@7))
-    @128 := copy ((*(@127)).3)
-    @6 := (move @128)(move (@7))
+    storage_live(@63)
+    storage_live(@64)
+    @63 := ptr_metadata(move (@7))
+    @64 := copy ((*(@63)).3)
+    @6 := (move @64)(move (@7))
     if move (@6) {
     }
     else {
@@ -2224,11 +2173,11 @@ fn main()
         @28 := const (100 : i32)
         @27 := &mut @28
         @26 := &*(@27)
-        storage_live(@129)
-        storage_live(@130)
-        @129 := ptr_metadata(move (@25))
-        @130 := copy ((*(@129)).3)
-        @24 := (move @130)(move (@25), move (@26))
+        storage_live(@65)
+        storage_live(@66)
+        @65 := ptr_metadata(move (@25))
+        @66 := copy ((*(@65)).3)
+        @24 := (move @66)(move (@25), move (@26))
         storage_dead(@26)
         storage_dead(@25)
         @23 := &@24
@@ -2301,11 +2250,11 @@ fn main()
         storage_live(@49)
         storage_live(@50)
         @50 := &*(z@43)
-        storage_live(@131)
-        storage_live(@132)
-        @131 := ptr_metadata(move (@50))
-        @132 := copy ((*(@131)).3)
-        @49 := (move @132)(move (@50))
+        storage_live(@67)
+        storage_live(@68)
+        @67 := ptr_metadata(move (@50))
+        @68 := copy ((*(@67)).3)
+        @49 := (move @68)(move (@50))
         storage_dead(@50)
         storage_dead(@49)
         storage_live(a@51)
@@ -2333,11 +2282,11 @@ fn main()
         @62 := const (200 : i64)
         @61 := &@62
         @60 := &*(@61)
-        storage_live(@133)
-        storage_live(@134)
-        @133 := ptr_metadata(move (@56))
-        @134 := copy ((*(@133)).3)
-        @55 := (move @134)(move (@56), move (@57), move (@60))
+        storage_live(@69)
+        storage_live(@70)
+        @69 := ptr_metadata(move (@56))
+        @70 := copy ((*(@69)).3)
+        @55 := (move @70)(move (@56), move (@57), move (@60))
         storage_dead(@60)
         storage_dead(@57)
         storage_dead(@56)
@@ -2346,214 +2295,7 @@ fn main()
         storage_dead(@59)
         storage_dead(@58)
         storage_dead(@55)
-        storage_live(tuple_handler@63)
-        storage_live(@64)
-        storage_live(@65)
-        storage_live(@66)
-        // Test tuple and array drop shim generation through trait objects
-        @66 := const (42 : i32)
-        @65 := &@66
-        @64 := &*(@65)
-        tuple_handler@63 := unsize_cast<&'_ (i32), &'_ ((dyn exists<_dyn> [@TraitClause0]: DropTuple<_dyn> + _dyn : '_)), {impl DropTuple for i32}>(move (@64))
-        storage_dead(@64)
-        storage_dead(@65)
-        storage_live(@67)
-        storage_live(@68)
-        storage_live(@69)
-        storage_live(@70)
-        storage_live(@71)
-        @71 := &*(tuple_handler@63)
-        storage_live(@72)
-        storage_live(@73)
-        storage_live(@74)
-        storage_live(@75)
-        @75 := const ("test")
-        @74 := &*(@75)
-        @73 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@74))
-        storage_dead(@74)
-        storage_live(@76)
-        storage_live(@77)
-        storage_live(@78)
-        @139 := [const (1 : i32), const (2 : i32)]
-        storage_live(@79)
-        @79 := @BoxNew<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>](move (@139))
-        @78 := move (@79)
-        @77 := unsize_cast<alloc::boxed::Box<Array<i32, 2 : usize>>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>], alloc::boxed::Box<Slice<i32>>[MetaSized<Slice<i32>>, Sized<Global>], 2 : usize>(move (@78))
-        drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @78
-        drop[{impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<Array<i32, 2 : usize>, Global>[MetaSized<Array<i32, 2 : usize>>, Sized<Global>]] @79
-        storage_dead(@79)
-        storage_dead(@78)
-        @76 := into_vec<i32, Global>[Sized<i32>, Sized<Global>](move (@77))
-        storage_dead(@77)
-        @72 := (move (@73), move (@76))
-        drop[{impl Drop for Vec<T>[@TraitClause0, @TraitClause1]}<i32, Global>[Sized<i32>, Sized<Global>]] @76
-        storage_dead(@76)
-        drop[{impl Drop for String}] @73
-        storage_dead(@73)
-        storage_live(@135)
-        storage_live(@136)
-        @135 := ptr_metadata(move (@71))
-        @136 := copy ((*(@135)).3)
-        @70 := (move @136)(move (@71), move (@72))
-        storage_dead(@72)
-        storage_dead(@71)
-        @69 := &@70
-        storage_live(@80)
-        storage_live(@81)
-        @81 := const (6 : usize)
-        @80 := &@81
-        @68 := (move (@69), move (@80))
-        storage_dead(@80)
-        storage_dead(@69)
-        storage_live(left_val@82)
-        left_val@82 := copy ((@68).0)
-        storage_live(right_val@83)
-        right_val@83 := copy ((@68).1)
-        storage_live(@84)
-        storage_live(@85)
-        @85 := copy (*(left_val@82))
-        storage_live(@86)
-        @86 := copy (*(right_val@83))
-        @84 := move (@85) == move (@86)
-        if move (@84) {
-        }
-        else {
-            storage_dead(@86)
-            storage_dead(@85)
-            storage_live(kind@87)
-            kind@87 := AssertKind::Eq {  }
-            storage_live(@88)
-            @88 := move (kind@87)
-            storage_live(@89)
-            storage_live(@90)
-            @90 := &*(left_val@82)
-            @89 := &*(@90)
-            storage_live(@91)
-            storage_live(@92)
-            @92 := &*(right_val@83)
-            @91 := &*(@92)
-            storage_live(@93)
-            @93 := Option::None {  }
-            panic(core::panicking::assert_failed)
-        }
-        storage_dead(@86)
-        storage_dead(@85)
-        storage_dead(@84)
-        storage_dead(right_val@83)
-        storage_dead(left_val@82)
-        storage_dead(@81)
-        storage_dead(@75)
-        storage_dead(@70)
-        storage_dead(@68)
-        storage_dead(@67)
-        storage_live(array_handler@94)
-        storage_live(@95)
-        storage_live(@96)
-        storage_live(@97)
-        @97 := const (42 : i32)
-        @96 := &@97
-        @95 := &*(@96)
-        array_handler@94 := unsize_cast<&'_ (i32), &'_ ((dyn exists<_dyn> [@TraitClause0]: DropArray<_dyn> + _dyn : '_)), {impl DropArray for i32}>(move (@95))
-        storage_dead(@95)
-        storage_dead(@96)
-        storage_live(@98)
-        storage_live(@99)
-        storage_live(@100)
-        storage_live(@101)
-        storage_live(@102)
-        @102 := &*(array_handler@94)
-        storage_live(@103)
-        storage_live(@104)
-        storage_live(@105)
-        storage_live(@106)
-        @106 := const ("x")
-        @105 := &*(@106)
-        @104 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@105))
-        storage_dead(@105)
-        storage_live(@107)
-        storage_live(@108)
-        storage_live(@109)
-        @109 := const ("yy")
-        @108 := &*(@109)
-        @107 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@108))
-        storage_dead(@108)
-        storage_live(@110)
-        storage_live(@111)
-        storage_live(@112)
-        @112 := const ("zzz")
-        @111 := &*(@112)
-        @110 := {impl ToString for T}::to_string<'_, Str>[MetaSized<Str>, {impl Display for Str}](move (@111))
-        storage_dead(@111)
-        @103 := [move (@104), move (@107), move (@110)]
-        drop[{impl Drop for String}] @110
-        storage_dead(@110)
-        drop[{impl Drop for String}] @107
-        storage_dead(@107)
-        drop[{impl Drop for String}] @104
-        storage_dead(@104)
-        storage_live(@137)
-        storage_live(@138)
-        @137 := ptr_metadata(move (@102))
-        @138 := copy ((*(@137)).3)
-        @101 := (move @138)(move (@102), move (@103))
-        storage_dead(@103)
-        storage_dead(@102)
-        @100 := &@101
-        storage_live(@113)
-        storage_live(@114)
-        @114 := const (6 : usize)
-        @113 := &@114
-        @99 := (move (@100), move (@113))
-        storage_dead(@113)
-        storage_dead(@100)
-        storage_live(left_val@115)
-        left_val@115 := copy ((@99).0)
-        storage_live(right_val@116)
-        right_val@116 := copy ((@99).1)
-        storage_live(@117)
-        storage_live(@118)
-        @118 := copy (*(left_val@115))
-        storage_live(@119)
-        @119 := copy (*(right_val@116))
-        @117 := move (@118) == move (@119)
-        if move (@117) {
-        }
-        else {
-            storage_dead(@119)
-            storage_dead(@118)
-            storage_live(kind@120)
-            kind@120 := AssertKind::Eq {  }
-            storage_live(@121)
-            @121 := move (kind@120)
-            storage_live(@122)
-            storage_live(@123)
-            @123 := &*(left_val@115)
-            @122 := &*(@123)
-            storage_live(@124)
-            storage_live(@125)
-            @125 := &*(right_val@116)
-            @124 := &*(@125)
-            storage_live(@126)
-            @126 := Option::None {  }
-            panic(core::panicking::assert_failed)
-        }
-        storage_dead(@119)
-        storage_dead(@118)
-        storage_dead(@117)
-        storage_dead(right_val@116)
-        storage_dead(left_val@115)
-        storage_dead(@114)
-        storage_dead(@112)
-        storage_dead(@109)
-        storage_dead(@106)
-        storage_dead(@101)
-        storage_dead(@99)
-        storage_dead(@98)
         @0 := ()
-        storage_dead(@97)
-        storage_dead(array_handler@94)
-        storage_dead(@66)
-        storage_dead(tuple_handler@63)
         storage_dead(@54)
         storage_dead(a@51)
         storage_dead(z@43)

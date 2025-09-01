@@ -1,11 +1,13 @@
 #![feature(trait_alias)]
 trait Super<T> {
-    fn super_method(&self, arg: T) -> i32;
+    type Output;
+    fn super_method(&self, arg: T) -> Self::Output;
 }
 trait Checkable<T>: Super<T> {
     fn check(&self) -> bool;
 }
 impl Super<i32> for i32 {
+    type Output = i32;
     fn super_method(&self, arg: i32) -> i32 {
         *self + arg
     }
@@ -14,6 +16,55 @@ impl Checkable<i32> for i32 {
     fn check(&self) -> bool {
         self.super_method(10) > 0
     }
+}
+fn use_checkable(x: &dyn Checkable<i32, Output = i32>) -> bool {
+    x.check()
+}
+impl Super<i32> for Box<i64> {
+    type Output = i32;
+    fn super_method(&self, arg: i32) -> i32 {
+        **self as i32 + arg
+    }
+}
+impl Checkable<i32> for Box<i64> {
+    fn check(&self) -> bool {
+        self.super_method(0) >= 0
+    }
+}
+
+impl<const N: usize> Super<i32> for [i32; N] {
+    type Output = i32;
+    fn super_method(&self, arg: i32) -> i32 {
+        self.iter().copied().sum::<i32>() + arg
+    }
+}
+impl<const N: usize> Checkable<i32> for [i32; N] {
+    fn check(&self) -> bool {
+        self.super_method(0) >= 0
+    }
+}
+
+impl<'a> Super<i32> for (i32, Box<i32>) {
+    type Output = i32;
+    fn super_method(&self, arg: i32) -> i32 {
+        self.0 + *self.1 + arg
+    }
+}
+impl<'a> Checkable<i32> for (i32, Box<i32>) {
+    fn check(&self) -> bool {
+        self.super_method(0) > 0
+    }
+}
+
+fn extra_checks() {
+    let b : Box<i64> = Box::new(5);
+    assert!(use_checkable(&b as &dyn Checkable<i32, Output = i32>));
+
+    let arr = [1, 2, 3];
+    assert!(use_checkable(&arr as &dyn Checkable<i32, Output = i32>));
+
+    let tup = (10, Box::new(32));
+    assert!(use_checkable(&tup as &dyn Checkable<i32, Output = i32>));
 }
 
 trait NoParam {
@@ -83,33 +134,10 @@ fn use_alias(x: &dyn Alias) {
     x.both_operate(&100, &200);
 }
 
-// Test cases for tuple and array drop shim generation  
-trait DropTuple {
-    fn process_tuple(&self, t: (String, Vec<i32>)) -> usize;
-}
-impl DropTuple for i32 {
-    fn process_tuple(&self, t: (String, Vec<i32>)) -> usize {
-        t.0.len() + t.1.len()
-    }
-}
-fn use_drop_tuple(x: &dyn DropTuple) -> usize {
-    x.process_tuple(("hello".to_string(), vec![1, 2, 3]))
-}
 
-trait DropArray {
-    fn process_array(&self, arr: [String; 3]) -> usize;
-}
-impl DropArray for i32 {
-    fn process_array(&self, arr: [String; 3]) -> usize {
-        arr.iter().map(|s| s.len()).sum()
-    }
-}
-fn use_drop_array(x: &dyn DropArray) -> usize {
-    x.process_array(["a".to_string(), "bb".to_string(), "ccc".to_string()])
-}
 
 fn main() {
-    let x: &dyn Checkable<i32> = &42;
+    let x: &dyn Checkable<i32, Output = i32> = &42;
     assert!(x.check());
     let y: &mut dyn Modifiable<i32> = &mut 99;
     assert!(!modify_trait_object(&"Hello".to_string()).is_empty());
@@ -118,11 +146,4 @@ fn main() {
     z.dummy();
     let a: &dyn Both32And64 = &42;
     a.both_operate(&100, &200);
-    
-    // Test tuple and array drop shim generation through trait objects
-    let tuple_handler: &dyn DropTuple = &42;
-    assert_eq!(tuple_handler.process_tuple(("test".to_string(), vec![1, 2])), 6);
-    
-    let array_handler: &dyn DropArray = &42;
-    assert_eq!(array_handler.process_array(["x".to_string(), "yy".to_string(), "zzz".to_string()]), 6);
 }
