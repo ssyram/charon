@@ -490,17 +490,13 @@ impl ItemTransCtx<'_, '_> {
                 use charon_lib::ullbc_ast::ClosureKind;
                 let virtual_impl = match closure_kind {
                     ClosureKind::FnOnce => fn_once_impl,
-                    ClosureKind::FnMut => fn_mut_impl.as_ref().ok_or_else(|| {
-                        Error {
-                            span,
-                            msg: "Missing FnMut impl for closure".to_string(),
-                        }
+                    ClosureKind::FnMut => fn_mut_impl.as_ref().ok_or_else(|| Error {
+                        span,
+                        msg: "Missing FnMut impl for closure".to_string(),
                     })?,
-                    ClosureKind::Fn => fn_impl.as_ref().ok_or_else(|| {
-                        Error {
-                            span,
-                            msg: "Missing Fn impl for closure".to_string(),
-                        }
+                    ClosureKind::Fn => fn_impl.as_ref().ok_or_else(|| Error {
+                        span,
+                        msg: "Missing Fn impl for closure".to_string(),
                     })?,
                 };
                 &virtual_impl.trait_pred.trait_ref

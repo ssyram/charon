@@ -249,5 +249,11 @@ fn gives_fn()
     return
 }
 
+// Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
+fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>
+
+// Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
+static {impl Fn<(&'_ mut (u32))> for closure}::{vtable}: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool> = {impl Fn<(&'_ mut (u32))> for closure}::{vtable}()
+
 
 
