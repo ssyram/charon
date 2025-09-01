@@ -954,7 +954,7 @@ fn {vtable_drop_shim_call_199_adt_Builtin(Box)}(@1: &'_ mut ((dyn exists<_dyn> [
 
     storage_live(concrete@2)
     concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>])>(move (self@1))
-    ret@0 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_>(move (concrete@2))
+    ret@0 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_, i64>[MetaSized<i64>, Sized<Global>](move (concrete@2))
     ret@0 := ()
     return
 }
