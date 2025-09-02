@@ -75,6 +75,11 @@ impl NoParam for i32 {
         assert!(*self > 0);
     }
 }
+impl NoParam for Box<i64> {
+    fn dummy(&self) {
+        assert!(**self > 0);
+    }
+}
 fn to_dyn_obj<T: NoParam>(arg: &T) -> &dyn NoParam {
     arg
 }
@@ -144,6 +149,8 @@ fn main() {
     assert_eq!(y.modify(&mut 100), 100);
     let z: &dyn NoParam = to_dyn_obj(&42);
     z.dummy();
+    let b : &dyn NoParam = &Box::new(64i64);
+    b.dummy();
     let a: &dyn Both32And64 = &42;
     a.both_operate(&100, &200);
 }

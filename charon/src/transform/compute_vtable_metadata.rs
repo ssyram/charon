@@ -456,42 +456,10 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
-    /// Check if a type is a Box type (either built-in or ADT Box)
-    fn is_box_type(&self, ty: &Ty) -> bool {
-        match ty.kind() {
-            TyKind::Adt(type_decl_ref) => match &type_decl_ref.id {
-                TypeId::Builtin(BuiltinTy::Box) => true,
-                TypeId::Adt(type_decl_id) => {
-                    // Check if this ADT is a Box by looking at its name or structure
-                    if let Some(type_decl) = self.ctx.translated.type_decls.get(*type_decl_id) {
-                        // Check if the name contains "Box" - this is a heuristic
-                        type_decl.item_meta.name.name.iter().any(|elem| match elem {
-                            PathElem::Ident(name, _) => name.contains("Box"),
-                            _ => false,
-                        })
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            },
-            _ => false,
-        }
-    }
-
     /// Check if this is a built-in Box type (vs ADT Box)
-    fn is_builtin_box(&self, type_id: &TypeId) -> bool {
-        match type_id {
-            TypeId::Builtin(BuiltinTy::Box) => true,
-            TypeId::Adt(type_decl_id) => {
-                // Also check for opaque Box types that have the box lang item
-                if let Some(type_decl) = self.ctx.translated.type_decls.get(*type_decl_id) {
-                    if let Some(ref lang_item) = type_decl.item_meta.lang_item {
-                        return lang_item == "owned_box";
-                    }
-                }
-                false
-            }
+    fn is_builtin_box(&self, ty: &Ty) -> bool {
+        match ty.kind() {
+            TyKind::Adt(TypeDeclRef { id: TypeId::Builtin(BuiltinTy::Box), .. }) => true,
             _ => false,
         }
     }
@@ -1484,6 +1452,16 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
+    /// Get the translated `Global` type, which should always be present as `Box` is translated
+    fn get_global_allocator_ty(&self) -> Result<Ty, Error> {
+        for ty_decl in &self.ctx.translated.type_decls {
+            if ty_decl.item_meta.lang_item == Some("global_alloc_ty".into()) {
+                return Ok(Ty::new(TyKind::Adt(TypeDeclRef { id: ty_decl.def_id.into(), generics: Box::new(GenericArgs::empty()) })));
+            }
+        }
+        raise_error!(self.ctx, self.span, "Global allocator type not found")
+    }
+
     /// Generic args for the drop call: reuse the concrete type's generics.
     /// For `impl<Args> Drop for T<Args'>` Rustc ensures Args == Args' match, so we just forward them.
     /// Additionally, we should add the lifetime as the first region argument for the `&mut self` receiver.
@@ -1493,19 +1471,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 let mut generic_args = type_decl_ref.generics.clone();
 
                 // Special handling for Box types
-                if self.is_box_type(concrete_ty) {
-                    // Check if this is a built-in Box
-                    if self.is_builtin_box(&type_decl_ref.id) {
-                        // For built-in Box, ignore the allocator parameter and trait constraints
-                        // Keep only the element type T, remove allocator A and trait clauses
-                        if let Some(element_ty) = generic_args.types.get(TypeVarId::new(0)) {
-                            // Create new generics with only the element type T
-                            let mut new_generics = GenericArgs::empty();
-                            let _ = new_generics.types.push_with(|_| element_ty.clone());
-                            // No trait clauses for built-in Box
-                            generic_args = Box::new(new_generics);
-                        }
-                    }
+                if self.is_builtin_box(concrete_ty) {
+                    generic_args.types.push(self.get_global_allocator_ty()?);
                 }
 
                 generic_args
