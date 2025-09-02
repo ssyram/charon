@@ -514,70 +514,9 @@ impl BodyTransCtx<'_, '_, '_> {
                                     }
                                     hax::ImplExprAtom::Builtin { trait_data, .. } => {
                                         // Handle built-in implementations, including closures
-                                        use hax::BuiltinTraitData;
-
-                                        let tref = &impl_expr.r#trait;
-                                        let trait_ref_skip = tref.hax_skip_binder_ref();
-                                        let hax_state = self.hax_state_with_id();
-                                        let erased_trait = trait_ref_skip.erase(&hax_state);
-                                        let trait_def = self.hax_def(&erased_trait)?;
-
-                                        // Check for closure implementations (Fn, FnMut, FnOnce)
-                                        let closure_kind =
-                                            trait_def.lang_item.as_deref().and_then(|lang| {
-                                                match lang {
-                                                    "fn_once" => Some(ClosureKind::FnOnce),
-                                                    "fn_mut" => Some(ClosureKind::FnMut),
-                                                    "r#fn" => Some(ClosureKind::Fn),
-                                                    _ => None,
-                                                }
-                                            });
-
-                                        if let Some(closure_kind) = closure_kind {
-                                            if let Some(hax::GenericArg::Type(closure_ty)) =
-                                                trait_ref_skip.generic_args.first()
-                                            {
-                                                if let hax::TyKind::Closure(closure_args) =
-                                                    closure_ty.kind()
-                                                {
-                                                    // Register closure vtable instance
-                                                    let _: GlobalDeclId = self.register_item(
-                                                        span,
-                                                        &closure_args.item,
-                                                        TransItemSourceKind::VTableInstance(
-                                                            TraitImplSource::Closure(closure_kind),
-                                                        ),
-                                                    );
-                                                }
-                                            }
-                                        } else if matches!(
-                                            trait_data,
-                                            BuiltinTraitData::Drop(hax::DropData::Glue { .. })
-                                        ) {
-                                            // Handle drop glue
-                                            if let hax::BuiltinTraitData::Drop(
-                                                hax::DropData::Glue { ty, .. },
-                                            ) = trait_data
-                                            {
-                                                if let hax::TyKind::Adt(item) = ty.kind() {
-                                                    let _: GlobalDeclId = self.register_item(
-                                                        span,
-                                                        item,
-                                                        TransItemSourceKind::VTableInstance(
-                                                            TraitImplSource::DropGlue,
-                                                        ),
-                                                    );
-                                                }
-                                            }
-                                        } else {
-                                            // For this case, we don't know how to register vtable instances
-                                            raise_error!(
-                                                self.i_ctx,
-                                                span,
-                                                "Cannot register vtable instance for built-in impl {:?}",
-                                                impl_expr
-                                            );
-                                        }
+                                        self.handle_builtin_impl_vtable_registration(
+                                            span, impl_expr, trait_data
+                                        )?;
                                     }
                                     hax::ImplExprAtom::LocalBound { .. } => {
                                         // No need to register anything here as there is no concrete impl
@@ -783,6 +722,92 @@ impl BodyTransCtx<'_, '_, '_> {
                 );
             }
         }
+    }
+
+    /// Helper function to determine closure kind from trait language item
+    fn get_closure_kind_from_trait(&self, trait_def: &hax::FullDef) -> Option<ClosureKind> {
+        trait_def.lang_item.as_deref().and_then(|lang| {
+            match lang {
+                "fn_once" => Some(ClosureKind::FnOnce),
+                "fn_mut" => Some(ClosureKind::FnMut),
+                "r#fn" => Some(ClosureKind::Fn),
+                _ => None,
+            }
+        })
+    }
+
+    /// Helper function to register closure vtable instance
+    fn register_closure_vtable_instance(
+        &mut self,
+        span: Span,
+        closure_kind: ClosureKind,
+        trait_ref_skip: &hax::TraitRef,
+    ) -> Result<(), Error> {
+        if let Some(hax::GenericArg::Type(closure_ty)) = trait_ref_skip.generic_args.first() {
+            if let hax::TyKind::Closure(closure_args) = closure_ty.kind() {
+                // Register closure vtable instance
+                let _: GlobalDeclId = self.register_item(
+                    span,
+                    &closure_args.item,
+                    TransItemSourceKind::VTableInstance(
+                        TraitImplSource::Closure(closure_kind),
+                    ),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Helper function to register drop glue vtable instance
+    fn register_drop_glue_vtable_instance(
+        &mut self,
+        span: Span,
+        trait_data: &hax::BuiltinTraitData,
+    ) -> Result<(), Error> {
+        if let hax::BuiltinTraitData::Drop(hax::DropData::Glue { ty, .. }) = trait_data {
+            if let hax::TyKind::Adt(item) = ty.kind() {
+                let _: GlobalDeclId = self.register_item(
+                    span,
+                    item,
+                    TransItemSourceKind::VTableInstance(TraitImplSource::DropGlue),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Helper function to handle builtin trait implementations for vtable registration
+    fn handle_builtin_impl_vtable_registration(
+        &mut self,
+        span: Span,
+        impl_expr: &hax::ImplExpr,
+        trait_data: &hax::BuiltinTraitData,
+    ) -> Result<(), Error> {
+        let tref = &impl_expr.r#trait;
+        let trait_ref_skip = tref.hax_skip_binder_ref();
+        let hax_state = self.hax_state_with_id();
+        let erased_trait = trait_ref_skip.erase(&hax_state);
+        let trait_def = self.hax_def(&erased_trait)?;
+
+        // Check for closure implementations (Fn, FnMut, FnOnce)
+        if let Some(closure_kind) = self.get_closure_kind_from_trait(&trait_def) {
+            self.register_closure_vtable_instance(span, closure_kind, trait_ref_skip)?;
+        } else if matches!(
+            trait_data,
+            hax::BuiltinTraitData::Drop(hax::DropData::Glue { .. })
+        ) {
+            // Handle drop glue
+            self.register_drop_glue_vtable_instance(span, trait_data)?;
+        } else {
+            // For this case, we don't know how to register vtable instances
+            raise_error!(
+                self.i_ctx,
+                span,
+                "Cannot register vtable instance for built-in impl {:?}",
+                impl_expr
+            );
+        }
+        Ok(())
     }
 
     /// Translate a statement
