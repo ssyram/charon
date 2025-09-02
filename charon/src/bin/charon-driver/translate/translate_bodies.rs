@@ -533,7 +533,6 @@ impl BodyTransCtx<'_, '_, '_> {
                                     hax::ImplExprAtom::Dyn | hax::ImplExprAtom::Error(..) => {
                                         // No need to register anything for these cases
                                     }
-                                    // TODO(dyn): more ways of registering vtable instance?
                                     hax::ImplExprAtom::SelfImpl { .. } => {
                                         raise_error!(
                                             self.i_ctx,
@@ -783,6 +782,7 @@ impl BodyTransCtx<'_, '_, '_> {
         impl_expr: &hax::ImplExpr,
         trait_data: &hax::BuiltinTraitData,
     ) -> Result<(), Error> {
+        // `tref`: `for<...> Ty : Fn[Mut|Once]<(Args), Output = Ret>`
         let tref = &impl_expr.r#trait;
         let trait_ref_skip = tref.hax_skip_binder_ref();
         let hax_state = self.hax_state_with_id();

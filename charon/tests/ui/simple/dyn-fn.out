@@ -251,6 +251,12 @@ fn gives_fn()
 
 // Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
 fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>
+{
+    let ret@0: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>; // return
+
+    ret@0 := core::ops::function::Fn::{vtable} { size: const (Opaque(closure size for Fn)), align: const (Opaque(closure align for Fn)), drop: const (Opaque(closure drop for Fn)), method_call: const (Opaque(closure call method)), super_trait_0: const (Opaque(additional closure vtable field)), super_trait_1: const (Opaque(additional closure vtable field)) }
+    return
+}
 
 // Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
 static {impl Fn<(&'_ mut (u32))> for closure}::{vtable}: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool> = {impl Fn<(&'_ mut (u32))> for closure}::{vtable}()
