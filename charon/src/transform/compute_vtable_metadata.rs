@@ -399,149 +399,13 @@ impl<'a> VtableMetadataComputer<'a> {
     // ========================================
 
     /// Analyze what kind of drop case applies to the given concrete type
-    /// Simplified version based on Rustc guarantees about concrete types
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
         trace!("[ANALYZE] Analyzing drop case for type: {:?}", concrete_ty);
-        trace!("[ANALYZE] Type kind: {:?}", concrete_ty.kind());
-
+        
         match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
-                match &type_decl_ref.id {
-                    TypeId::Builtin(BuiltinTy::Array) => {
-                        trace!("[ANALYZE] Found Array type, recursively analyzing element");
-                        // Array [T; N] - recursively analyze element type
-                        if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
-                            // Check if array length is 0 - if so, no drops needed
-                            if let Some(const_val) = type_decl_ref
-                                .generics
-                                .const_generics
-                                .get(ConstGenericVarId::new(0))
-                            {
-                                if let ConstGeneric::Value(literal) = const_val {
-                                    if let Literal::Scalar(ScalarValue::Unsigned(_, 0))
-                                    | Literal::Scalar(ScalarValue::Signed(_, 0)) = literal
-                                    {
-                                        trace!("[ANALYZE] Array has length 0, no drops needed");
-                                        return Ok(DropCase::Empty);
-                                    }
-                                }
-                            }
-
-                            let element_case = self.analyze_drop_case(element_ty)?;
-                            trace!("[ANALYZE] Array element drop case: {:?}", element_case);
-                            match element_case {
-                                DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
-                                    // If element is Empty/Panic/Unknown, return that directly
-                                    Ok(element_case)
-                                }
-                                _ => {
-                                    // Otherwise, wrap in Array case
-                                    trace!("[ANALYZE] Wrapping element case in Array traversal");
-                                    Ok(DropCase::Array {
-                                        element_ty: element_ty.clone(),
-                                        element_drop: Box::new(element_case),
-                                    })
-                                }
-                            }
-                        } else {
-                            Ok(DropCase::Unknown(
-                                "Array type missing element type parameter".to_string(),
-                            ))
-                        }
-                    }
-                    TypeId::Tuple => {
-                        trace!("[ANALYZE] Found Tuple type, recursively analyzing fields");
-                        // Tuple (T1, T2, ...) - recursively analyze each field
-                        let tuple_generics = &type_decl_ref.generics.types;
-                        let mut fields = Vec::new();
-
-                        // Analyze each field in the tuple
-                        for (idx, field_ty) in tuple_generics.iter().enumerate() {
-                            trace!("[ANALYZE] Tuple field {}: {:?}", idx, field_ty);
-                            let field_case = self.analyze_drop_case(field_ty)?;
-                            trace!("[ANALYZE] Tuple field {} drop case: {:?}", idx, field_case);
-                            
-                            match field_case {
-                                DropCase::Panic(_) | DropCase::Unknown(_) => {
-                                    // If any field is Panic/Unknown, return that immediately
-                                    trace!("[ANALYZE] Field {} has error case, returning early", idx);
-                                    return Ok(field_case);
-                                }
-                                _ => {
-                                    fields.push((field_ty.clone(), field_case));
-                                }
-                            }
-                        }
-
-                        if fields.is_empty() {
-                            trace!("[ANALYZE] Empty tuple, no fields need dropping");
-                            Ok(DropCase::Empty)
-                        } else {
-                            // Check if any field actually needs dropping
-                            let has_drops = fields
-                                .iter()
-                                .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
-
-                            if !has_drops {
-                                trace!("[ANALYZE] No tuple fields need dropping, using empty drop");
-                                Ok(DropCase::Empty)
-                            } else {
-                                trace!(
-                                    "[ANALYZE] Creating tuple drop with {} fields, {} need drops",
-                                    fields.len(),
-                                    fields
-                                        .iter()
-                                        .filter(|(_, dc)| !matches!(dc, DropCase::Empty))
-                                        .count()
-                                );
-                                Ok(DropCase::Tuple { fields })
-                            }
-                        }
-                    }
-                    TypeId::Adt(_type_decl_id) => {
-                        trace!("[ANALYZE] Found ADT type, looking for direct drop implementation");
-                        // Regular ADT - look for direct drop implementation
-                        if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
-                            Ok(DropCase::Direct(fun_ref))
-                        } else {
-                            Ok(DropCase::Panic(format!(
-                                "Drop implementation for {:?} not found or not translated",
-                                concrete_ty
-                            )))
-                        }
-                    }
-                    TypeId::Builtin(builtin_ty) => {
-                        trace!("[ANALYZE] Found Builtin type: {:?}", builtin_ty);
-                        match builtin_ty {
-                            BuiltinTy::Array => {
-                                // This should not happen since Array is handled above
-                                unreachable!("Array should be handled above")
-                            }
-                            BuiltinTy::Box => {
-                                trace!("[ANALYZE] Handling Box type - looking for direct drop");
-                                // For Box, simply look for Box's Drop implementation
-                                if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
-                                    Ok(DropCase::Direct(fun_ref))
-                                } else {
-                                    Ok(DropCase::Panic(
-                                        "Box Drop implementation not found or not translated".to_string()
-                                    ))
-                                }
-                            }
-                            BuiltinTy::Slice => {
-                                trace!("[ANALYZE] Slice is incomplete type, using empty drop");
-                                // Slice is incomplete - drop happens in creation (e.g., Box<Array> → Box<Slice>)
-                                Ok(DropCase::Empty)
-                            }
-                            BuiltinTy::Str => {
-                                trace!("[ANALYZE] str type doesn't need drop");
-                                Ok(DropCase::Empty)
-                            }
-                        }
-                    }
-                }
+                self.analyze_adt_drop_case(type_decl_ref, concrete_ty)
             }
-            // Non-ADT concrete types that don't need drop
             TyKind::Literal(_) => {
                 trace!("[ANALYZE] Literal type doesn't need drop");
                 Ok(DropCase::Empty)
@@ -550,7 +414,6 @@ impl<'a> VtableMetadataComputer<'a> {
                 trace!("[ANALYZE] Reference/pointer type doesn't need drop");
                 Ok(DropCase::Empty)
             }
-            // Non-concrete cases should be Unknown
             _ => {
                 trace!("[ANALYZE] Non-concrete type, returning Unknown");
                 Ok(DropCase::Unknown(format!(
@@ -561,9 +424,153 @@ impl<'a> VtableMetadataComputer<'a> {
         }
     }
 
+    /// Analyze drop case for ADT types (arrays, tuples, structs, enums)
+    fn analyze_adt_drop_case(&self, type_decl_ref: &TypeDeclRef, concrete_ty: &Ty) -> Result<DropCase, Error> {
+        match &type_decl_ref.id {
+            TypeId::Builtin(BuiltinTy::Array) => {
+                self.analyze_array_drop_case(type_decl_ref)
+            }
+            TypeId::Tuple => {
+                self.analyze_tuple_drop_case(type_decl_ref)
+            }
+            TypeId::Builtin(builtin_ty) => {
+                self.analyze_builtin_drop_case(builtin_ty, concrete_ty)
+            }
+            TypeId::Adt(_) => {
+                trace!("[ANALYZE] Found ADT type, looking for direct drop implementation");
+                if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
+                    Ok(DropCase::Direct(fun_ref))
+                } else {
+                    Ok(DropCase::Panic(format!(
+                        "Drop implementation for {:?} not found or not translated",
+                        concrete_ty
+                    )))
+                }
+            }
+        }
+    }
+
+    /// Analyze drop case for array types [T; N]
+    fn analyze_array_drop_case(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
+        trace!("[ANALYZE] Found Array type, recursively analyzing element");
+        
+        let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) else {
+            return Ok(DropCase::Unknown("Array type missing element type parameter".to_string()));
+        };
+
+        // Check if array length is 0 - if so, no drops needed
+        if self.is_array_empty(type_decl_ref)? {
+            trace!("[ANALYZE] Array has length 0, no drops needed");
+            return Ok(DropCase::Empty);
+        }
+
+        let element_case = self.analyze_drop_case(element_ty)?;
+        trace!("[ANALYZE] Array element drop case: {:?}", element_case);
+        
+        match element_case {
+            DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
+                Ok(element_case)
+            }
+            _ => {
+                trace!("[ANALYZE] Wrapping element case in Array traversal");
+                Ok(DropCase::Array {
+                    element_ty: element_ty.clone(),
+                    element_drop: Box::new(element_case),
+                })
+            }
+        }
+    }
+
+    /// Analyze drop case for tuple types (T1, T2, ...)
+    fn analyze_tuple_drop_case(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
+        trace!("[ANALYZE] Found Tuple type, recursively analyzing fields");
+        
+        let tuple_generics = &type_decl_ref.generics.types;
+        let mut fields = Vec::new();
+
+        // Analyze each field in the tuple
+        for (idx, field_ty) in tuple_generics.iter().enumerate() {
+            trace!("[ANALYZE] Tuple field {}: {:?}", idx, field_ty);
+            let field_case = self.analyze_drop_case(field_ty)?;
+            trace!("[ANALYZE] Tuple field {} drop case: {:?}", idx, field_case);
+            
+            match field_case {
+                DropCase::Panic(_) | DropCase::Unknown(_) => {
+                    trace!("[ANALYZE] Field {} has error case, returning early", idx);
+                    return Ok(field_case);
+                }
+                _ => {
+                    fields.push((field_ty.clone(), field_case));
+                }
+            }
+        }
+
+        if fields.is_empty() {
+            trace!("[ANALYZE] Empty tuple, no fields need dropping");
+            Ok(DropCase::Empty)
+        } else {
+            let has_drops = fields
+                .iter()
+                .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
+
+            if !has_drops {
+                trace!("[ANALYZE] No tuple fields need dropping, using empty drop");
+                Ok(DropCase::Empty)
+            } else {
+                trace!("[ANALYZE] Creating tuple drop with {} fields", fields.len());
+                Ok(DropCase::Tuple { fields })
+            }
+        }
+    }
+
+    /// Analyze drop case for builtin types (Box, Slice, etc.)
+    fn analyze_builtin_drop_case(&self, builtin_ty: &BuiltinTy, concrete_ty: &Ty) -> Result<DropCase, Error> {
+        trace!("[ANALYZE] Found Builtin type: {:?}", builtin_ty);
+        match builtin_ty {
+            BuiltinTy::Array => {
+                unreachable!("Array should be handled separately")
+            }
+            BuiltinTy::Box => {
+                trace!("[ANALYZE] Handling Box type - looking for direct drop");
+                if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
+                    Ok(DropCase::Direct(fun_ref))
+                } else {
+                    Ok(DropCase::Panic(
+                        "Box Drop implementation not found or not translated".to_string()
+                    ))
+                }
+            }
+            BuiltinTy::Slice => {
+                trace!("[ANALYZE] Slice is incomplete type, using empty drop");
+                Ok(DropCase::Empty)
+            }
+            BuiltinTy::Str => {
+                trace!("[ANALYZE] str type doesn't need drop");
+                Ok(DropCase::Empty)
+            }
+        }
+    }
+
+    /// Check if an array has length 0
+    fn is_array_empty(&self, type_decl_ref: &TypeDeclRef) -> Result<bool, Error> {
+        if let Some(const_val) = type_decl_ref.generics.const_generics.get(ConstGenericVarId::new(0)) {
+            if let ConstGeneric::Value(literal) = const_val {
+                if let Literal::Scalar(ScalarValue::Unsigned(_, 0))
+                | Literal::Scalar(ScalarValue::Signed(_, 0)) = literal
+                {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    // ========================================
+    // DROP TRAIT DETECTION AND IMPLEMENTATION LOOKUP
+    // ========================================
+
     /// Check if a trait declaration is the Drop trait
     fn is_drop_trait(&self, trait_decl_id: &TraitDeclId) -> bool {
-        // Look up the trait declaration and check if it has the "drop" lang_item
         if let Some(trait_decl) = self.ctx.translated.trait_decls.get(*trait_decl_id) {
             if let Some(ref lang_item) = trait_decl.item_meta.lang_item {
                 return lang_item == "drop";
@@ -572,15 +579,46 @@ impl<'a> VtableMetadataComputer<'a> {
         false
     }
 
+    /// Find direct Drop implementation for a concrete type
+    fn find_direct_drop_impl(&self, concrete_ty: &Ty) -> Result<Option<FunDeclRef>, Error> {
+        trace!("[DROP_IMPL] Looking for drop implementation for type: {:?}", concrete_ty);
+
+        for trait_impl in self.ctx.translated.trait_impls.iter() {
+            let trait_decl_id = trait_impl.impl_trait.id;
+            
+            if self.is_drop_trait(&trait_decl_id) {
+                if let Some(self_type) = self.get_impl_self_type(trait_impl) {
+                    trace!("[DROP_IMPL] Checking impl with self type: {:?}", self_type);
+                    
+                    if self.types_match(&self_type, concrete_ty) {
+                        trace!("[DROP_IMPL] Found matching drop impl");
+                        
+                        // Find the drop method in this implementation
+                        if let Some((method_name, method_ref)) = trait_impl.methods().find(|(n, _)| n.0 == "drop") {
+                            trace!("[DROP_IMPL] Found drop method: {}, {:?}", method_name, method_ref);
+                            // Extract the FunDeclRef from the binder
+                            return Ok(Some(method_ref.skip_binder.clone()));
+                        }
+                        
+                        trace!("[DROP_IMPL] No drop method found in matching impl");
+                    }
+                }
+            }
+        }
+
+        trace!("[DROP_IMPL] No drop implementation found for type: {:?}", concrete_ty);
+        Ok(None)
+    }
+
+    // ========================================
+    // TYPE UTILITIES
+    // ========================================
+
     /// Get the self type from a trait implementation
     fn get_impl_self_type(&self, trait_impl: &TraitImpl) -> Option<Ty> {
-        // For Drop implementations, the Self type is typically found in the implemented trait's generics
-        // The Drop trait is `Drop<Self>` so the first generic argument is the Self type
         if let Some(first_generic) = trait_impl.impl_trait.generics.types.get(TypeVarId::new(0)) {
             Some(first_generic.clone())
         } else {
-            // If no generic types, try to extract from the trait implementation structure
-            // This is a fallback - the actual self type might be encoded elsewhere
             None
         }
     }
@@ -596,31 +634,16 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Check if two types match for the purpose of drop implementation lookup
     fn types_match(&self, ty1: &Ty, ty2: &Ty) -> bool {
         match (ty1.kind(), ty2.kind()) {
-            // ADT types - match by ID, ignore generics for now (they should be handled by substitution)
             (TyKind::Adt(ref1), TyKind::Adt(ref2)) => {
-                trace!(
-                    "[TYPE_MATCH] Comparing ADT types: {:?} vs {:?}",
-                    ref1.id, ref2.id
-                );
-                let match_result = ref1.id == ref2.id;
-                trace!("[TYPE_MATCH] ADT match result: {}", match_result);
-                match_result
+                trace!("[TYPE_MATCH] Comparing ADT types: {:?} vs {:?}", ref1.id, ref2.id);
+                ref1.id == ref2.id
             }
-            // Literal types - exact match
             (TyKind::Literal(lit1), TyKind::Literal(lit2)) => {
-                trace!(
-                    "[TYPE_MATCH] Comparing literal types: {:?} vs {:?}",
-                    lit1, lit2
-                );
+                trace!("[TYPE_MATCH] Comparing literal types: {:?} vs {:?}", lit1, lit2);
                 lit1 == lit2
             }
-            // For other types, use structural equality
             _ => {
-                trace!(
-                    "[TYPE_MATCH] Comparing other types structurally: {:?} vs {:?}",
-                    ty1.kind(),
-                    ty2.kind()
-                );
+                trace!("[TYPE_MATCH] Comparing other types structurally");
                 ty1 == ty2
             }
         }
@@ -648,61 +671,8 @@ impl<'a> VtableMetadataComputer<'a> {
     // ========================================
 
     /// Find direct drop implementation for a concrete type
-    fn find_direct_drop_impl(&self, concrete_ty: &Ty) -> Result<Option<FunDeclRef>, Error> {
-        trace!(
-            "[FIND_DROP] Looking for drop implementation for type: {:?}",
-            concrete_ty
-        );
-
-        // Look for drop implementations for this type
-        for trait_impl in self.ctx.translated.trait_impls.iter() {
-            // Check if this is a drop implementation for our type
-            let trait_decl_ref = &trait_impl.impl_trait;
-
-            // Check if this implements the Drop trait
-            if self.is_drop_trait(&trait_decl_ref.id) {
-                trace!("[FIND_DROP] Found Drop trait impl: {:?}", trait_impl.def_id);
-
-                // Check if the self type matches our concrete type
-                if let Some(self_ty) = self.get_impl_self_type(trait_impl) {
-                    trace!("[FIND_DROP] Impl self type: {:?}", self_ty);
-                    trace!("[FIND_DROP] Concrete type: {:?}", concrete_ty);
-
-                    if self.types_match(concrete_ty, &self_ty) {
-                        trace!("[FIND_DROP] Types match! Looking for drop method");
-
-                        // Found drop implementation - create function reference
-                        if let Some(drop_method) =
-                            trait_impl.methods.iter().find(|(name, _)| name.0 == "drop")
-                        {
-                            let fun_ref = drop_method.1.skip_binder.clone();
-                            trace!("[FIND_DROP] Found drop method: {:?}", fun_ref);
-                            return Ok(Some(fun_ref));
-                        } else {
-                            trace!("[FIND_DROP] Drop trait impl found but no drop method");
-                        }
-                    } else {
-                        trace!("[FIND_DROP] Types don't match");
-                    }
-                } else {
-                    trace!("[FIND_DROP] Could not get self type from trait impl");
-                }
-            }
-        }
-
-        trace!(
-            "[FIND_DROP] No drop implementation found for type: {:?}",
-            concrete_ty
-        );
-        Ok(None)
-    }
-
-
-
     // ========================================
-    // FUNCTION TYPE AND GENERICS CREATION
-    // ========================================
-    // FUNCTION CREATION AND BODY GENERATION
+    // DROP SHIM FUNCTION CREATION
     // ========================================
 
     /// Different kinds of drop shims we need to generate
