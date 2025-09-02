@@ -127,6 +127,57 @@ enum DropCase {
     Tuple { fields: Vec<(Ty, DropCase)> },
 }
 
+impl DropCase {
+    fn simplify(self) -> Self {
+        match self {
+            DropCase::Direct(..) | DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
+                self
+            }
+            DropCase::Array {
+                element_ty,
+                element_drop,
+            } => {
+                let simplified_case = element_drop.simplify();
+                match &simplified_case {
+                    // Quick return for simple / emergency cases
+                    DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => simplified_case,
+                    // Other cases, simply keep the structure
+                    DropCase::Array { .. } | DropCase::Direct(_) | DropCase::Tuple { .. } => {
+                        DropCase::Array {
+                            element_ty,
+                            element_drop: Box::new(simplified_case),
+                        }
+                    }
+                }
+            }
+            DropCase::Tuple { fields } => {
+                let mut new_fields = Vec::new();
+                
+                for (ty, drop_case) in fields {
+                    let simplified_case = drop_case.simplify();
+                    match &simplified_case {
+                        // Early return for emergency cases
+                        DropCase::Panic(_) | DropCase::Unknown(_) => return simplified_case,
+                        // Keep other cases
+                        _ => new_fields.push((ty, simplified_case)),
+                    }
+                }
+                
+                // Check if all fields are empty
+                let has_non_empty = new_fields
+                    .iter()
+                    .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
+                
+                if has_non_empty {
+                    DropCase::Tuple { fields: new_fields }
+                } else {
+                    DropCase::Empty
+                }
+            }
+        }
+    }
+}
+
 /// Vtable metadata computer that holds common state and provides methods
 /// for computing size, align, and drop shim functions for vtable instances.
 struct VtableMetadataComputer<'a> {
@@ -624,6 +675,38 @@ impl<'a> VtableMetadataComputer<'a> {
             output: Ty::mk_unit(),
         };
 
+        let body = DropShimCtx::create_drop_shim_body(self, &self.get_drop_receiver()?, concrete_ty, drop_case)?;
+
+        // Create item meta
+        let item_meta = ItemMeta {
+            span: self.span,
+            name: Name::from_path(&[&shim_name]),
+            source_text: None,
+            attr_info: AttrInfo::default(),
+            is_local: true,
+            opacity: ItemOpacity::Transparent, // Mark as transparent so the name shows up
+            lang_item: None,
+        };
+        let shim_name = item_meta.name.clone();
+
+        // Create and add function declaration
+        let shim_id = self.ctx.translated.fun_decls.push_with(|id| FunDecl {
+            def_id: id,
+            item_meta,
+            signature,
+            kind: ItemKind::TopLevel,
+            is_global_initializer: None,
+            body: Ok(body),
+        });
+        self.ctx
+            .translated
+            .item_names
+            .insert(AnyTransId::Fun(shim_id), shim_name);
+
+        Ok(shim_id)
+    }
+
+    fn old_create_drop_shim_body(&mut self, dyn_trait_param_ty: &Ty, concrete_ty: &Ty, drop_case: &DropCase) -> Result<Body, Error> {
         // Create locals for the function
         let mut locals = Locals::default();
         locals.arg_count = 1; // One argument: &mut self
@@ -670,7 +753,7 @@ impl<'a> VtableMetadataComputer<'a> {
             DropCase::Panic(msg) => {
                 trace!("Generating panic drop shim.");
                 // Generate a function that panics
-                self.create_panic_drop_body(&locals, msg)?
+                self.create_panic_drop_body(&locals, &msg)?
             }
             DropCase::Array {
                 element_ty,
@@ -696,33 +779,7 @@ impl<'a> VtableMetadataComputer<'a> {
             }
         };
 
-        // Create item meta
-        let item_meta = ItemMeta {
-            span: self.span,
-            name: Name::from_path(&[&shim_name]),
-            source_text: None,
-            attr_info: AttrInfo::default(),
-            is_local: true,
-            opacity: ItemOpacity::Transparent, // Mark as transparent so the name shows up
-            lang_item: None,
-        };
-        let shim_name = item_meta.name.clone();
-
-        // Create and add function declaration
-        let shim_id = self.ctx.translated.fun_decls.push_with(|id| FunDecl {
-            def_id: id,
-            item_meta,
-            signature,
-            kind: ItemKind::TopLevel,
-            is_global_initializer: None,
-            body: Ok(body),
-        });
-        self.ctx
-            .translated
-            .item_names
-            .insert(AnyTransId::Fun(shim_id), shim_name);
-
-        Ok(shim_id)
+        Ok(body)
     }
 
     /// Create a drop function call statement and terminator - abstracted from direct drop logic
@@ -1493,6 +1550,441 @@ impl<'a> VtableMetadataComputer<'a> {
             .insert_and_shift_ids(RegionId::ZERO, Region::Erased);
 
         Ok(generics)
+    }
+}
+
+struct DropShimCtx<'a> {
+    ctx: &'a VtableMetadataComputer<'a>,
+    locals: &'a mut Locals,
+    blocks: Vector<BlockId, BlockData>,
+    unwind_block: Option<BlockId>,
+}
+
+impl<'a> IntoFormatter for &'_ DropShimCtx<'a> {
+    type C = <&'a TransformCtx as IntoFormatter>::C;
+    fn into_fmt(self) -> Self::C {
+        self.ctx.ctx.into_fmt()
+    }
+}
+
+impl<'a> DropShimCtx<'a> {
+    /// Create a new context with the given initial concretize statement in the initial block
+    fn new(ctx: &'a VtableMetadataComputer, locals: &'a mut Locals) -> Self {
+        let mut ret = Self {
+            ctx,
+            locals,
+            blocks: Vector::new(),
+            unwind_block: None,
+        };
+        // create the new initial block, which must exist
+        let _ = ret.new_block();
+        ret
+    }
+
+    /// Get the initial block, i.e., block 0, which always exists
+    fn init_block(&mut self) -> &mut BlockData {
+        self.blocks.get_mut(BlockId::new(0)).unwrap()
+    }
+
+    /// The return block
+    fn func_ret_block(&mut self) -> BlockId {
+        if self.blocks.elem_count() > 1 {
+            BlockId::new(1)
+        } else {
+            let (block_id, _) = self.new_block();
+            block_id
+        }
+    }
+
+    fn ret_place(&self) -> Place {
+        self.locals.return_place()
+    }
+
+    fn span(&self) -> Span {
+        self.ctx.span
+    }
+
+    fn get_unwind_block(&mut self) -> BlockId {
+        if let Some(block_id) = self.unwind_block {
+            block_id
+        } else {
+            let span = self.span();
+            let block_id = self.blocks.push_with(|_| BlockData {
+                statements: vec![],
+                terminator: Terminator {
+                    span,
+                    content: RawTerminator::Abort(AbortKind::UnwindTerminate),
+                    comments_before: vec![],
+                },
+            });
+            self.unwind_block = Some(block_id);
+            block_id
+        }
+    }
+
+    fn new_block(&mut self) -> (BlockId, &mut BlockData) {
+        self.new_block_with_terminator(Terminator {
+            span: self.span(),
+            content: RawTerminator::Return,
+            comments_before: vec![],
+        })
+    }
+
+    fn new_block_with_terminator(&mut self, terminator: Terminator) -> (BlockId, &mut BlockData) {
+        let block_id = self.blocks.push_with(|_| BlockData {
+            statements: vec![],
+            terminator,
+        });
+        let block_data = self.blocks.get_mut(block_id).unwrap();
+        (block_id, block_data)
+    }
+
+    fn empty_drop_block(&mut self, end_block: BlockId) -> Result<BlockId, Error> {
+        let (empty_block_id, _) =
+            self.new_block_with_terminator(Terminator::goto(self.span(), end_block));
+        Ok(empty_block_id)
+    }
+
+    fn panic_drop_block(&mut self, msg: &String) -> Result<BlockId, Error> {
+        let (block_id, _) = self.new_block_with_terminator(Terminator {
+            span: self.span(),
+            content: RawTerminator::Abort(AbortKind::Panic(None)),
+            comments_before: vec![format!("Panic: {}", msg)],
+        });
+        Ok(block_id)
+    }
+
+    /// Set the initial block's terminator to a goto to the specified target
+    fn set_init_block_goto(&mut self, target: BlockId) {
+        self.init_block().terminator = Terminator::goto(self.span(), target);
+    }
+
+    /// Create a new call block to call the drop function
+    /// If the call succeeds, goes to `end_block`, otherwise to the unwind block
+    fn direct_drop_block(
+        &mut self,
+        drop_place: Place,
+        end_block: BlockId,
+        fun_ref: &FunDeclRef,
+    ) -> Result<BlockId, Error> {
+        // Create a new variable with var := &mut drop_place
+        // This is the argument to the drop function
+        let drop_place_ref = self.new_var(None, Ty::new(TyKind::Ref(
+            Region::Erased,
+            drop_place.ty().clone(),
+            RefKind::Mut,
+        )));
+        let assn_stmt = Statement {
+            span: self.span(),
+            content: RawStatement::Assign(
+                drop_place_ref.clone(),
+                Rvalue::Ref(drop_place.clone(), BorrowKind::Mut),
+            ),
+            comments_before: vec!["Create reference for drop argument".to_string()],
+        };
+
+        // Create the call
+        let call = Call {
+            func: FnOperand::Regular(FnPtr::from(FunDeclRef {
+                id: fun_ref.id,
+                generics: self.ctx.create_drop_function_generics(drop_place.ty())?,
+            })),
+            args: vec![Operand::Move(drop_place_ref)],
+            dest: self.ret_place(),
+        };
+
+        // Create the terminator
+        let unwind_block = self.get_unwind_block();
+        let terminator = Terminator {
+            span: self.span(),
+            content: RawTerminator::Call {
+                call,
+                target: end_block,
+                on_unwind: unwind_block,
+            },
+            comments_before: vec![format!(
+                "Call drop function: {}",
+                fun_ref.id.with_ctx(&self.ctx.ctx.into_fmt())
+            )],
+        };
+
+        let (block_id, block_data) = self.new_block_with_terminator(terminator);
+
+        // Add the assignment statement at the start of the block
+        block_data.statements.push(assn_stmt);
+
+        Ok(block_id)
+    }
+
+    fn new_var(&mut self, name: Option<String>, ty: Ty) -> Place {
+        self.locals.new_var(name, ty)
+    }
+
+    fn get_block(&mut self, block_id: BlockId) -> &mut BlockData {
+        self.blocks.get_mut(block_id).unwrap()
+    }
+
+    /// Create blocks for dropping each element of the array in a loop
+    fn array_drop_blocks(
+        &mut self,
+        drop_place: Place,
+        end_block: BlockId,
+        element_ty: &Ty,
+        element_drop: &DropCase,
+    ) -> Result<BlockId, Error> {
+        // The constant builder for creating zero and one constants
+        let constant_builder = ConstantBuilder::new(self.ctx.ctx, self.span());
+        // The array length constant (as expression, but should be treated as constant)
+        let array_length_expr = self.ctx.get_array_length(drop_place.ty())?;
+
+        // The blocks of this looping structure
+        // The block to setup the counter
+        let (setup_block, _) = self.new_block();
+        // The condition check block to test if counter < array length
+        let (cond_block, _) = self.new_block();
+        // The loop body init block to increase counter
+        let (counter_incr_block, _) = self.new_block();
+        // After increasing counter, get the actual drop by recursion, which has `end_block` as the `cond_block`
+
+        // The initial block: create counter and initialize to 0
+        let counter_ty = array_length_expr.ty.clone();
+        let counter = self.new_var(None, counter_ty.clone());
+
+        // Furnish the setup block
+        {
+            let init_counter_stmt = Statement {
+                span: self.span(),
+                content: RawStatement::Assign(
+                    counter.clone(),
+                    Rvalue::Use(Operand::Const(Box::new(
+                        constant_builder.zero_constant(&counter_ty)?,
+                    ))),
+                ),
+                comments_before: vec!["Initialize counter to 0".to_string()],
+            };
+
+            let span = self.span();
+            let setup_block_data = self.get_block(setup_block);
+
+            setup_block_data.statements.push(init_counter_stmt);
+            setup_block_data.terminator = Terminator::goto(span, cond_block);
+        }
+
+        // Furnish the condition block
+        {
+            let counter_check = self.new_var(None, TyKind::Literal(LiteralTy::Bool).into_ty());
+
+            let counter_check_stmt = Statement {
+                span: self.span(),
+                content: RawStatement::Assign(
+                    counter_check.clone(),
+                    Rvalue::BinaryOp(
+                        BinOp::Lt,
+                        Operand::Copy(counter.clone()),
+                        Operand::Const(Box::new(array_length_expr.clone())),
+                    ),
+                ),
+                comments_before: vec![format!("Check if counter < array length")],
+            };
+
+            let loop_switch = SwitchTargets::If(
+                counter_incr_block, // true: go to loop body
+                end_block,          // false: go to return
+            );
+
+            let span = self.span();
+            let cond_block_data = self.get_block(cond_block);
+
+            cond_block_data.statements.push(counter_check_stmt);
+            cond_block_data.terminator = Terminator {
+                span,
+                content: RawTerminator::Switch {
+                    discr: Operand::Move(counter_check.clone()),
+                    targets: loop_switch,
+                },
+                comments_before: vec!["Branch based on loop condition".to_string()],
+            };
+        }
+
+        // Build the actual block for droping the internal
+        let new_drop_place = drop_place.project(
+            ProjectionElem::Index {
+                offset: Box::new(Operand::Copy(counter.clone())),
+                from_end: false,
+            },
+            element_ty.clone(),
+        );
+        let working_block =
+            self.creat_drop_case_blocks(new_drop_place, cond_block, element_drop)?;
+
+        // Furnish the counter increment block
+        {
+            let one_constant = constant_builder.one_constant(&counter_ty)?;
+
+            let counter_increment_stmt = Statement {
+                span: self.span(),
+                content: RawStatement::Assign(
+                    counter.clone(),
+                    Rvalue::BinaryOp(
+                        BinOp::Add(OverflowMode::Panic),
+                        Operand::Move(counter.clone()),
+                        Operand::Const(Box::new(one_constant)),
+                    ),
+                ),
+                comments_before: vec!["Increment counter".to_string()],
+            };
+
+            let span = self.span();
+            let counter_incr_block_data = self.get_block(counter_incr_block);
+
+            counter_incr_block_data
+                .statements
+                .push(counter_increment_stmt);
+            counter_incr_block_data.terminator = Terminator::goto(span, working_block);
+        }
+
+        // The initial block is the setup block
+        Ok(setup_block)
+    }
+
+    fn tuple_drop_blocks(
+        &mut self,
+        drop_place: Place,
+        end_block: BlockId,
+        fields: &Vec<(Ty, DropCase)>,
+    ) -> Result<BlockId, Error> {
+        // Create a series of blocks to drop each field
+        // And they chain to each other, ending in end_block
+        let mut current_end_block = end_block;
+
+        for (field_id, (ty, case)) in fields.iter().enumerate().rev() {
+            // Create the field projection
+            let new_drop_place = drop_place.clone().project(
+                ProjectionElem::Field(FieldProjKind::Tuple(fields.len()), FieldId::new(field_id)),
+                ty.clone(),
+            );
+            let working_block =
+                self.creat_drop_case_blocks(new_drop_place, current_end_block, case)?;
+
+            current_end_block = working_block;
+        }
+
+        // If it is the same as end_block, create an empty block to maintain the guarantee
+        if current_end_block == end_block {
+            self.empty_drop_block(end_block)
+        } else {
+            Ok(current_end_block)
+        }
+    }
+
+    /// It is guaranteed that the resulting block is NOT `end_block`
+    /// But it is not guaranteed that the `end_block` is reachable from the resulting block, due to panics
+    /// But if there is no panic, the `end_block` is always reachable
+    fn creat_drop_case_blocks(
+        &mut self,
+        drop_place: Place,
+        end_block: BlockId,
+        case: &DropCase,
+    ) -> Result<BlockId, Error> {
+        match case {
+            DropCase::Empty => self.empty_drop_block(end_block),
+            DropCase::Panic(msg) => self.panic_drop_block(msg),
+            DropCase::Direct(fun_ref) => self.direct_drop_block(drop_place, end_block, fun_ref),
+            DropCase::Unknown(..) => unreachable!("This should be handled at first"),
+            DropCase::Array {
+                element_ty,
+                element_drop,
+            } => self.array_drop_blocks(drop_place, end_block, element_ty, element_drop),
+            DropCase::Tuple { fields } => self.tuple_drop_blocks(drop_place, end_block, fields),
+        }
+    }
+
+    pub fn create_drop_shim_body(
+        ctx: &VtableMetadataComputer,
+        dyn_trait_param_ty: &Ty,
+        concrete_ty: &Ty,
+        drop_case: &DropCase,
+    ) -> Result<Body, Error> {
+        let mut locals = Locals {
+            arg_count: 1,
+            locals: Vector::new(),
+        };
+        // create the return place
+        let _ = locals.new_var(None, Ty::mk_unit());
+        let dyn_receiver =
+            locals.new_var(Some("dyn_receiver".to_string()), dyn_trait_param_ty.clone());
+
+        let drop_case = drop_case.clone().simplify();
+
+        match drop_case {
+            DropCase::Empty => {
+                let mut blocks = Vector::new();
+                let sole_block = BlockData {
+                    statements: vec![],
+                    terminator: Terminator {
+                        span: ctx.span,
+                        content: RawTerminator::Return,
+                        comments_before: vec!["Nothing to drop, return".to_string()],
+                    },
+                };
+
+                let _ = blocks.push_with(|_| sole_block);
+                // Nothing to drop, just return
+                return Ok(Body::Unstructured(ExprBody {
+                    span: ctx.span,
+                    locals,
+                    comments: vec![],
+                    body: blocks,
+                }))
+            }
+            _ => {
+                let concrete_place = locals.new_var(Some("concrete".into()), Ty::new(TyKind::Ref(
+                    Region::Erased,
+                    concrete_ty.clone(),
+                    RefKind::Mut,
+                )));
+
+                let concretize_stmt = Statement {
+                    span: ctx.span,
+                    content: RawStatement::Assign(
+                        dyn_receiver.clone(),
+                        Rvalue::UnaryOp(
+                            UnOp::Cast(CastKind::Concretize(
+                                dyn_trait_param_ty.clone(),
+                                TyKind::Ref(
+                                    Region::Erased,
+                                    concrete_ty.clone(),
+                                    RefKind::Mut,
+                                )
+                                .into_ty(),
+                            )),
+                            Operand::Move(locals.place_for_var(LocalId::new(1))),
+                        ),
+                    ),
+                    comments_before: vec![format!(
+                        "Concretize to concrete type: {}",
+                        concrete_ty.with_ctx(&ctx.ctx.into_fmt())
+                    )],
+                };
+
+                let mut shim_ctx = DropShimCtx::new(ctx, &mut locals);
+                shim_ctx.init_block().statements.push(concretize_stmt);
+                let drop_place = concrete_place.deref();
+                let end_block = shim_ctx.func_ret_block();
+
+                let next_block = shim_ctx.creat_drop_case_blocks(drop_place, end_block, &drop_case)?;
+                shim_ctx.set_init_block_goto(next_block);
+
+                let body = shim_ctx.blocks;
+
+                Ok(Body::Unstructured(ExprBody {
+                    span: ctx.span,
+                    locals,
+                    comments: vec![],
+                    body,
+                }))
+            }
+        }
     }
 }
 
