@@ -95,59 +95,6 @@ impl<'a> ConstantBuilder<'a> {
     }
 }
 
-/// Helper for common drop shim construction patterns
-struct DropShimBuilder<'a> {
-    span: Span,
-    constant_builder: ConstantBuilder<'a>,
-}
-
-impl<'a> DropShimBuilder<'a> {
-    fn new(ctx: &'a TransformCtx, span: Span) -> Self {
-        Self {
-            span,
-            constant_builder: ConstantBuilder::new(ctx, span),
-        }
-    }
-
-    fn concretize_statement(
-        &self,
-        target_place: Place,
-        source_place: Place,
-        from_ty: &Ty,
-        to_ty: &Ty,
-    ) -> Statement {
-        Statement {
-            span: self.span,
-            content: RawStatement::Assign(
-                target_place,
-                Rvalue::UnaryOp(
-                    UnOp::Cast(CastKind::Concretize(from_ty.clone(), to_ty.clone())),
-                    Operand::Move(source_place),
-                ),
-            ),
-            comments_before: vec![],
-        }
-    }
-
-    fn return_block(&self) -> BlockData {
-        BlockData {
-            statements: vec![],
-            terminator: Terminator {
-                span: self.span,
-                content: RawTerminator::Return,
-                comments_before: vec![],
-            },
-        }
-    }
-
-    fn goto_block(&self, target: BlockId) -> BlockData {
-        BlockData {
-            statements: vec![],
-            terminator: Terminator::goto(self.span, target),
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 enum DropCase {
     /// Drop function found - call it directly
@@ -280,14 +227,12 @@ impl<'a> VtableMetadataComputer<'a> {
     // VTABLE DETECTION AND TYPE EXTRACTION
     // ========================================
 
-    /// Check if a type ID represents a vtable struct by getting the correct vtable def-id
-    /// from the impl-ref: impl-ref → def-id of implemented trait → get definition of the trait → get the vtable-ref → get the type-def-id of target vtable
+    /// Check if a type ID represents a vtable struct
     fn is_vtable_struct(&self, type_id: &TypeId) -> Result<bool, Error> {
         let TypeId::Adt(type_decl_id) = type_id else {
             return Ok(false);
         };
 
-        // Get the trait implementation
         let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
             raise_error!(
                 self.ctx,
@@ -297,7 +242,6 @@ impl<'a> VtableMetadataComputer<'a> {
             );
         };
 
-        // Get the implemented trait
         let trait_decl_ref = &trait_impl.impl_trait;
         let Some(trait_decl) = self.ctx.translated.trait_decls.get(trait_decl_ref.id) else {
             raise_error!(
@@ -452,27 +396,20 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Analyze drop case for array types [T; N]
     fn analyze_array_drop_case(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
-        trace!("[ANALYZE] Found Array type, recursively analyzing element");
-        
         let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) else {
             return Ok(DropCase::Unknown("Array type missing element type parameter".to_string()));
         };
 
-        // Check if array length is 0 - if so, no drops needed
         if self.is_array_empty(type_decl_ref)? {
-            trace!("[ANALYZE] Array has length 0, no drops needed");
             return Ok(DropCase::Empty);
         }
 
         let element_case = self.analyze_drop_case(element_ty)?;
-        trace!("[ANALYZE] Array element drop case: {:?}", element_case);
-        
         match element_case {
             DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
                 Ok(element_case)
             }
             _ => {
-                trace!("[ANALYZE] Wrapping element case in Array traversal");
                 Ok(DropCase::Array {
                     element_ty: element_ty.clone(),
                     element_drop: Box::new(element_case),
@@ -483,20 +420,14 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Analyze drop case for tuple types (T1, T2, ...)
     fn analyze_tuple_drop_case(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
-        trace!("[ANALYZE] Found Tuple type, recursively analyzing fields");
-        
         let tuple_generics = &type_decl_ref.generics.types;
         let mut fields = Vec::new();
 
-        // Analyze each field in the tuple
-        for (idx, field_ty) in tuple_generics.iter().enumerate() {
-            trace!("[ANALYZE] Tuple field {}: {:?}", idx, field_ty);
+        for (_idx, field_ty) in tuple_generics.iter().enumerate() {
             let field_case = self.analyze_drop_case(field_ty)?;
-            trace!("[ANALYZE] Tuple field {} drop case: {:?}", idx, field_case);
             
             match field_case {
                 DropCase::Panic(_) | DropCase::Unknown(_) => {
-                    trace!("[ANALYZE] Field {} has error case, returning early", idx);
                     return Ok(field_case);
                 }
                 _ => {
@@ -506,7 +437,6 @@ impl<'a> VtableMetadataComputer<'a> {
         }
 
         if fields.is_empty() {
-            trace!("[ANALYZE] Empty tuple, no fields need dropping");
             Ok(DropCase::Empty)
         } else {
             let has_drops = fields
@@ -514,10 +444,8 @@ impl<'a> VtableMetadataComputer<'a> {
                 .any(|(_, drop_case)| !matches!(drop_case, DropCase::Empty));
 
             if !has_drops {
-                trace!("[ANALYZE] No tuple fields need dropping, using empty drop");
                 Ok(DropCase::Empty)
             } else {
-                trace!("[ANALYZE] Creating tuple drop with {} fields", fields.len());
                 Ok(DropCase::Tuple { fields })
             }
         }
@@ -525,13 +453,11 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Analyze drop case for builtin types (Box, Slice, etc.)
     fn analyze_builtin_drop_case(&self, builtin_ty: &BuiltinTy, concrete_ty: &Ty) -> Result<DropCase, Error> {
-        trace!("[ANALYZE] Found Builtin type: {:?}", builtin_ty);
         match builtin_ty {
             BuiltinTy::Array => {
                 unreachable!("Array should be handled separately")
             }
             BuiltinTy::Box => {
-                trace!("[ANALYZE] Handling Box type - looking for direct drop");
                 if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
                     Ok(DropCase::Direct(fun_ref))
                 } else {
@@ -540,14 +466,8 @@ impl<'a> VtableMetadataComputer<'a> {
                     ))
                 }
             }
-            BuiltinTy::Slice => {
-                trace!("[ANALYZE] Slice is incomplete type, using empty drop");
-                Ok(DropCase::Empty)
-            }
-            BuiltinTy::Str => {
-                trace!("[ANALYZE] str type doesn't need drop");
-                Ok(DropCase::Empty)
-            }
+            BuiltinTy::Slice => Ok(DropCase::Empty),
+            BuiltinTy::Str => Ok(DropCase::Empty),
         }
     }
 
@@ -634,18 +554,9 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Check if two types match for the purpose of drop implementation lookup
     fn types_match(&self, ty1: &Ty, ty2: &Ty) -> bool {
         match (ty1.kind(), ty2.kind()) {
-            (TyKind::Adt(ref1), TyKind::Adt(ref2)) => {
-                trace!("[TYPE_MATCH] Comparing ADT types: {:?} vs {:?}", ref1.id, ref2.id);
-                ref1.id == ref2.id
-            }
-            (TyKind::Literal(lit1), TyKind::Literal(lit2)) => {
-                trace!("[TYPE_MATCH] Comparing literal types: {:?} vs {:?}", lit1, lit2);
-                lit1 == lit2
-            }
-            _ => {
-                trace!("[TYPE_MATCH] Comparing other types structurally");
-                ty1 == ty2
-            }
+            (TyKind::Adt(ref1), TyKind::Adt(ref2)) => ref1.id == ref2.id,
+            (TyKind::Literal(lit1), TyKind::Literal(lit2)) => lit1 == lit2,
+            _ => ty1 == ty2,
         }
     }
 
