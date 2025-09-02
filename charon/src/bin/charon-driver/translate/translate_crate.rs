@@ -426,7 +426,6 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     }
 
     /// Register this item without enqueueing it for translation.
-    #[expect(dead_code)]
     pub(crate) fn register_item_no_enqueue<T: TryFrom<AnyTransId>>(
         &mut self,
         span: Span,
@@ -483,7 +482,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         span: Span,
         item: &hax::ItemRef,
     ) -> Result<TypeDeclRef, Error> {
-        match self.recognize_builtin_type(item)? {
+        match self.recognize_builtin_type(span, item)? {
             Some(id) => {
                 let generics =
                     self.translate_generic_args(span, &item.generic_args, &item.impl_exprs)?;

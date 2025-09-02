@@ -1840,6 +1840,7 @@ and type_decl_of_json (ctx : of_json_ctx) (js : json) :
           ("kind", kind);
           ("layout", layout);
           ("ptr_metadata", ptr_metadata);
+          ("drop_glue", drop_glue);
         ] ->
         let* def_id = type_decl_id_of_json ctx def_id in
         let* item_meta = item_meta_of_json ctx item_meta in
@@ -1850,8 +1851,18 @@ and type_decl_of_json (ctx : of_json_ctx) (js : json) :
         let* ptr_metadata =
           option_of_json ptr_metadata_of_json ctx ptr_metadata
         in
+        let* drop_glue = option_of_json trait_impl_ref_of_json ctx drop_glue in
         Ok
-          ({ def_id; item_meta; generics; src; kind; layout; ptr_metadata }
+          ({
+             def_id;
+             item_meta;
+             generics;
+             src;
+             kind;
+             layout;
+             ptr_metadata;
+             drop_glue;
+           }
             : type_decl)
     | _ -> Error "")
 

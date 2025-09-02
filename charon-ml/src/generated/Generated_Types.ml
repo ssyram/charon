@@ -866,6 +866,9 @@ and type_decl = {
           are unable to obtain the info. See
           [translate_types::{impl ItemTransCtx}::translate_ptr_metadata] for
           more details. *)
+  drop_glue : trait_impl_ref option;
+      (** The drop implementation for this type, if any. This is [Some] if and
+          only if the given type has a drop implementation. *)
 }
 
 and type_decl_kind =
