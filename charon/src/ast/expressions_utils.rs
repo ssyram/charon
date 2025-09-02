@@ -245,4 +245,11 @@ impl Operand {
             Operand::Const(c) => &c.ty,
         }
     }
+
+    pub fn opaque(msg: String, ty: Ty) -> Self {
+        Operand::Const(Box::new(ConstantExpr {
+            kind: ConstantExprKind::Opaque(msg),
+            ty,
+        }))
+    }
 }

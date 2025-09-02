@@ -22,6 +22,7 @@ pub mod add_missing_info {
 
 /// Passes that effect some kind of normalization on the crate.
 pub mod normalize {
+    pub mod compute_vtable_metadata;
     pub mod expand_associated_types;
     pub mod filter_unreachable_blocks;
     pub mod monomorphize;
@@ -116,6 +117,8 @@ pub static ULLBC_PASSES: &[Pass] = &[
     // Transform dyn trait method calls to vtable function pointer calls
     // This should be early to handle the calls before other transformations
     UnstructuredBody(&normalize::transform_dyn_trait_calls::Transform),
+    // Compute vtable metadata (size, align, drop) - should be early to have complete vtables
+    NonBody(&normalize::compute_vtable_metadata::Transform),
     // Inline promoted consts into their parent bodies.
     UnstructuredBody(&simplify_output::inline_promoted_consts::Transform),
     // # Micro-pass: merge single-origin gotos into their parent. This drastically reduces the
