@@ -270,12 +270,11 @@ impl<'a> VtableMetadataComputer<'a> {
     // ========================================
 
     /// Analyze what kind of drop case applies to the given concrete type
+    /// Simplified version based on Rustc guarantees about concrete types
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
         trace!("[ANALYZE] Analyzing drop case for type: {:?}", concrete_ty);
         trace!("[ANALYZE] Type kind: {:?}", concrete_ty.kind());
 
-        // Use proper recursive analysis: match the concrete_ty structure first,
-        // then recursively analyze sub-components for composite types
         match concrete_ty.kind() {
             TyKind::Adt(type_decl_ref) => {
                 match &type_decl_ref.id {
@@ -386,9 +385,8 @@ impl<'a> VtableMetadataComputer<'a> {
                         trace!("[ANALYZE] Found Builtin type: {:?}", builtin_ty);
                         match builtin_ty {
                             BuiltinTy::Array => {
-                                // This should not happen since Array is handled at the higher level
-                                // but included for completeness
-                                unreachable!("Array should be handled at the higher level")
+                                // This should not happen since Array is handled above
+                                unreachable!("Array should be handled above")
                             }
                             BuiltinTy::Box => {
                                 trace!("[ANALYZE] Handling Box type - looking for direct drop");
@@ -402,53 +400,34 @@ impl<'a> VtableMetadataComputer<'a> {
                                 }
                             }
                             BuiltinTy::Slice => {
-                                trace!("[ANALYZE] Found Slice type, recursively analyzing element");
-                                // Slice &[T] - recursively analyze element type (similar to Array)
-                                if let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) {
-                                    let element_case = self.analyze_drop_case(element_ty)?;
-                                    trace!("[ANALYZE] Slice element drop case: {:?}", element_case);
-                                    match element_case {
-                                        DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
-                                            Ok(element_case)
-                                        }
-                                        _ => {
-                                            Ok(DropCase::Array {
-                                                element_ty: element_ty.clone(),
-                                                element_drop: Box::new(element_case),
-                                            })
-                                        }
-                                    }
-                                } else {
-                                    Ok(DropCase::Unknown(
-                                        "Slice type missing element type parameter".to_string(),
-                                    ))
-                                }
+                                trace!("[ANALYZE] Slice is incomplete type, using empty drop");
+                                // Slice is incomplete - drop happens in creation (e.g., Box<Array> → Box<Slice>)
+                                Ok(DropCase::Empty)
                             }
                             BuiltinTy::Str => {
                                 trace!("[ANALYZE] str type doesn't need drop");
-                                Ok(DropCase::Empty) // str does not need drop
+                                Ok(DropCase::Empty)
                             }
                         }
                     }
                 }
             }
-            // Non-ADT types - handle primitive types that don't need drop
+            // Non-ADT concrete types that don't need drop
             TyKind::Literal(_) => {
                 trace!("[ANALYZE] Literal type doesn't need drop");
                 Ok(DropCase::Empty)
             }
             TyKind::Ref(..) | TyKind::RawPtr(..) => {
                 trace!("[ANALYZE] Reference/pointer type doesn't need drop");
-                Ok(DropCase::Empty) // References and raw pointers don't need drop
+                Ok(DropCase::Empty)
             }
-            // Other non-ADT types should raise an error - these cases should not be called with drop
+            // Non-concrete cases should be Unknown
             _ => {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Unsupported type for drop case analysis: {}",
+                trace!("[ANALYZE] Non-concrete type, returning Unknown");
+                Ok(DropCase::Unknown(format!(
+                    "Non-concrete type for drop analysis: {}",
                     self.type_to_string(concrete_ty)
-                )
+                )))
             }
         }
     }
@@ -1131,13 +1110,15 @@ impl<'a> VtableMetadataComputer<'a> {
                 let element_ref =
                     locals.new_var(Some("element_ref".to_string()), element_ref_ty.clone());
 
-                // Create array index projection
+                // Create array index projection - need to dereference the reference first
                 let index_projection = ProjectionElem::Index {
                     offset: Box::new(Operand::Copy(counter.clone())),
                     from_end: false,
                 };
 
-                let projected_place = concrete.project(index_projection, element_ref_ty.clone());
+                // Dereference the concrete reference to get the array, then index
+                let deref_place = concrete.clone().project(ProjectionElem::Deref, concrete_ty.clone());
+                let projected_place = deref_place.project(index_projection, element_ref_ty.clone());
 
                 let element_proj_stmt = Statement {
                     span: self.span,
@@ -1349,10 +1330,9 @@ impl<'a> VtableMetadataComputer<'a> {
                                 field_ref_ty.clone(),
                             );
 
-                            // Create field projection statement
-                            let projected_place = concrete
-                                .clone()
-                                .project(field_projection, field_ref_ty.clone());
+                            // Create field projection statement - need to dereference the reference first
+                            let deref_place = concrete.clone().project(ProjectionElem::Deref, concrete_ty.clone());
+                            let projected_place = deref_place.project(field_projection, field_ref_ty.clone());
 
                             let field_assign_stmt = Statement {
                                 span: self.span,

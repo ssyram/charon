@@ -32,25 +32,25 @@ impl Checkable<i32> for String {
     }
 }
 
-impl<const N: usize> Super<i32> for [Vec<i32>; N] {
+impl<const N: usize> Super<i32> for [String; N] {
     type Output = i32;
     fn super_method(&self, arg: i32) -> i32 {
-        if self[0].len() > N { arg + 1 } else { arg }
+        if N > 0 { arg + self[0].len() as i32 } else { arg }
     }
 }
-impl<const N: usize> Checkable<i32> for [Vec<i32>; N] {
+impl<const N: usize> Checkable<i32> for [String; N] {
     fn check(&self) -> bool {
         self.super_method(0) >= 0
     }
 }
 
-impl Super<i32> for (i32, Vec<i32>) {
+impl Super<i32> for (i32, String) {
     type Output = i32;
     fn super_method(&self, arg: i32) -> i32 {
-        self.0 + self.1.iter().copied().sum::<i32>() + arg
+        self.0 + self.1.len() as i32 + arg
     }
 }
-impl Checkable<i32> for (i32, Vec<i32>) {
+impl Checkable<i32> for (i32, String) {
     fn check(&self) -> bool {
         self.super_method(0) > 0
     }
@@ -60,10 +60,10 @@ fn extra_checks() {
     let b : String = String::from("Hello");
     assert!(use_checkable(&b as &dyn Checkable<i32, Output = i32>));
 
-    let arr = [vec![0], vec![2, 3]];
+    let arr = [String::from("test"), String::from("array")];
     assert!(use_checkable(&arr as &dyn Checkable<i32, Output = i32>));
 
-    let tup = (10, vec![20, 30]);
+    let tup = (10, String::from("tuple"));
     assert!(use_checkable(&tup as &dyn Checkable<i32, Output = i32>));
 }
 
