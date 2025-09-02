@@ -16,6 +16,159 @@ use crate::{
     register_error, transform::TransformCtx, ullbc_ast::*,
 };
 
+// ========================================
+// HELPER STRUCTURES
+// ========================================
+
+/// Helper for creating constants with specific types
+struct ConstantBuilder<'a> {
+    ctx: &'a TransformCtx,
+    span: Span,
+}
+
+impl<'a> ConstantBuilder<'a> {
+    fn new(ctx: &'a TransformCtx, span: Span) -> Self {
+        Self { ctx, span }
+    }
+
+    fn zero_constant(&self, ty: &Ty) -> Result<ConstantExpr, Error> {
+        match ty.kind() {
+            TyKind::Literal(LiteralTy::UInt(uint_ty)) => {
+                let expr = ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::from_uint(
+                            self.ctx.translated.target_information.target_pointer_size,
+                            *uint_ty,
+                            0,
+                        ).or_else(|_| {
+                            raise_error!(self.ctx, self.span, "Zero value out of bounds")
+                        })?,
+                    )),
+                    ty: ty.clone(),
+                };
+                Ok(expr)
+            }
+            _ => raise_error!(self.ctx, self.span, "Unsupported type for zero constant: {:?}", ty)
+        }
+    }
+
+    fn one_constant(&self, ty: &Ty) -> Result<ConstantExpr, Error> {
+        match ty.kind() {
+            TyKind::Literal(LiteralTy::UInt(uint_ty)) => {
+                let expr = ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::from_uint(
+                            self.ctx.translated.target_information.target_pointer_size,
+                            *uint_ty,
+                            1,
+                        ).or_else(|_| {
+                            raise_error!(self.ctx, self.span, "One value out of bounds")
+                        })?,
+                    )),
+                    ty: ty.clone(),
+                };
+                Ok(expr)
+            }
+            _ => raise_error!(self.ctx, self.span, "Unsupported type for one constant: {:?}", ty)
+        }
+    }
+
+    fn layout_constant(&self, value: Either<String, u64>) -> Result<Operand, Error> {
+        match value {
+            Either::Left(reason) => Ok(Operand::opaque(reason, Ty::mk_usize())),
+            Either::Right(val) => {
+                let expr = ConstantExpr {
+                    value: RawConstantExpr::Literal(Literal::Scalar(
+                        ScalarValue::from_uint(
+                            self.ctx.translated.target_information.target_pointer_size,
+                            UIntTy::Usize,
+                            val as u128,
+                        ).or_else(|_| {
+                            raise_error!(self.ctx, self.span, "Layout value out of bounds")
+                        })?,
+                    )),
+                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
+                };
+                Ok(Operand::Const(Box::new(expr)))
+            }
+        }
+    }
+}
+
+/// Helper for common drop shim construction patterns
+struct DropShimBuilder<'a> {
+    span: Span,
+    constant_builder: ConstantBuilder<'a>,
+}
+
+impl<'a> DropShimBuilder<'a> {
+    fn new(ctx: &'a TransformCtx, span: Span) -> Self {
+        Self {
+            span,
+            constant_builder: ConstantBuilder::new(ctx, span),
+        }
+    }
+
+    fn concretize_statement(
+        &self,
+        target_place: Place,
+        source_place: Place,
+        from_ty: &Ty,
+        to_ty: &Ty,
+    ) -> Statement {
+        Statement {
+            span: self.span,
+            content: RawStatement::Assign(
+                target_place,
+                Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(from_ty.clone(), to_ty.clone())),
+                    Operand::Move(source_place),
+                ),
+            ),
+            comments_before: vec![],
+        }
+    }
+
+    fn return_block(&self) -> BlockData {
+        BlockData {
+            statements: vec![],
+            terminator: Terminator {
+                span: self.span,
+                content: RawTerminator::Return,
+                comments_before: vec![],
+            },
+        }
+    }
+
+    fn goto_block(&self, target: BlockId) -> BlockData {
+        BlockData {
+            statements: vec![],
+            terminator: Terminator::goto(self.span, target),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum DropCase {
+    /// Drop function found - call it directly
+    Direct(FunDeclRef),
+    /// No drop function needed (e.g., i32) - generate empty shim
+    Empty,
+    /// Drop function not translated - generate panic shim
+    Panic(String),
+    /// Unknown due to generics - generate opaque
+    Unknown(String),
+    /// Array traversal drop (drop each element)
+    Array {
+        element_ty: Ty,
+        element_drop: Box<DropCase>,
+    },
+    /// Tuple field-by-field drop (drop each field that needs it)
+    Tuple {
+        fields: Vec<(Ty, DropCase)>,
+    },
+}
+
 /// Vtable metadata computer that holds common state and provides methods
 /// for computing size, align, and drop shim functions for vtable instances.
 struct VtableMetadataComputer<'a> {
@@ -101,50 +254,26 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     fn compute_layout(&mut self, fields: &mut Vec<Operand>, concrete_ty: &Ty) -> Result<(), Error> {
+        let constant_builder = ConstantBuilder::new(self.ctx, self.span);
+        
         match concrete_ty.layout(&self.ctx.translated) {
             Ok(layout) => {
-                fields[0] = self.layout_field_constant(match layout.size {
+                fields[0] = constant_builder.layout_constant(match layout.size {
                     Some(size) => Either::Right(size),
                     None => Either::Left("Size not available".to_string()),
                 })?;
-                fields[1] = self.layout_field_constant(match layout.align {
+                fields[1] = constant_builder.layout_constant(match layout.align {
                     Some(align) => Either::Right(align),
                     None => Either::Left("Align not available".to_string()),
                 })?;
             }
             Err(reason) => {
-                // Fallback to opaque values for both size and align when layout computation fails
                 let reason_msg = format!("Layout not available: {}", reason);
-                fields[0] = self.layout_field_constant(Either::Left(reason_msg.clone()))?;
-                fields[1] = self.layout_field_constant(Either::Left(reason_msg))?;
+                fields[0] = constant_builder.layout_constant(Either::Left(reason_msg.clone()))?;
+                fields[1] = constant_builder.layout_constant(Either::Left(reason_msg))?;
             }
         }
         Ok(())
-    }
-
-    /// Create a constant operand for layout fields (size/align)
-    /// If Left(reason), creates an opaque constant with the reason
-    /// If Right(value), creates a literal constant with the value
-    fn layout_field_constant(&self, value: Either<String, u64>) -> Result<Operand, Error> {
-        match value {
-            Either::Left(reason) => Ok(Operand::opaque(reason, Ty::mk_usize())),
-            Either::Right(val) => {
-                let expr = ConstantExpr {
-                    value: RawConstantExpr::Literal(Literal::Scalar(
-                        ScalarValue::from_uint(
-                            self.ctx.translated.target_information.target_pointer_size,
-                            UIntTy::Usize,
-                            val as u128,
-                        )
-                        .or_else(|_| {
-                            raise_error!(self.ctx, self.span, "Layout value out of bounds")
-                        })?,
-                    )),
-                    ty: Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize))),
-                };
-                Ok(Operand::Const(Box::new(expr)))
-            }
-        }
     }
 
     // ========================================
@@ -916,54 +1045,6 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Create a constant expression with value 0 of the same type as the array length
-    fn create_zero_constant_like(&self, array_length_ty: &Ty) -> Result<ConstantExpr, Error> {
-        match array_length_ty.kind() {
-            TyKind::Literal(LiteralTy::UInt(uint_ty)) => Ok(ConstantExpr {
-                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(
-                    *uint_ty, 0,
-                ))),
-                ty: array_length_ty.clone(),
-            }),
-            TyKind::Literal(LiteralTy::Int(int_ty)) => Ok(ConstantExpr {
-                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Signed(*int_ty, 0))),
-                ty: array_length_ty.clone(),
-            }),
-            _ => {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Array length type should be integer, found: {:?}",
-                    array_length_ty
-                )
-            }
-        }
-    }
-
-    /// Create a constant expression with value 1 of the same type as the array length
-    fn create_one_constant_like(&self, array_length_ty: &Ty) -> Result<ConstantExpr, Error> {
-        match array_length_ty.kind() {
-            TyKind::Literal(LiteralTy::UInt(uint_ty)) => Ok(ConstantExpr {
-                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Unsigned(
-                    *uint_ty, 1,
-                ))),
-                ty: array_length_ty.clone(),
-            }),
-            TyKind::Literal(LiteralTy::Int(int_ty)) => Ok(ConstantExpr {
-                value: RawConstantExpr::Literal(Literal::Scalar(ScalarValue::Signed(*int_ty, 1))),
-                ty: array_length_ty.clone(),
-            }),
-            _ => {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Array length type should be integer, found: {:?}",
-                    array_length_ty
-                )
-            }
-        }
-    }
-
-    /// Create function body for array drop functions (placeholder)
     fn create_array_drop_body(
         &self,
         locals: &mut Locals,
@@ -973,6 +1054,7 @@ impl<'a> VtableMetadataComputer<'a> {
         element_drop: &DropCase,
     ) -> Result<Body, Error> {
         let mut blocks = Vector::new();
+        let constant_builder = ConstantBuilder::new(self.ctx, self.span);
 
         // Get array length as a constant expression
         let array_length_expr = self.get_array_length(concrete_ty)?;
@@ -1018,7 +1100,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 let counter = locals.new_var(Some("counter".to_string()), counter_ty.clone());
 
                 // Create zero constant with the same type as array length
-                let zero_constant = self.create_zero_constant_like(counter_ty)?;
+                let zero_constant = constant_builder.zero_constant(counter_ty)?;
 
                 // Block 0: Setup - concretize and initialize counter
                 let counter_init_stmt = Statement {
@@ -1112,7 +1194,7 @@ impl<'a> VtableMetadataComputer<'a> {
                 });
 
                 // Block 3: Increment counter and loop back
-                let one_constant = self.create_one_constant_like(counter_ty)?;
+                let one_constant = constant_builder.one_constant(counter_ty)?;
 
                 let counter_increment_stmt = Statement {
                     span: self.span,
@@ -1510,28 +1592,6 @@ impl<'a> VtableMetadataComputer<'a> {
 
         Ok(generics)
     }
-}
-
-/// Represents the different cases for drop function resolution and shim generation
-#[derive(Debug, Clone)]
-enum DropCase {
-    /// Case 1: Drop function found - call it directly
-    Direct(FunDeclRef),
-    /// Case 2: No drop function needed (e.g., i32) - generate empty shim
-    Empty,
-    /// Case 3: Drop function not translated - generate panic shim
-    Panic(String),
-    /// Case 4: Unknown due to generics - generate opaque
-    Unknown(String),
-    /// Case 5: Array traversal drop (drop each element)
-    Array {
-        element_ty: Ty,
-        element_drop: Box<DropCase>,
-    },
-    /// Case 6: Tuple field-by-field drop (drop each field that needs it)
-    Tuple {
-        fields: Vec<(Ty, DropCase)>, // (field_index, field_type, field_drop_case)
-    },
 }
 
 /// Count vtable instances for logging
