@@ -810,16 +810,6 @@ impl BodyTransCtx<'_, '_, '_> {
         Ok(())
     }
 
-    /// Helper function to get closure method name based on closure kind
-    fn get_closure_method_name(closure_kind: &ClosureKind) -> &'static str {
-        use charon_lib::ullbc_ast::ClosureKind;
-        match closure_kind {
-            ClosureKind::Fn => "call",
-            ClosureKind::FnMut => "call_mut", 
-            ClosureKind::FnOnce => "call_once",
-        }
-    }
-
     /// Translate a statement
     ///
     /// We return an option, because we ignore some statements (`Nop`, `StorageLive`...)

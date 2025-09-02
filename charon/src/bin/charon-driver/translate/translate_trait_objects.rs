@@ -469,16 +469,6 @@ impl ItemTransCtx<'_, '_> {
         Ok(Some(vtable_ref))
     }
 
-    /// Helper function to check if a closure implementation is valid for vtable generation
-    fn is_closure_impl_valid_for_vtable(
-        &self,
-        _closure_kind: &ClosureKind,
-    ) -> bool {
-        // For now, we support all closure kinds for vtable generation
-        // In a full implementation, this would check specific requirements
-        true
-    }
-
     /// Generate a basic closure vtable body
     fn gen_basic_closure_vtable_body(
         &mut self,
