@@ -80,6 +80,22 @@ impl NoParam for Box<i64> {
         assert!(**self > 0);
     }
 }
+impl NoParam for (i32, i32) {
+    fn dummy(&self) {
+        assert!(self.0 > self.1);
+    }
+}
+impl NoParam for [i32; 10] {
+    fn dummy(&self) {
+        assert!(self[0] < self[9]);
+    }
+}
+fn composite_no_param() {
+    let x: &dyn NoParam = &(42, 21);
+    x.dummy();
+    let y: &dyn NoParam = &[1,2,3,4,5,6,7,8,9,10];
+    y.dummy();
+}
 fn to_dyn_obj<T: NoParam>(arg: &T) -> &dyn NoParam {
     arg
 }
