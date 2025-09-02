@@ -40,7 +40,8 @@ impl<'a> ConstantBuilder<'a> {
                             self.ctx.translated.target_information.target_pointer_size,
                             *uint_ty,
                             0,
-                        ).or_else(|_| {
+                        )
+                        .or_else(|_| {
                             raise_error!(self.ctx, self.span, "Zero value out of bounds")
                         })?,
                     )),
@@ -48,7 +49,12 @@ impl<'a> ConstantBuilder<'a> {
                 };
                 Ok(expr)
             }
-            _ => raise_error!(self.ctx, self.span, "Unsupported type for zero constant: {:?}", ty)
+            _ => raise_error!(
+                self.ctx,
+                self.span,
+                "Unsupported type for zero constant: {:?}",
+                ty
+            ),
         }
     }
 
@@ -61,7 +67,8 @@ impl<'a> ConstantBuilder<'a> {
                             self.ctx.translated.target_information.target_pointer_size,
                             *uint_ty,
                             1,
-                        ).or_else(|_| {
+                        )
+                        .or_else(|_| {
                             raise_error!(self.ctx, self.span, "One value out of bounds")
                         })?,
                     )),
@@ -69,7 +76,12 @@ impl<'a> ConstantBuilder<'a> {
                 };
                 Ok(expr)
             }
-            _ => raise_error!(self.ctx, self.span, "Unsupported type for one constant: {:?}", ty)
+            _ => raise_error!(
+                self.ctx,
+                self.span,
+                "Unsupported type for one constant: {:?}",
+                ty
+            ),
         }
     }
 
@@ -83,7 +95,8 @@ impl<'a> ConstantBuilder<'a> {
                             self.ctx.translated.target_information.target_pointer_size,
                             UIntTy::Usize,
                             val as u128,
-                        ).or_else(|_| {
+                        )
+                        .or_else(|_| {
                             raise_error!(self.ctx, self.span, "Layout value out of bounds")
                         })?,
                     )),
@@ -111,9 +124,7 @@ enum DropCase {
         element_drop: Box<DropCase>,
     },
     /// Tuple field-by-field drop (drop each field that needs it)
-    Tuple {
-        fields: Vec<(Ty, DropCase)>,
-    },
+    Tuple { fields: Vec<(Ty, DropCase)> },
 }
 
 /// Vtable metadata computer that holds common state and provides methods
@@ -202,7 +213,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
     fn compute_layout(&mut self, fields: &mut Vec<Operand>, concrete_ty: &Ty) -> Result<(), Error> {
         let constant_builder = ConstantBuilder::new(self.ctx, self.span);
-        
+
         match concrete_ty.layout(&self.ctx.translated) {
             Ok(layout) => {
                 fields[0] = constant_builder.layout_constant(match layout.size {
@@ -345,21 +356,17 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Analyze what kind of drop case applies to the given concrete type
     fn analyze_drop_case(&self, concrete_ty: &Ty) -> Result<DropCase, Error> {
         trace!("[ANALYZE] Analyzing drop case for type: {:?}", concrete_ty);
-        
+
         match concrete_ty.kind() {
-            TyKind::Adt(type_decl_ref) => {
-                self.analyze_adt_drop_case(type_decl_ref, concrete_ty)
-            }
-            TyKind::Literal(_) => {
-                trace!("[ANALYZE] Literal type doesn't need drop");
-                Ok(DropCase::Empty)
-            }
-            TyKind::Ref(..) | TyKind::RawPtr(..) => {
-                trace!("[ANALYZE] Reference/pointer type doesn't need drop");
-                Ok(DropCase::Empty)
-            }
-            _ => {
-                trace!("[ANALYZE] Non-concrete type, returning Unknown");
+            TyKind::Adt(type_decl_ref) => self.analyze_adt_drop_case(type_decl_ref, concrete_ty),
+            // Those having no drop behavior: literal have no drop
+            TyKind::Literal(_) |
+            // The reference and pointer types do not need drop
+            TyKind::Ref(..) | TyKind::RawPtr(..) |
+            // Other types that do not need drop
+            TyKind::DynTrait(..) | TyKind::FnPtr(..) | TyKind::FnDef(..) => Ok(DropCase::Empty),
+            // Other types with unknown drop behavior
+            TyKind::TypeVar(..) | TyKind::Never | TyKind::TraitType(..) | TyKind::Error(_) => {
                 Ok(DropCase::Unknown(format!(
                     "Non-concrete type for drop analysis: {}",
                     self.type_to_string(concrete_ty)
@@ -369,17 +376,15 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Analyze drop case for ADT types (arrays, tuples, structs, enums)
-    fn analyze_adt_drop_case(&self, type_decl_ref: &TypeDeclRef, concrete_ty: &Ty) -> Result<DropCase, Error> {
+    fn analyze_adt_drop_case(
+        &self,
+        type_decl_ref: &TypeDeclRef,
+        concrete_ty: &Ty,
+    ) -> Result<DropCase, Error> {
         match &type_decl_ref.id {
-            TypeId::Builtin(BuiltinTy::Array) => {
-                self.analyze_array_drop_case(type_decl_ref)
-            }
-            TypeId::Tuple => {
-                self.analyze_tuple_drop_case(type_decl_ref)
-            }
-            TypeId::Builtin(builtin_ty) => {
-                self.analyze_builtin_drop_case(builtin_ty, concrete_ty)
-            }
+            TypeId::Builtin(BuiltinTy::Array) => self.analyze_array_drop_case(type_decl_ref),
+            TypeId::Tuple => self.analyze_tuple_drop_case(type_decl_ref),
+            TypeId::Builtin(builtin_ty) => self.analyze_builtin_drop_case(builtin_ty, concrete_ty),
             TypeId::Adt(_) => {
                 trace!("[ANALYZE] Found ADT type, looking for direct drop implementation");
                 if let Some(fun_ref) = self.find_direct_drop_impl(concrete_ty)? {
@@ -397,7 +402,9 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Analyze drop case for array types [T; N]
     fn analyze_array_drop_case(&self, type_decl_ref: &TypeDeclRef) -> Result<DropCase, Error> {
         let Some(element_ty) = type_decl_ref.generics.types.get(TypeVarId::new(0)) else {
-            return Ok(DropCase::Unknown("Array type missing element type parameter".to_string()));
+            return Ok(DropCase::Unknown(
+                "Array type missing element type parameter".to_string(),
+            ));
         };
 
         if self.is_array_empty(type_decl_ref)? {
@@ -406,15 +413,11 @@ impl<'a> VtableMetadataComputer<'a> {
 
         let element_case = self.analyze_drop_case(element_ty)?;
         match element_case {
-            DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => {
-                Ok(element_case)
-            }
-            _ => {
-                Ok(DropCase::Array {
-                    element_ty: element_ty.clone(),
-                    element_drop: Box::new(element_case),
-                })
-            }
+            DropCase::Empty | DropCase::Panic(_) | DropCase::Unknown(_) => Ok(element_case),
+            _ => Ok(DropCase::Array {
+                element_ty: element_ty.clone(),
+                element_drop: Box::new(element_case),
+            }),
         }
     }
 
@@ -425,7 +428,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
         for (_idx, field_ty) in tuple_generics.iter().enumerate() {
             let field_case = self.analyze_drop_case(field_ty)?;
-            
+
             match field_case {
                 DropCase::Panic(_) | DropCase::Unknown(_) => {
                     return Ok(field_case);
@@ -452,7 +455,11 @@ impl<'a> VtableMetadataComputer<'a> {
     }
 
     /// Analyze drop case for builtin types (Box, Slice, etc.)
-    fn analyze_builtin_drop_case(&self, builtin_ty: &BuiltinTy, concrete_ty: &Ty) -> Result<DropCase, Error> {
+    fn analyze_builtin_drop_case(
+        &self,
+        builtin_ty: &BuiltinTy,
+        concrete_ty: &Ty,
+    ) -> Result<DropCase, Error> {
         match builtin_ty {
             BuiltinTy::Array => {
                 unreachable!("Array should be handled separately")
@@ -462,7 +469,7 @@ impl<'a> VtableMetadataComputer<'a> {
                     Ok(DropCase::Direct(fun_ref))
                 } else {
                     Ok(DropCase::Panic(
-                        "Box Drop implementation not found or not translated".to_string()
+                        "Box Drop implementation not found or not translated".to_string(),
                     ))
                 }
             }
@@ -473,7 +480,11 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Check if an array has length 0
     fn is_array_empty(&self, type_decl_ref: &TypeDeclRef) -> Result<bool, Error> {
-        if let Some(const_val) = type_decl_ref.generics.const_generics.get(ConstGenericVarId::new(0)) {
+        if let Some(const_val) = type_decl_ref
+            .generics
+            .const_generics
+            .get(ConstGenericVarId::new(0))
+        {
             if let ConstGeneric::Value(literal) = const_val {
                 if let Literal::Scalar(ScalarValue::Unsigned(_, 0))
                 | Literal::Scalar(ScalarValue::Signed(_, 0)) = literal
@@ -501,32 +512,43 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Find direct Drop implementation for a concrete type
     fn find_direct_drop_impl(&self, concrete_ty: &Ty) -> Result<Option<FunDeclRef>, Error> {
-        trace!("[DROP_IMPL] Looking for drop implementation for type: {:?}", concrete_ty);
+        trace!(
+            "[DROP_IMPL] Looking for drop implementation for type: {:?}",
+            concrete_ty
+        );
 
         for trait_impl in self.ctx.translated.trait_impls.iter() {
             let trait_decl_id = trait_impl.impl_trait.id;
-            
+
             if self.is_drop_trait(&trait_decl_id) {
                 if let Some(self_type) = self.get_impl_self_type(trait_impl) {
                     trace!("[DROP_IMPL] Checking impl with self type: {:?}", self_type);
-                    
+
                     if self.types_match(&self_type, concrete_ty) {
                         trace!("[DROP_IMPL] Found matching drop impl");
-                        
+
                         // Find the drop method in this implementation
-                        if let Some((method_name, method_ref)) = trait_impl.methods().find(|(n, _)| n.0 == "drop") {
-                            trace!("[DROP_IMPL] Found drop method: {}, {:?}", method_name, method_ref);
+                        if let Some((method_name, method_ref)) =
+                            trait_impl.methods().find(|(n, _)| n.0 == "drop")
+                        {
+                            trace!(
+                                "[DROP_IMPL] Found drop method: {}, {:?}",
+                                method_name, method_ref
+                            );
                             // Extract the FunDeclRef from the binder
                             return Ok(Some(method_ref.skip_binder.clone()));
                         }
-                        
+
                         trace!("[DROP_IMPL] No drop method found in matching impl");
                     }
                 }
             }
         }
 
-        trace!("[DROP_IMPL] No drop implementation found for type: {:?}", concrete_ty);
+        trace!(
+            "[DROP_IMPL] No drop implementation found for type: {:?}",
+            concrete_ty
+        );
         Ok(None)
     }
 
@@ -546,7 +568,10 @@ impl<'a> VtableMetadataComputer<'a> {
     /// Check if this is a built-in Box type (vs ADT Box)
     fn is_builtin_box(&self, ty: &Ty) -> bool {
         match ty.kind() {
-            TyKind::Adt(TypeDeclRef { id: TypeId::Builtin(BuiltinTy::Box), .. }) => true,
+            TyKind::Adt(TypeDeclRef {
+                id: TypeId::Builtin(BuiltinTy::Box),
+                ..
+            }) => true,
             _ => false,
         }
     }
@@ -562,19 +587,7 @@ impl<'a> VtableMetadataComputer<'a> {
 
     /// Convert a type to a string representation for display purposes
     fn type_to_string(&self, ty: &Ty) -> String {
-        match ty.kind() {
-            TyKind::Literal(lit_ty) => match lit_ty {
-                LiteralTy::Bool => "bool".to_string(),
-                LiteralTy::Char => "char".to_string(),
-                LiteralTy::Int(int_ty) => format!("{:?}", int_ty).to_lowercase(),
-                LiteralTy::UInt(uint_ty) => format!("{:?}", uint_ty).to_lowercase(),
-                LiteralTy::Float(float_ty) => format!("{:?}", float_ty).to_lowercase(),
-            },
-            TyKind::Adt(type_decl_ref) => {
-                format!("adt_{:?}", type_decl_ref.id)
-            }
-            _ => format!("{:?}", ty).chars().take(50).collect(),
-        }
+        ty.with_ctx(&self.ctx.into_fmt()).to_string()
     }
 
     // ========================================
@@ -1048,7 +1061,9 @@ impl<'a> VtableMetadataComputer<'a> {
                 };
 
                 // Dereference the concrete reference to get the array, then index
-                let deref_place = concrete.clone().project(ProjectionElem::Deref, concrete_ty.clone());
+                let deref_place = concrete
+                    .clone()
+                    .project(ProjectionElem::Deref, concrete_ty.clone());
                 let projected_place = deref_place.project(index_projection, element_ref_ty.clone());
 
                 let element_proj_stmt = Statement {
@@ -1262,8 +1277,11 @@ impl<'a> VtableMetadataComputer<'a> {
                             );
 
                             // Create field projection statement - need to dereference the reference first
-                            let deref_place = concrete.clone().project(ProjectionElem::Deref, concrete_ty.clone());
-                            let projected_place = deref_place.project(field_projection, field_ref_ty.clone());
+                            let deref_place = concrete
+                                .clone()
+                                .project(ProjectionElem::Deref, concrete_ty.clone());
+                            let projected_place =
+                                deref_place.project(field_projection, field_ref_ty.clone());
 
                             let field_assign_stmt = Statement {
                                 span: self.span,
@@ -1419,7 +1437,10 @@ impl<'a> VtableMetadataComputer<'a> {
     fn get_global_allocator_ty(&self) -> Result<Ty, Error> {
         for ty_decl in &self.ctx.translated.type_decls {
             if ty_decl.item_meta.lang_item == Some("global_alloc_ty".into()) {
-                return Ok(Ty::new(TyKind::Adt(TypeDeclRef { id: ty_decl.def_id.into(), generics: Box::new(GenericArgs::empty()) })));
+                return Ok(Ty::new(TyKind::Adt(TypeDeclRef {
+                    id: ty_decl.def_id.into(),
+                    generics: Box::new(GenericArgs::empty()),
+                })));
             }
         }
         raise_error!(self.ctx, self.span, "Global allocator type not found")
