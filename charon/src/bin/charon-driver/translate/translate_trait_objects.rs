@@ -916,11 +916,10 @@ impl ItemTransCtx<'_, '_> {
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;
                 Ok(body)
             }
-            TraitImplSource::Closure(_) => {
-                // For closures, we need to generate a vtable body that's compatible with closure trait impls
-                // For now, generate an opaque body since the actual vtable structure would be complex
+            TraitImplSource::Closure(_closure_kind) => {
+                // For closure vtables, generate an opaque body for now
                 // TODO: Implement proper closure vtable generation
-                Err(charon_lib::ullbc_ast::Opaque)
+                Err(Opaque)
             }
             _ => {
                 raise_error!(
