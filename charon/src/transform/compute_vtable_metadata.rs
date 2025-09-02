@@ -676,6 +676,8 @@ impl<'a> VtableMetadataComputer<'a> {
         };
 
         let body = DropShimCtx::create_drop_shim_body(self, &self.get_drop_receiver()?, concrete_ty, drop_case)?;
+        
+        // let body = self.old_create_drop_shim_body(&self.get_drop_receiver()?, concrete_ty, drop_case)?;
 
         // Create item meta
         let item_meta = ItemMeta {
@@ -1910,9 +1912,9 @@ impl<'a> DropShimCtx<'a> {
             locals: Vector::new(),
         };
         // create the return place
-        let _ = locals.new_var(None, Ty::mk_unit());
+        let _ = locals.new_var(Some("ret".into()), Ty::mk_unit());
         let dyn_receiver =
-            locals.new_var(Some("dyn_receiver".to_string()), dyn_trait_param_ty.clone());
+            locals.new_var(Some("self".to_string()), dyn_trait_param_ty.clone());
 
         let drop_case = drop_case.clone().simplify();
 
@@ -1947,7 +1949,7 @@ impl<'a> DropShimCtx<'a> {
                 let concretize_stmt = Statement {
                     span: ctx.span,
                     content: RawStatement::Assign(
-                        dyn_receiver.clone(),
+                        concrete_place.clone(),
                         Rvalue::UnaryOp(
                             UnOp::Cast(CastKind::Concretize(
                                 dyn_trait_param_ty.clone(),

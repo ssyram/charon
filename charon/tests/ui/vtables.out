@@ -489,10 +489,13 @@ fn {{impl Checkable<i32> for String}}::{vtable}::{drop_method}<'_0>(@1: &'_ mut 
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
     let concrete@2: &'_ mut (String); // local
+    let @3: &'_ mut (String); // anonymous local
 
     storage_live(concrete@2)
+    storage_live(@3)
     concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (String)>(move (self@1))
-    ret@0 := {impl Drop for String}::drop<'_0>(move (concrete@2))
+    @3 := &mut *(concrete@2)
+    ret@0 := {impl Drop for String}::drop<'_0>(move (@3))
     ret@0 := ()
     return
 }
@@ -624,31 +627,31 @@ fn {{impl Checkable<i32> for Array<String, const N : usize>}}::{vtable}::{drop_m
 {
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
-    let concrete_array@2: &'_ mut (Array<String, const N : usize>); // local
-    let counter@3: usize; // local
-    let counter_check@4: bool; // local
-    let element_ref@5: &'_ mut (String); // local
+    let concrete@2: &'_ mut (Array<String, const N : usize>); // local
+    let @3: usize; // anonymous local
+    let @4: bool; // anonymous local
+    let @5: &'_ mut (String); // anonymous local
     let @6: &'_ mut (Array<String, const N : usize>); // anonymous local
     let @7: &'_ mut (String); // anonymous local
 
-    storage_live(concrete_array@2)
-    storage_live(counter@3)
-    storage_live(counter_check@4)
-    storage_live(element_ref@5)
+    storage_live(concrete@2)
+    storage_live(@3)
+    storage_live(@4)
+    storage_live(@5)
     storage_live(@6)
     storage_live(@7)
-    concrete_array@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<String, const N : usize>)>(move (self@1))
-    counter@3 := const (0 : usize)
+    concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut (Array<String, const N : usize>)>(move (self@1))
+    @3 := const (0 : usize)
     loop {
-        counter_check@4 := copy (counter@3) < const (const N : usize)
-        if move (counter_check@4) {
+        @4 := copy (@3) < const (const N : usize)
+        if move (@4) {
+            @3 := move (@3) panic.+ const (1 : usize)
             storage_live(@6)
-            @6 := &mut *(concrete_array@2)
+            @6 := &mut *(concrete@2)
             storage_live(@7)
-            @7 := @ArrayIndexMut<'_, String, const N : usize>(move (@6), copy (counter@3))
-            element_ref@5 := &mut *(@7)
-            ret@0 := {impl Drop for String}::drop<'_0>(move (element_ref@5))
-            counter@3 := move (counter@3) panic.+ const (1 : usize)
+            @7 := @ArrayIndexMut<'_, String, const N : usize>(move (@6), copy (@3))
+            @5 := &mut *(@7)
+            ret@0 := {impl Drop for String}::drop<'_0>(move (@5))
             continue 0
         }
         else {
@@ -771,14 +774,14 @@ fn {{impl Checkable<i32> for (i32, String)}}::{vtable}::{drop_method}<'_0>(@1: &
 {
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)); // arg #1
-    let concrete_tuple@2: &'_ mut ((i32, String)); // local
-    let field_1_ref@3: &'_ mut (String); // local
+    let concrete@2: &'_ mut ((i32, String)); // local
+    let @3: &'_ mut (String); // anonymous local
 
-    storage_live(concrete_tuple@2)
-    storage_live(field_1_ref@3)
-    concrete_tuple@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut ((i32, String))>(move (self@1))
-    field_1_ref@3 := &mut (*(concrete_tuple@2)).1
-    ret@0 := {impl Drop for String}::drop<'_0>(move (field_1_ref@3))
+    storage_live(concrete@2)
+    storage_live(@3)
+    concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: Checkable<_dyn, i32> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = i32)), &'_ mut ((i32, String))>(move (self@1))
+    @3 := &mut (*(concrete@2)).1
+    ret@0 := {impl Drop for String}::drop<'_0>(move (@3))
     ret@0 := ()
     return
 }
@@ -1055,10 +1058,13 @@ fn {{impl NoParam for alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]}}::{
     let ret@0: (); // return
     let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // arg #1
     let concrete@2: &'_ mut (alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]); // local
+    let @3: &'_ mut (alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]); // anonymous local
 
     storage_live(concrete@2)
+    storage_live(@3)
     concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), &'_ mut (alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>])>(move (self@1))
-    ret@0 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0, i64, Global>[MetaSized<i64>, Sized<Global>](move (concrete@2))
+    @3 := &mut *(concrete@2)
+    ret@0 := {impl Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop<'_0, i64, Global>[MetaSized<i64>, Sized<Global>](move (@3))
     ret@0 := ()
     return
 }
@@ -1274,6 +1280,125 @@ impl NoParam for Array<i32, 10 : usize> {
     vtable: {impl NoParam for Array<i32, 10 : usize>}::{vtable}
 }
 
+// Full name: test_crate::{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy
+fn {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy<'_0, const N : usize, const M : usize>(@1: &'_0 (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>))
+{
+    let @0: (); // return
+    let self@1: &'_ (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>); // arg #1
+
+    @0 := ()
+    @0 := ()
+    return
+}
+
+fn {{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}}::{vtable}::{drop_method}<'_0, const N : usize, const M : usize>(@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)))
+{
+    let ret@0: (); // return
+    let self@1: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // arg #1
+    let concrete@2: &'_ mut (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>); // local
+    let @3: usize; // anonymous local
+    let @4: bool; // anonymous local
+    let @5: usize; // anonymous local
+    let @6: bool; // anonymous local
+    let @7: &'_ mut (String); // anonymous local
+    let @8: &'_ mut (String); // anonymous local
+    let @9: &'_ mut (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>); // anonymous local
+    let @10: &'_ mut ((String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>)); // anonymous local
+    let @11: &'_ mut (Array<(i32, String), const M : usize>); // anonymous local
+    let @12: &'_ mut ((i32, String)); // anonymous local
+    let @13: &'_ mut (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>); // anonymous local
+    let @14: &'_ mut ((String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>)); // anonymous local
+
+    storage_live(concrete@2)
+    storage_live(@3)
+    storage_live(@4)
+    storage_live(@5)
+    storage_live(@6)
+    storage_live(@7)
+    storage_live(@8)
+    storage_live(@9)
+    storage_live(@10)
+    storage_live(@11)
+    storage_live(@12)
+    storage_live(@13)
+    storage_live(@14)
+    concrete@2 := concretize<&'_ mut ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), &'_ mut (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>)>(move (self@1))
+    @3 := const (0 : usize)
+    loop {
+        @4 := copy (@3) < const (const N : usize)
+        if move (@4) {
+            @3 := move (@3) panic.+ const (1 : usize)
+            storage_live(@13)
+            @13 := &mut *(concrete@2)
+            storage_live(@14)
+            @14 := @ArrayIndexMut<'_, (String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>(move (@13), copy (@3))
+            @8 := &mut (*(@14)).0
+            ret@0 := {impl Drop for String}::drop<'_0>(move (@8))
+            @5 := const (0 : usize)
+            loop {
+                @6 := copy (@5) < const (const M : usize)
+                if move (@6) {
+                    @5 := move (@5) panic.+ const (1 : usize)
+                    storage_live(@9)
+                    @9 := &mut *(concrete@2)
+                    storage_live(@10)
+                    @10 := @ArrayIndexMut<'_, (String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>(move (@9), copy (@3))
+                    storage_live(@11)
+                    @11 := &mut (*(@10)).2
+                    storage_live(@12)
+                    @12 := @ArrayIndexMut<'_, (i32, String), const M : usize>(move (@11), copy (@5))
+                    @7 := &mut (*(@12)).1
+                    ret@0 := {impl Drop for String}::drop<'_0>(move (@7))
+                    continue 0
+                }
+                else {
+                    continue 1
+                }
+            }
+        }
+        else {
+            break 0
+        }
+    }
+    ret@0 := ()
+    return
+}
+
+// Full name: test_crate::{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy::{vtable_method}
+fn {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy::{vtable_method}<'_0, const N : usize, const M : usize>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)))
+{
+    let @0: (); // return
+    let @1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // arg #1
+    let @2: &'_0 (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    @2 := concretize<&'_0 ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), &'_0 (Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>)>(move (@1))
+    @0 := {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy<'_0, const N : usize, const M : usize>(move (@2))
+    @0 := ()
+    return
+}
+
+// Full name: test_crate::{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::{vtable}
+fn {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::{vtable}<const N : usize, const M : usize>() -> test_crate::NoParam::{vtable}
+{
+    let ret@0: test_crate::NoParam::{vtable}; // return
+
+    ret@0 := test_crate::NoParam::{vtable} { size: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_1)), align: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_1)), drop: const ({{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}}::{vtable}::{drop_method}<'_, const N : usize, const M : usize>), method_dummy: const ({impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy::{vtable_method}<'_, const N : usize, const M : usize>), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    return
+}
+
+// Full name: test_crate::{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::{vtable}
+static {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::{vtable}<const N : usize, const M : usize>: test_crate::NoParam::{vtable} = {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::{vtable}()
+
+// Full name: test_crate::{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}
+impl<const N : usize, const M : usize> NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize> {
+    parent_clause0 = MetaSized<Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>>
+    fn dummy<'_0> = {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy<'_0_0, const N : usize, const M : usize>
+    vtable: {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::{vtable}<const N : usize, const M : usize>
+}
+
 // Full name: test_crate::composite_no_param
 fn composite_no_param()
 {
@@ -1290,10 +1415,27 @@ fn composite_no_param()
     let @10: Array<i32, 10 : usize>; // anonymous local
     let @11: (); // anonymous local
     let @12: &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // anonymous local
-    let @13: *const test_crate::NoParam::{vtable}; // anonymous local
-    let @14: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
-    let @15: *const test_crate::NoParam::{vtable}; // anonymous local
-    let @16: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
+    let complex@13: &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // local
+    let @14: &'_ (Array<(String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>), 1 : usize>); // anonymous local
+    let @15: &'_ (Array<(String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>), 1 : usize>); // anonymous local
+    let @16: Array<(String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>), 1 : usize>; // anonymous local
+    let @17: (String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>); // anonymous local
+    let @18: String; // anonymous local
+    let @19: Array<(i32, i32), 2 : usize>; // anonymous local
+    let @20: (i32, i32); // anonymous local
+    let @21: Array<(i32, String), 2 : usize>; // anonymous local
+    let @22: (i32, String); // anonymous local
+    let @23: String; // anonymous local
+    let @24: (i32, String); // anonymous local
+    let @25: String; // anonymous local
+    let @26: (); // anonymous local
+    let @27: &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // anonymous local
+    let @28: *const test_crate::NoParam::{vtable}; // anonymous local
+    let @29: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
+    let @30: *const test_crate::NoParam::{vtable}; // anonymous local
+    let @31: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
+    let @32: *const test_crate::NoParam::{vtable}; // anonymous local
+    let @33: fn(&'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_))); // anonymous local
 
     storage_live(x@1)
     storage_live(@2)
@@ -1308,11 +1450,11 @@ fn composite_no_param()
     storage_live(@5)
     storage_live(@6)
     @6 := &*(x@1)
-    storage_live(@13)
-    storage_live(@14)
-    @13 := ptr_metadata(move (@6))
-    @14 := copy ((*(@13)).3)
-    @5 := (move @14)(move (@6))
+    storage_live(@28)
+    storage_live(@29)
+    @28 := ptr_metadata(move (@6))
+    @29 := copy ((*(@28)).3)
+    @5 := (move @29)(move (@6))
     storage_dead(@6)
     storage_dead(@5)
     storage_live(y@7)
@@ -1328,14 +1470,71 @@ fn composite_no_param()
     storage_live(@11)
     storage_live(@12)
     @12 := &*(y@7)
-    storage_live(@15)
-    storage_live(@16)
-    @15 := ptr_metadata(move (@12))
-    @16 := copy ((*(@15)).3)
-    @11 := (move @16)(move (@12))
+    storage_live(@30)
+    storage_live(@31)
+    @30 := ptr_metadata(move (@12))
+    @31 := copy ((*(@30)).3)
+    @11 := (move @31)(move (@12))
     storage_dead(@12)
     storage_dead(@11)
+    storage_live(complex@13)
+    storage_live(@14)
+    storage_live(@15)
+    storage_live(@16)
+    storage_live(@17)
+    storage_live(@18)
+    @18 := {impl From<&'_0 (Str)> for String}::from<'_>(const ("hello"))
+    storage_live(@19)
+    storage_live(@20)
+    @20 := (const (1 : i32), const (2 : i32))
+    @19 := @ArrayRepeat<'_, (i32, i32), 2 : usize>(move (@20))
+    storage_dead(@20)
+    storage_live(@21)
+    storage_live(@22)
+    storage_live(@23)
+    @23 := {impl From<&'_0 (Str)> for String}::from<'_>(const ("world"))
+    @22 := (const (9 : i32), move (@23))
+    drop[{impl Drop for String}] @23
+    storage_dead(@23)
+    storage_live(@24)
+    storage_live(@25)
+    @25 := {impl From<&'_0 (Str)> for String}::from<'_>(const ("!"))
+    @24 := (const (0 : i32), move (@25))
+    drop[{impl Drop for String}] @25
+    storage_dead(@25)
+    @21 := [move (@22), move (@24)]
+    drop[Drop<(i32, String)>] @24
+    storage_dead(@24)
+    drop[Drop<(i32, String)>] @22
+    storage_dead(@22)
+    @17 := (move (@18), move (@19), move (@21))
+    drop[Drop<Array<(i32, String), 2 : usize>>] @21
+    storage_dead(@21)
+    storage_dead(@19)
+    drop[{impl Drop for String}] @18
+    storage_dead(@18)
+    @16 := @ArrayRepeat<'_, (String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>), 1 : usize>(move (@17))
+    drop[Drop<(String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>)>] @17
+    storage_dead(@17)
+    @15 := &@16
+    @14 := &*(@15)
+    complex@13 := unsize_cast<&'_ (Array<(String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>), 1 : usize>), &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}<1 : usize, 2 : usize>>(move (@14))
+    storage_dead(@14)
+    storage_dead(@15)
+    storage_live(@26)
+    storage_live(@27)
+    @27 := &*(complex@13)
+    storage_live(@32)
+    storage_live(@33)
+    @32 := ptr_metadata(move (@27))
+    @33 := copy ((*(@32)).3)
+    @26 := (move @33)(move (@27))
+    storage_dead(@27)
+    storage_dead(@26)
     @0 := ()
+    drop[Drop<Array<(String, Array<(i32, i32), 2 : usize>, Array<(i32, String), 2 : usize>), 1 : usize>>] @16
+    storage_dead(@16)
+    storage_dead(complex@13)
     storage_dead(@10)
     storage_dead(y@7)
     storage_dead(@4)

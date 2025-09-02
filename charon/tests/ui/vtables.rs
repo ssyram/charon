@@ -80,6 +80,7 @@ impl NoParam for Box<i64> {
         assert!(**self > 0);
     }
 }
+// These should have empty {drop_method} bodies
 impl NoParam for (i32, i32) {
     fn dummy(&self) {
         assert!(self.0 > self.1);
@@ -90,11 +91,18 @@ impl NoParam for [i32; 10] {
         assert!(self[0] < self[9]);
     }
 }
+impl <const N: usize, const M: usize> NoParam for
+    [(String, [(i32, i32); M], [(i32, String); M]); N] {
+    fn dummy(&self) { }
+}
 fn composite_no_param() {
     let x: &dyn NoParam = &(42, 21);
     x.dummy();
     let y: &dyn NoParam = &[1,2,3,4,5,6,7,8,9,10];
     y.dummy();
+    let complex: &dyn NoParam =
+        &[(String::from("hello"), [(1, 2); 2], [(9, String::from("world")), (0, String::from("!"))]); 1];
+    complex.dummy();
 }
 fn to_dyn_obj<T: NoParam>(arg: &T) -> &dyn NoParam {
     arg
