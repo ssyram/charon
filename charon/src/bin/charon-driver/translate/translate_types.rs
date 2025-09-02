@@ -365,14 +365,14 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     /// Enqueue the drop implementation for Box<T> when Box is encountered
     fn enqueue_box_drop_impl(&mut self, span: Span, item: &hax::ItemRef) -> Result<(), Error> {
         use crate::translate::translate_crate::TransItemSourceKind;
-        
+
         // Register the drop implementation for Box
         let _drop_impl_id: TraitImplId = self.register_item_no_enqueue(
             span,
             item,
             TransItemSourceKind::TraitImpl(TraitImplSource::DropGlue),
         );
-        
+
         Ok(())
     }
 
@@ -778,8 +778,16 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
 
         // Check if this type has a drop implementation by checking both drop_impl and drop_glue
         match def.kind() {
-            hax::FullDefKind::Adt { drop_impl: _, drop_glue, .. } |
-            hax::FullDefKind::Closure { drop_impl: _, drop_glue, .. } => {
+            hax::FullDefKind::Adt {
+                drop_impl: _,
+                drop_glue,
+                ..
+            }
+            | hax::FullDefKind::Closure {
+                drop_impl: _,
+                drop_glue,
+                ..
+            } => {
                 // Only create a TraitImplRef if there's actually a drop implementation
                 // We check drop_glue to see if there's an actual implementation
                 if drop_glue.is_some() {
@@ -789,13 +797,13 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                         def.this(),
                         TransItemSourceKind::TraitImpl(TraitImplSource::DropGlue),
                     );
-                    
+
                     // Create the TraitImplRef
                     let trait_impl_ref = TraitImplRef {
                         id: drop_impl_id,
                         generics: Box::new(self.the_only_binder().params.identity_args()),
                     };
-                    
+
                     Ok(Some(trait_impl_ref))
                 } else {
                     // Type supports drop but doesn't have a custom implementation

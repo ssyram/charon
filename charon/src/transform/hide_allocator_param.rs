@@ -23,6 +23,9 @@ impl VisitAstMut for RemoveLastParamVisitor {
 pub struct Transform;
 impl TransformPass for Transform {
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
+        // Debug output
+        std::fs::write("/tmp/hide_allocator_ran.txt", "hide_allocator_param transform was called").unwrap();
+        
         if !ctx.options.hide_allocator {
             return;
         }

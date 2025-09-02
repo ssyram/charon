@@ -5,14 +5,11 @@
 //!
 //! This pass transforms (after hide_allocator_param has already run):
 //! - `impl<T, A> Drop for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1] where MetaSized<T>, Sized<A>`
-//! 
+//!
 //! To:
 //! - `impl<T> Drop for Box<T>` (builtin Box, no trait clauses)
 
-use crate::{
-    ast::*,
-    transform::TransformCtx,
-};
+use crate::{ast::*, transform::TransformCtx};
 
 use super::ctx::TransformPass;
 
@@ -20,69 +17,65 @@ pub struct Transform;
 
 impl TransformPass for Transform {
     fn transform_ctx(&self, ctx: &mut TransformCtx) {
-        trace!("=== SIMPLIFY BOX IMPLS TRANSFORM STARTED ===");
+        // Force output to stdout and stderr
+        eprintln!("STDERR: SIMPLIFY BOX TRANSFORM WAS CALLED!");
+        println!("STDOUT: SIMPLIFY BOX TRANSFORM WAS CALLED!");
+        
+        // Try to create a file to verify the transform runs
+        std::fs::write("/tmp/transform_ran.txt", "Transform was called").unwrap();
         
         if ctx.options.raw_boxes {
-            trace!("Raw boxes enabled, skipping simplification");
+            eprintln!("Raw boxes enabled, skipping simplification");
             return;
         }
 
-        trace!("Total trait impls: {}", ctx.translated.trait_impls.elem_count());
-        trace!("Total fun decls: {}", ctx.translated.fun_decls.elem_count());
-        
-        // First collect the IDs that need to be simplified to avoid borrowing conflicts
-        let mut box_trait_impls_to_simplify = Vec::new();
-        let mut box_methods_to_simplify = Vec::new();
-        
-        // Traverse all trait implementations to find Box Drop implementations
+        // Find the unique impl Drop for Box trait implementation
+        let mut box_trait_impl_id = None;
         for timpl in ctx.translated.trait_impls.iter() {
             if is_box_drop_impl(timpl, ctx) {
-                trace!("Found Box Drop trait impl: {:?}", timpl.item_meta.name);
-                box_trait_impls_to_simplify.push(timpl.def_id);
+                println!("Found Box Drop trait impl: {:?}", timpl.item_meta.name);
+                box_trait_impl_id = Some(timpl.def_id);
+                break; // Should be unique
             }
         }
         
-        // Traverse all function declarations to find Box Drop methods
+        // Find the unique drop function for Box
+        let mut box_drop_fun_id = None;
         for fun_decl in ctx.translated.fun_decls.iter() {
             if is_box_drop_method(fun_decl, ctx) {
-                trace!("Found Box Drop method: {:?}", fun_decl.item_meta.name);
-                box_methods_to_simplify.push(fun_decl.def_id);
+                println!("Found Box Drop method: {:?}", fun_decl.item_meta.name);
+                box_drop_fun_id = Some(fun_decl.def_id);
+                break; // Should be unique
             }
         }
 
-        trace!("Box implementations to simplify: {} trait impls, {} methods", 
-               box_trait_impls_to_simplify.len(), box_methods_to_simplify.len());
+        println!("Box trait impl ID: {:?}, Box drop fun ID: {:?}", box_trait_impl_id, box_drop_fun_id);
 
-        // Apply simplification to trait implementations
-        // TODO: Currently disabled to avoid AST consistency issues
-        // The detection logic works correctly, but the simplification creates dangling references
-        trace!("Box implementations detected: {} trait impls, {} methods", 
-               box_trait_impls_to_simplify.len(), box_methods_to_simplify.len());
-        trace!("Simplification temporarily disabled pending proper implementation");
-        
-        /*
-        for impl_id in box_trait_impls_to_simplify {
+        // Apply simplifications
+        if let Some(impl_id) = box_trait_impl_id {
             if let Some(timpl) = ctx.translated.trait_impls.get_mut(impl_id) {
-                trace!("Simplifying trait impl: {:?}", timpl.item_meta.name);
-                simplify_box_generic_params(&mut timpl.generics);
-                simplify_box_trait_decl_ref(&mut timpl.impl_trait);
-            }
-        }
-        
-        // Apply simplification to methods
-        for method_id in box_methods_to_simplify {
-            if let Some(fun_decl) = ctx.translated.fun_decls.get_mut(method_id) {
-                trace!("Simplifying method: {:?}", fun_decl.item_meta.name);
-                simplify_box_generic_params(&mut fun_decl.signature.generics);
-                simplify_box_fun_sig_types(&mut fun_decl.signature);
+                println!("Simplifying trait impl: {:?}", timpl.item_meta.name);
                 
-                // Also update trait ref in function kind if it's a trait impl method
-                if let ItemKind::TraitImpl { trait_ref, .. } = &mut fun_decl.kind {
-                    simplify_box_trait_decl_ref(trait_ref);
+                // 1. Change the trait impl's generic parameters
+                simplify_generic_params(&mut timpl.generics);
+                
+                // 2. Change its reference to its internal drop method in methods list
+                for (_, method_ref) in &mut timpl.methods {
+                    simplify_method_ref_generics(&mut method_ref.skip_binder);
                 }
             }
         }
-        */
+        
+        if let Some(fun_id) = box_drop_fun_id {
+            if let Some(fun_decl) = ctx.translated.fun_decls.get_mut(fun_id) {
+                println!("Simplifying method: {:?}", fun_decl.item_meta.name);
+                
+                // Change the function's generic parameters
+                simplify_generic_params(&mut fun_decl.signature.generics);
+            }
+        }
+
+        println!("Box simplification transform completed");
     }
 }
 
@@ -107,7 +100,12 @@ fn is_box_drop_impl(timpl: &TraitImpl, ctx: &TransformCtx) -> bool {
 
 /// Check if this function is a Box Drop method
 fn is_box_drop_method(fun_decl: &FunDecl, ctx: &TransformCtx) -> bool {
-    if let ItemKind::TraitImpl { trait_ref, item_name, .. } = &fun_decl.kind {
+    if let ItemKind::TraitImpl {
+        trait_ref,
+        item_name,
+        ..
+    } = &fun_decl.kind
+    {
         // Check if this is a Drop trait and if the item is drop
         if item_name.0 == "drop" {
             if let Some(trait_decl) = ctx.translated.trait_decls.get(trait_ref.id) {
@@ -123,16 +121,17 @@ fn is_box_drop_method(fun_decl: &FunDecl, ctx: &TransformCtx) -> bool {
     false
 }
 
-/// Simplify GenericParams for Box Drop implementations
-/// Only remove trait clauses, keep type parameters to avoid dangling references
-fn simplify_box_generic_params(generics: &mut GenericParams) {
+/// Simplify GenericParams for Box Drop implementations by removing allocator type parameter and all trait clauses
+fn simplify_generic_params(generics: &mut GenericParams) {
     trace!("Simplifying generic params - before: {} type params, {} trait clauses", 
            generics.types.elem_count(), generics.trait_clauses.elem_count());
     
-    // For now, just remove trait clauses to avoid dangling references
-    // TODO: Remove allocator type parameter properly with visitor pattern
+    // Remove allocator type parameter (A) - keep only T
+    if generics.types.elem_count() >= 2 {
+        generics.types.remove(TypeVarId::new(1));
+    }
     
-    // Remove ALL trait clauses  
+    // Remove ALL trait clauses (MetaSized, Sized, Allocator)
     let clause_ids: Vec<TraitClauseId> = generics.trait_clauses.all_indices().collect();
     for clause_id in clause_ids {
         generics.trait_clauses.remove(clause_id);
@@ -142,107 +141,36 @@ fn simplify_box_generic_params(generics: &mut GenericParams) {
            generics.types.elem_count(), generics.trait_clauses.elem_count());
 }
 
-/// Simplify TraitDeclRef for Box Drop implementations  
-/// Changes alloc::boxed::Box<T, A> to builtin Box<T>
-fn simplify_box_trait_decl_ref(trait_decl_ref: &mut TraitDeclRef) {
-    trace!("Simplifying trait decl ref");
+/// Simplify method reference generics for Box Drop implementations
+fn simplify_method_ref_generics(method_ref: &mut FunDeclRef) {
+    trace!("Simplifying method ref generics");
     
-    // Update the first type argument from alloc::boxed::Box<T, A> to Box<T>
-    if let Some(first_type) = trait_decl_ref.generics.types.get_mut(TypeVarId::new(0)) {
-        // We need to modify the Ty in place
-        if let TyKind::Adt(type_decl_ref) = first_type.kind() {
-            if matches!(type_decl_ref.id, TypeId::Adt(_)) {
-                // Create a new Ty with builtin Box
-                let new_ty_kind = TyKind::Adt(TypeDeclRef {
-                    id: TypeId::Builtin(BuiltinTy::Box),
-                    generics: {
-                        let mut new_generics = type_decl_ref.generics.clone();
-                        // Remove allocator type argument (keep only T)
-                        if new_generics.types.elem_count() >= 2 {
-                            new_generics.types.remove(TypeVarId::new(1));
-                        }
-                        // Remove all trait clause references
-                        let clause_ids: Vec<TraitClauseId> = new_generics.trait_refs.all_indices().collect();
-                        for clause_id in clause_ids {
-                            new_generics.trait_refs.remove(clause_id);
-                        }
-                        new_generics
-                    },
-                });
-                *first_type = Ty::new(new_ty_kind);
-            }
-        }
-    }
-}
-
-/// Simplify FunSig types for Box Drop implementations
-/// Updates input and output types to use simplified Box types
-fn simplify_box_fun_sig_types(fun_sig: &mut FunSig) {
-    trace!("Simplifying function signature types");
-    
-    // Update input types
-    for input_ty in &mut fun_sig.inputs {
-        simplify_box_type_in_place(input_ty);
+    // Remove allocator type parameter (A) - keep only T  
+    if method_ref.generics.types.elem_count() >= 2 {
+        method_ref.generics.types.remove(TypeVarId::new(1));
     }
     
-    // Update output type  
-    simplify_box_type_in_place(&mut fun_sig.output);
-}
-
-/// Recursively simplify Box types within a type
-fn simplify_box_type_in_place(ty: &mut Ty) {
-    match ty.kind() {
-        TyKind::Adt(type_decl_ref) => {
-            // Check if this is alloc::boxed::Box that should be simplified to builtin Box
-            if matches!(type_decl_ref.id, TypeId::Adt(_)) {
-                // Create a new simplified type
-                let new_ty_kind = TyKind::Adt(TypeDeclRef {
-                    id: TypeId::Builtin(BuiltinTy::Box),
-                    generics: {
-                        let mut new_generics = type_decl_ref.generics.clone();
-                        // Remove allocator type argument (keep only T)
-                        if new_generics.types.elem_count() >= 2 {
-                            new_generics.types.remove(TypeVarId::new(1));
-                        }
-                        // Remove all trait clause references
-                        let clause_ids: Vec<TraitClauseId> = new_generics.trait_refs.all_indices().collect();
-                        for clause_id in clause_ids {
-                            new_generics.trait_refs.remove(clause_id);
-                        }
-                        new_generics
-                    },
-                });
-                *ty = Ty::new(new_ty_kind);
-            }
-        }
-        TyKind::Ref(region, inner_ty, ref_kind) => {
-            // For reference types, create a new type with simplified inner type
-            let mut new_inner_ty = inner_ty.clone();
-            simplify_box_type_in_place(&mut new_inner_ty);
-            *ty = Ty::new(TyKind::Ref(*region, new_inner_ty, *ref_kind));
-        }
-        _ => {
-            // For other types, no simplification needed
-        }
+    // Remove ALL trait references
+    let trait_ref_ids: Vec<TraitClauseId> = method_ref.generics.trait_refs.all_indices().collect();
+    for trait_ref_id in trait_ref_ids {
+        method_ref.generics.trait_refs.remove(trait_ref_id);
     }
 }
 
 /// Check if a type is a Box type (either Builtin::Box or a type-decl with Box lang-item)
 fn is_box_type(ty: &Ty, ctx: &TransformCtx) -> bool {
     match ty.kind() {
-        TyKind::Adt(type_decl_ref) => {
-            match &type_decl_ref.id {
-                TypeId::Builtin(BuiltinTy::Box) => true,
-                TypeId::Adt(type_decl_id) => {
-                    if let Some(type_decl) = ctx.translated.type_decls.get(*type_decl_id) {
-                        type_decl.item_meta.lang_item.as_deref() == Some("owned_box")
-                    } else {
-                        false
-                    }
+        TyKind::Adt(type_decl_ref) => match &type_decl_ref.id {
+            TypeId::Builtin(BuiltinTy::Box) => true,
+            TypeId::Adt(type_decl_id) => {
+                if let Some(type_decl) = ctx.translated.type_decls.get(*type_decl_id) {
+                    type_decl.item_meta.lang_item.as_deref() == Some("owned_box")
+                } else {
+                    false
                 }
-                _ => false,
             }
-        }
+            _ => false,
+        },
         _ => false,
     }
 }
