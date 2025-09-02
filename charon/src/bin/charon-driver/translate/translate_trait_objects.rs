@@ -479,6 +479,141 @@ impl ItemTransCtx<'_, '_> {
         true
     }
 
+    /// Generate a basic closure vtable body
+    fn gen_basic_closure_vtable_body(
+        &mut self,
+        span: Span,
+        impl_def: &hax::FullDef,
+        vtable_struct_ref: TypeDeclRef,
+        closure_kind: &ClosureKind,
+    ) -> Result<Body, Error> {
+        let mut locals = Locals {
+            arg_count: 0,
+            locals: Vector::new(),
+        };
+        let ret_ty = Ty::new(TyKind::Adt(vtable_struct_ref.clone()));
+        let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
+
+        // For closures, we need to extract information from the virtual implementation
+        let hax::FullDefKind::Closure {
+            fn_once_impl,
+            fn_mut_impl,
+            fn_impl,
+            ..
+        } = impl_def.kind()
+        else {
+            raise_error!(self, span, "Expected closure definition for closure vtable");
+        };
+
+        // Get the appropriate virtual implementation based on closure kind
+        use charon_lib::ullbc_ast::ClosureKind;
+        let virtual_impl = match closure_kind {
+            ClosureKind::FnOnce => fn_once_impl,
+            ClosureKind::FnMut => fn_mut_impl.as_ref().ok_or_else(|| Error {
+                span,
+                msg: "Missing FnMut impl for closure".to_string(),
+            })?,
+            ClosureKind::Fn => fn_impl.as_ref().ok_or_else(|| Error {
+                span,
+                msg: "Missing Fn impl for closure".to_string(),
+            })?,
+        };
+
+        // Extract the trait reference and translate the self type
+        let trait_ref = &virtual_impl.trait_pred.trait_ref;
+        let _self_ty = if let Some(hax::GenericArg::Type(self_ty)) = trait_ref.generic_args.first() {
+            self.translate_ty(span, self_ty)?
+        } else {
+            raise_error!(self, span, "Missing self type in closure trait reference");
+        };
+
+        // Retrieve the expected field types from the vtable struct definition
+        let field_tys = {
+            let vtable_decl_id = vtable_struct_ref.id.as_adt().unwrap().clone();
+            let AnyTransItem::Type(vtable_def) =
+                self.t_ctx.get_or_translate(vtable_decl_id.into())?
+            else {
+                unreachable!()
+            };
+            let TypeDeclKind::Struct(fields) = &vtable_def.kind else {
+                unreachable!()
+            };
+            fields
+                .iter()
+                .map(|f| &f.ty)
+                .cloned()
+                .map(|ty| ty.substitute(&vtable_struct_ref.generics))
+                .collect_vec()
+        };
+
+        let mut aggregate_fields = vec![];
+        let mut field_ty_iter = field_tys.into_iter();
+        let mut next_ty = || field_ty_iter.next().unwrap();
+        let mut mk_field = |kind, ty| {
+            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
+        };
+
+        // Generate basic vtable fields with opaque implementations for now
+        // In a full implementation, these would be properly computed
+        mk_field(
+            RawConstantExpr::Opaque(format!("closure size for {:?}", closure_kind)),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque(format!("closure align for {:?}", closure_kind)),
+            next_ty(),
+        );
+        mk_field(
+            RawConstantExpr::Opaque(format!("closure drop for {:?}", closure_kind)),
+            next_ty(),
+        );
+
+        // Add method fields - for now just opaque implementations
+        let method_name = match closure_kind {
+            ClosureKind::Fn => "call",
+            ClosureKind::FnMut => "call_mut",
+            ClosureKind::FnOnce => "call_once",
+        };
+        
+        mk_field(
+            RawConstantExpr::Opaque(format!("closure {} method", method_name)),
+            next_ty(),
+        );
+
+        // Handle any remaining fields as opaque
+        while let Some(field_ty) = field_ty_iter.next() {
+            mk_field(
+                RawConstantExpr::Opaque("additional closure vtable field".to_string()),
+                field_ty,
+            );
+        }
+
+        // Construct the final vtable struct
+        let statements = vec![Statement::new(
+            span,
+            RawStatement::Assign(
+                ret_place,
+                Rvalue::Aggregate(
+                    AggregateKind::Adt(vtable_struct_ref.clone(), None, None),
+                    aggregate_fields,
+                ),
+            ),
+        )];
+
+        let mut blocks = Vector::new();
+        let _block_id = blocks.push(BlockData {
+            statements,
+            terminator: Terminator::new(span, RawTerminator::Return),
+        });
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: Vec::new(),
+            body: blocks,
+        }))
+    }
+
     /// Local helper function to get the vtable struct reference and trait declaration reference
     fn get_vtable_instance_info<'a>(
         &mut self,
@@ -926,10 +1061,10 @@ impl ItemTransCtx<'_, '_> {
                 let body = self.gen_vtable_instance_init_body(span, impl_def, vtable_struct_ref)?;
                 Ok(body)
             }
-            TraitImplSource::Closure(_closure_kind) => {
-                // For closure vtables, generate an opaque body for now
-                // TODO: Implement proper closure vtable generation
-                Err(Opaque)
+            TraitImplSource::Closure(closure_kind) => {
+                // Generate a basic closure vtable body
+                let body = self.gen_basic_closure_vtable_body(span, impl_def, vtable_struct_ref, closure_kind)?;
+                Ok(body)
             }
             _ => {
                 raise_error!(
