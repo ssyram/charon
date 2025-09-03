@@ -512,11 +512,30 @@ impl BodyTransCtx<'_, '_, '_> {
                                             ),
                                         );
                                     }
-                                    // TODO(dyn): more ways of registering vtable instance?
-                                    _ => {
-                                        trace!(
-                                            "impl_expr not triggering registering vtable: {:?}",
-                                            impl_expr
+                                    hax::ImplExprAtom::Builtin { .. } => {
+                                        // Handle built-in implementations, including closures
+                                        todo!("HANDLE BUILT-IN IMPL VTABLE REGISTRATION")
+                                    }
+                                    hax::ImplExprAtom::LocalBound { .. } => {
+                                        // No need to register anything here as there is no concrete impl
+                                        // This results in that: the vtable instance in generic case might not exist
+                                        // But this case should not happen in the monomorphized case
+                                        if self.monomorphize() {
+                                            raise_error!(
+                                                self.i_ctx,
+                                                span,
+                                                "Unexpected `LocalBound` in monomorphized context"
+                                            )
+                                        }
+                                    }
+                                    hax::ImplExprAtom::Dyn | hax::ImplExprAtom::Error(..) => {
+                                        // No need to register anything for these cases
+                                    }
+                                    hax::ImplExprAtom::SelfImpl { .. } => {
+                                        raise_error!(
+                                            self.i_ctx,
+                                            span,
+                                            "`SelfImpl` should not appear in the function body"
                                         )
                                     }
                                 };
