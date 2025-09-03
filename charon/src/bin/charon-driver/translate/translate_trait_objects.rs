@@ -892,19 +892,16 @@ impl ItemTransCtx<'_, '_> {
             next_ty(),
         );
         mk_field(
-            RawConstantExpr::Opaque("closure drop".to_string()),
+            RawConstantExpr::Opaque("closure drop - no-op".to_string()),
             next_ty(),
         );
 
         // Add the closure method (call, call_mut, or call_once)
-        let closure_method_shim = self.generate_closure_method_shim(
-            span,
-            impl_def,
-            &self_ty,
-            &dyn_self,
-            closure_kind,
-        )?;
-        mk_field(closure_method_shim, next_ty());
+        // For now, use a placeholder - we'll improve this later
+        mk_field(
+            RawConstantExpr::Opaque(format!("closure {} method", closure_kind.method_name())),
+            next_ty(),
+        );
 
         // Create the aggregate for the vtable struct
         let ret_rvalue = Rvalue::Aggregate(
