@@ -148,7 +148,9 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                     unreachable!()
                 };
                 let ty_decl = bt_ctx.translate_vtable_struct(id, item_meta, &def)?;
-                self.translated.type_decls.set_slot(id, ty_decl);
+                if !self.translated.type_decls.set_slot_if_empty(id, ty_decl) {
+                    trace!("VTable slot {:?} for item {:?} is already filled, skipping", id, item_src);
+                }
             }
             TransItemSourceKind::VTableInstance(impl_kind) => {
                 let Some(AnyTransId::Global(id)) = trans_id else {
@@ -156,7 +158,9 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                 };
                 let global_decl =
                     bt_ctx.translate_vtable_instance(id, item_meta, &def, impl_kind)?;
-                self.translated.global_decls.set_slot(id, global_decl);
+                if !self.translated.global_decls.set_slot_if_empty(id, global_decl) {
+                    trace!("VTableInstance slot {:?} for item {:?} is already filled, skipping", id, item_src);
+                }
             }
             TransItemSourceKind::VTableInstanceInitializer(impl_kind) => {
                 let Some(AnyTransId::Fun(id)) = trans_id else {
@@ -164,7 +168,9 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                 };
                 let fun_decl =
                     bt_ctx.translate_vtable_instance_init(id, item_meta, &def, impl_kind)?;
-                self.translated.fun_decls.set_slot(id, fun_decl);
+                if !self.translated.fun_decls.set_slot_if_empty(id, fun_decl) {
+                    trace!("VTableInstanceInitializer slot {:?} for item {:?} is already filled, skipping", id, item_src);
+                }
             }
             TransItemSourceKind::VTableMethod(self_ty, dyn_self) => {
                 let Some(AnyTransId::Fun(id)) = trans_id else {
@@ -172,7 +178,9 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                 };
                 let fun_decl =
                     bt_ctx.translate_vtable_shim(id, item_meta, &self_ty, &dyn_self, &def)?;
-                self.translated.fun_decls.set_slot(id, fun_decl);
+                if !self.translated.fun_decls.set_slot_if_empty(id, fun_decl) {
+                    trace!("VTableMethod slot {:?} for item {:?} is already filled, skipping", id, item_src);
+                }
             }
         }
         Ok(())

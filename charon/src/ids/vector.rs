@@ -98,6 +98,18 @@ where
         self.elem_count += 1;
     }
 
+    /// Fill the reserved slot if it's empty, otherwise ignore silently.
+    /// This is a defensive method to handle cases where the same item might be translated multiple times.
+    pub fn set_slot_if_empty(&mut self, id: I, x: T) -> bool {
+        if self.vector[id].is_none() {
+            self.vector[id] = Some(x);
+            self.elem_count += 1;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Remove the value from this slot, leaving other ids unchanged.
     pub fn remove(&mut self, id: I) -> Option<T> {
         if self.vector[id].is_some() {
