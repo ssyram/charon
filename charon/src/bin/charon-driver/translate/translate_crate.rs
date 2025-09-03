@@ -309,7 +309,10 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         item_src: TransItemSource,
     ) -> Option<T> {
         let id = self.register_no_enqueue(dep_src, &item_src);
-        self.items_to_translate.insert(item_src);
+        // Only enqueue if not already processed and not currently in the queue
+        if !self.processed.contains(&item_src) && !self.items_to_translate.contains(&item_src) {
+            self.items_to_translate.insert(item_src);
+        }
         id
     }
 
