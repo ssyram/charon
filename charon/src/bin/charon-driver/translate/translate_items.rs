@@ -190,6 +190,10 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                 let span = self.def_span(item_source.def_id());
                 raise_error!(self, span, "Failed to translate item {id:?}.")
             }
+            // This prevents re-translating of the same item in the usual queue processing loop.
+            // If this is not present, if the function is called before the usual processing loop,
+            // `processed` does not record the item as processed, and we end up translating it again.
+            self.processed.insert(item_source);
         }
         let item = self.translated.get_item(id);
         Ok(item.unwrap())

@@ -249,5 +249,28 @@ fn gives_fn()
     return
 }
 
+fn {{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1>(@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)))
+{
+    let ret@0: (); // return
+    let self@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)); // arg #1
+    let concrete@2: &'_0 mut (closure); // local
+
+    storage_live(concrete@2)
+    concrete@2 := concretize<&'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)), &'_0 mut (closure)>(move (self@1))
+    panic
+}
+
+// Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
+fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>
+{
+    let ret@0: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>; // return
+
+    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>), method_call: const (Opaque(closure call method)) }
+    return
+}
+
+// Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
+static {impl Fn<(&'_ mut (u32))> for closure}::{vtable}: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool> = {impl Fn<(&'_ mut (u32))> for closure}::{vtable}()
+
 
 
