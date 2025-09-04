@@ -517,23 +517,28 @@ impl BodyTransCtx<'_, '_, '_> {
                                         let tref = &impl_expr.r#trait;
                                         let hax_state = self.hax_state_with_id();
                                         let trait_def = self.hax_def(
-                                            &tref.hax_skip_binder_ref().erase(&hax_state)
+                                            &tref.hax_skip_binder_ref().erase(&hax_state),
                                         )?;
-                                        let closure_kind = trait_def.lang_item.as_deref().and_then(|lang| match lang {
-                                            "fn_once" => Some(ClosureKind::FnOnce),
-                                            "fn_mut" => Some(ClosureKind::FnMut),
-                                            "r#fn" => Some(ClosureKind::Fn),
-                                            _ => None,
-                                        });
+                                        let closure_kind =
+                                            trait_def.lang_item.as_deref().and_then(|lang| {
+                                                match lang {
+                                                    "fn_once" => Some(ClosureKind::FnOnce),
+                                                    "fn_mut" => Some(ClosureKind::FnMut),
+                                                    "fn" | "r#fn" => Some(ClosureKind::Fn),
+                                                    _ => None,
+                                                }
+                                            });
 
                                         // Check if this is a closure trait implementation
                                         if let Some(closure_kind) = closure_kind
-                                            && let Some(hax::GenericArg::Type(closure_ty)) = impl_expr
-                                                .r#trait
-                                                .hax_skip_binder_ref()
-                                                .generic_args
-                                                .first()
-                                            && let hax::TyKind::Closure(closure_args) = closure_ty.kind()
+                                            && let Some(hax::GenericArg::Type(closure_ty)) =
+                                                impl_expr
+                                                    .r#trait
+                                                    .hax_skip_binder_ref()
+                                                    .generic_args
+                                                    .first()
+                                            && let hax::TyKind::Closure(closure_args) =
+                                                closure_ty.kind()
                                         {
                                             // Register the closure vtable instance
                                             let _: GlobalDeclId = self.register_item(

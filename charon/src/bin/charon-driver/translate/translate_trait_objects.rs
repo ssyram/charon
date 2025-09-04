@@ -892,7 +892,7 @@ impl ItemTransCtx<'_, '_> {
             next_ty(),
         );
         mk_field(
-            RawConstantExpr::Opaque("closure drop - no-op".to_string()),
+            RawConstantExpr::Opaque("closure drop".to_string()),
             next_ty(),
         );
 
@@ -1044,7 +1044,12 @@ impl ItemTransCtx<'_, '_> {
             }
             TraitImplSource::Closure(closure_kind) => {
                 // For closures, we need to generate the vtable init body differently
-                let body = self.gen_closure_vtable_instance_init_body(span, impl_def, vtable_struct_ref, *closure_kind)?;
+                let body = self.gen_closure_vtable_instance_init_body(
+                    span,
+                    impl_def,
+                    vtable_struct_ref,
+                    *closure_kind,
+                )?;
                 Ok(body)
             }
             _ => {
