@@ -265,7 +265,7 @@ fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn
 {
     let ret@0: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>; // return
 
-    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, type_error("Unexpected error: could not find the type variable <closure_kind>"), type_error("Unexpected error: could not find the type variable <closure_signature>"), type_error("Unexpected error: could not find the type variable <upvars>")>), method_call: const (Opaque(closure call method)) }
+    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call: const (Opaque(closure call method)) }
     return
 }
 

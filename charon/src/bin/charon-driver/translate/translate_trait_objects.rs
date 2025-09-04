@@ -470,15 +470,19 @@ impl ItemTransCtx<'_, '_> {
     fn get_vtable_instance_info<'a>(
         &mut self,
         span: Span,
-        impl_def: &'a hax::FullDef,
+        def: &'a hax::FullDef,
         impl_kind: &TraitImplSource,
     ) -> Result<(TraitImplRef, TraitDeclRef, TypeDeclRef), Error> {
-        let implemented_trait = match impl_def.kind() {
-            hax::FullDefKind::TraitImpl { trait_pred, .. } => &trait_pred.trait_ref,
+        let (implemented_trait, impl_ref) = match def.kind() {
+            hax::FullDefKind::TraitImpl { trait_pred, .. } => (
+                &trait_pred.trait_ref,
+                self.translate_item(span, def.this(), TransItemSourceKind::TraitImpl(*impl_kind))?,
+            ),
             hax::FullDefKind::Closure {
                 fn_once_impl,
                 fn_mut_impl,
                 fn_impl,
+                args,
                 ..
             } => {
                 // For closures, get the trait implementation based on the closure kind
@@ -492,7 +496,15 @@ impl ItemTransCtx<'_, '_> {
                     }
                     _ => unreachable!("Expected closure trait impl source"),
                 };
-                &closure_trait_impl.trait_pred.trait_ref
+                let target_kind = match impl_kind {
+                    TraitImplSource::Closure(kind) => *kind,
+                    _ => unreachable!(),
+                };
+                (
+                    &closure_trait_impl.trait_pred.trait_ref,
+                    self.translate_closure_bound_impl_ref(span, args, target_kind)?
+                        .erase(),
+                )
             }
             _ => unreachable!(),
         };
@@ -500,11 +512,6 @@ impl ItemTransCtx<'_, '_> {
             .translate_vtable_struct_ref(span, implemented_trait)?
             .expect("trait should be dyn-compatible");
         let implemented_trait = self.translate_trait_decl_ref(span, implemented_trait)?;
-        let impl_ref = self.translate_item(
-            span,
-            impl_def.this(),
-            TransItemSourceKind::TraitImpl(*impl_kind),
-        )?;
         Ok((impl_ref, implemented_trait, vtable_struct_ref))
     }
 
@@ -749,7 +756,6 @@ impl ItemTransCtx<'_, '_> {
             aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
         };
 
-        // TODO(dyn): provide values
         mk_field(
             RawConstantExpr::Opaque("unknown size".to_string()),
             next_ty(),

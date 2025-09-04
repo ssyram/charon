@@ -548,6 +548,12 @@ impl BodyTransCtx<'_, '_, '_> {
                                                     TraitImplSource::Closure(closure_kind),
                                                 ),
                                             );
+                                        } else {
+                                            raise_error!(
+                                                self.i_ctx,
+                                                span,
+                                                "Handle non-closure virtual trait implementations."
+                                            );
                                         }
                                     }
                                     hax::ImplExprAtom::LocalBound { .. } => {
