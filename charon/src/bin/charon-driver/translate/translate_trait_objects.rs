@@ -635,12 +635,30 @@ impl ItemTransCtx<'_, '_> {
         mut next_ty: impl FnMut() -> Ty,
         mut mk_field: impl FnMut(RawConstantExpr, Ty),
     ) -> Result<(), Error> {
-        let hax::FullDefKind::TraitImpl {
-            implied_impl_exprs, ..
-        } = impl_def.kind()
-        else {
-            unreachable!()
+        let implied_impl_exprs = match impl_def.kind() {
+            hax::FullDefKind::TraitImpl {
+                implied_impl_exprs, ..
+            } => implied_impl_exprs,
+            hax::FullDefKind::Closure { fn_once_impl, fn_mut_impl, fn_impl, .. } => {
+                match trait_def.lang_item {
+                    Some("fn") | Some("r#fn") => &fn_impl.as_ref().unwrap().implied_impl_exprs,
+                    Some("fn_once") => &fn_once_impl.as_ref().implied_impl_exprs,
+                    Some("fn_mut") => &fn_mut_impl.as_ref().unwrap().implied_impl_exprs,
+                    _ => unreachable!(),
+                }
+            },
+            kind => raise_error!(
+                self,
+                span,
+                "TODO: Unknown type of impl full def: {kind:?}"
+            ),
         };
+        // let hax::FullDefKind::TraitImpl {
+        //     implied_impl_exprs, ..
+        // } = impl_def.kind()
+        // else {
+        //     unreachable!()
+        // };
         let hax::FullDefKind::Trait {
             implied_predicates, ..
         } = trait_def.kind()
@@ -756,6 +774,7 @@ impl ItemTransCtx<'_, '_> {
             aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty })));
         };
 
+        // The metadata will be provided later in the `compute_vtable_metadata` pass
         mk_field(
             RawConstantExpr::Opaque("unknown size".to_string()),
             next_ty(),
@@ -889,6 +908,7 @@ impl ItemTransCtx<'_, '_> {
         };
 
         // Add the standard vtable metadata fields (size, align, drop)
+        // like usual instance, the value will be provided in a pass later
         mk_field(
             RawConstantExpr::Opaque("closure size".to_string()),
             next_ty(),
@@ -905,9 +925,12 @@ impl ItemTransCtx<'_, '_> {
         // Add the closure method (call, call_mut, or call_once)
         // For now, use a placeholder - we'll improve this later
         mk_field(
-            RawConstantExpr::Opaque(format!("closure {} method", closure_kind.method_name())),
+            RawConstantExpr::Opaque(format!("closure exec {} method", closure_kind.method_name())),
             next_ty(),
         );
+
+        let trait_def = self.hax_def(&trait_impl.trait_pred.trait_ref)?;
+        self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, next_ty, mk_field)?;
 
         // Create the aggregate for the vtable struct
         let ret_rvalue = Rvalue::Aggregate(

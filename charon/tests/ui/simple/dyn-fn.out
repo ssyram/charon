@@ -265,7 +265,7 @@ fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn
 {
     let ret@0: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>; // return
 
-    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call: const (Opaque(closure call method)) }
+    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call: const (Opaque(closure exec call method)), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: const (Opaque(missing supertrait vtable)) }
     return
 }
 
