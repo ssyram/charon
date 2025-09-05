@@ -391,7 +391,7 @@ fn {impl Checkable<i32> for i32}::{vtable}() -> test_crate::Checkable::{vtable}<
 
     storage_live(@1)
     storage_live(@2)
-    @1 := &core::marker::MetaSized::{vtable}<i32>
+    @1 := &core::marker::MetaSized::{vtable}
     @2 := &{impl Super<i32> for i32}::{vtable}
     ret@0 := test_crate::Checkable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const ({{impl Checkable<i32> for i32}}::{vtable}::{drop_method}<'_>), method_check: const ({impl Checkable<i32> for i32}::check::{vtable_method}<'_>), super_trait_0: move (@1), super_trait_1: move (@2) }
     return
@@ -527,7 +527,7 @@ fn {impl Checkable<i32> for String}::{vtable}() -> test_crate::Checkable::{vtabl
 
     storage_live(@1)
     storage_live(@2)
-    @1 := &core::marker::MetaSized::{vtable}<String>
+    @1 := &core::marker::MetaSized::{vtable}
     @2 := &{impl Super<i32> for String}::{vtable}
     ret@0 := test_crate::Checkable::{vtable} { size: const (24 : usize), align: const (8 : usize), drop: const ({{impl Checkable<i32> for String}}::{vtable}::{drop_method}<'_>), method_check: const ({impl Checkable<i32> for String}::check::{vtable_method}<'_>), super_trait_0: move (@1), super_trait_1: move (@2) }
     return
@@ -692,7 +692,7 @@ fn {impl Checkable<i32> for Array<String, const N : usize>}::{vtable}<const N : 
 
     storage_live(@1)
     storage_live(@2)
-    @1 := &core::marker::MetaSized::{vtable}<Array<String, const N : usize>>
+    @1 := &core::marker::MetaSized::{vtable}
     @2 := &{impl Super<i32> for Array<String, const N : usize>}::{vtable}<const N : usize>
     ret@0 := test_crate::Checkable::{vtable} { size: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_0)), align: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_0)), drop: const ({{impl Checkable<i32> for Array<String, const N : usize>}}::{vtable}::{drop_method}<'_, const N : usize>), method_check: const ({impl Checkable<i32> for Array<String, const N : usize>}::check::{vtable_method}<'_, const N : usize>), super_trait_0: move (@1), super_trait_1: move (@2) }
     return
@@ -819,7 +819,7 @@ fn {impl Checkable<i32> for (i32, String)}::{vtable}() -> test_crate::Checkable:
 
     storage_live(@1)
     storage_live(@2)
-    @1 := &core::marker::MetaSized::{vtable}<(i32, String)>
+    @1 := &core::marker::MetaSized::{vtable}
     @2 := &{impl Super<i32> for (i32, String)}::{vtable}
     ret@0 := test_crate::Checkable::{vtable} { size: const (32 : usize), align: const (8 : usize), drop: const ({{impl Checkable<i32> for (i32, String)}}::{vtable}::{drop_method}<'_>), method_check: const ({impl Checkable<i32> for (i32, String)}::check::{vtable_method}<'_>), super_trait_0: move (@1), super_trait_1: move (@2) }
     return
@@ -1104,7 +1104,7 @@ fn {impl NoParam for alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]}::{vt
     let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
 
     storage_live(@1)
-    @1 := &core::marker::MetaSized::{vtable}<alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]>
+    @1 := &core::marker::MetaSized::{vtable}
     ret@0 := test_crate::NoParam::{vtable} { size: const (Opaque(Layout not available: TODO: handle Box with ptr-metadata)), align: const (Opaque(Layout not available: TODO: handle Box with ptr-metadata)), drop: const ({{impl NoParam for alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]}}::{vtable}::{drop_method}<'_>), method_dummy: const ({impl NoParam for alloc::boxed::Box<i64>[MetaSized<i64>, Sized<Global>]}::dummy::{vtable_method}<'_>), super_trait_0: move (@1) }
     return
 }
@@ -1184,7 +1184,7 @@ fn {impl NoParam for (i32, i32)}::{vtable}() -> test_crate::NoParam::{vtable}
     let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
 
     storage_live(@1)
-    @1 := &core::marker::MetaSized::{vtable}<(i32, i32)>
+    @1 := &core::marker::MetaSized::{vtable}
     ret@0 := test_crate::NoParam::{vtable} { size: const (8 : usize), align: const (4 : usize), drop: const ({{impl NoParam for (i32, i32)}}::{vtable}::{drop_method}<'_>), method_dummy: const ({impl NoParam for (i32, i32)}::dummy::{vtable_method}<'_>), super_trait_0: move (@1) }
     return
 }
@@ -1286,7 +1286,7 @@ fn {impl NoParam for Array<i32, 10 : usize>}::{vtable}() -> test_crate::NoParam:
     let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
 
     storage_live(@1)
-    @1 := &core::marker::MetaSized::{vtable}<Array<i32, 10 : usize>>
+    @1 := &core::marker::MetaSized::{vtable}
     ret@0 := test_crate::NoParam::{vtable} { size: const (40 : usize), align: const (4 : usize), drop: const ({{impl NoParam for Array<i32, 10 : usize>}}::{vtable}::{drop_method}<'_>), method_dummy: const ({impl NoParam for Array<i32, 10 : usize>}::dummy::{vtable_method}<'_>), super_trait_0: move (@1) }
     return
 }
@@ -1408,7 +1408,7 @@ fn {impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i
     let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
 
     storage_live(@1)
-    @1 := &core::marker::MetaSized::{vtable}<Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>>
+    @1 := &core::marker::MetaSized::{vtable}
     ret@0 := test_crate::NoParam::{vtable} { size: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_1)), align: const (Opaque(Layout not available: No instant available const generic value or wrong format value: @ConstGeneric0_1)), drop: const ({{impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}}::{vtable}::{drop_method}<'_, const N : usize, const M : usize>), method_dummy: const ({impl NoParam for Array<(String, Array<(i32, i32), const M : usize>, Array<(i32, String), const M : usize>), const N : usize>}::dummy::{vtable_method}<'_, const N : usize, const M : usize>), super_trait_0: move (@1) }
     return
 }
@@ -1677,7 +1677,7 @@ where
     let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
 
     storage_live(@1)
-    @1 := &core::marker::MetaSized::{vtable}<i32>
+    @1 := &core::marker::MetaSized::{vtable}
     ret@0 := test_crate::Modifiable::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const ({{impl Modifiable<T> for i32}}::{vtable}::{drop_method}<'_, T>[@TraitClause0, @TraitClause1]), method_modify: const ({impl Modifiable<T> for i32}::modify::{vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: move (@1) }
     return
 }
@@ -1960,7 +1960,7 @@ fn {impl Both32And64 for i32}::{vtable}() -> test_crate::Both32And64::{vtable}
     storage_live(@1)
     storage_live(@2)
     storage_live(@3)
-    @1 := &core::marker::MetaSized::{vtable}<i32>
+    @1 := &core::marker::MetaSized::{vtable}
     @2 := &{impl BaseOn<i32> for i32}::{vtable}
     @3 := &{impl BaseOn<i64> for i32}::{vtable}
     ret@0 := test_crate::Both32And64::{vtable} { size: const (4 : usize), align: const (4 : usize), drop: const ({{impl Both32And64 for i32}}::{vtable}::{drop_method}<'_>), method_both_operate: const (Opaque(shim for default methods aren't yet supported)), super_trait_0: move (@1), super_trait_1: move (@2), super_trait_2: move (@3) }

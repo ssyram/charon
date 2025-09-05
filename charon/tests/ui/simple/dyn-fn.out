@@ -47,6 +47,13 @@ pub trait FnOnce<Self, Args>
     vtable: core::ops::function::FnOnce::{vtable}<Args, Self::Output>
 }
 
+struct core::ops::function::FnOnce::{vtable}<Args, Ty0> {
+  size: usize,
+  align: usize,
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnOnce<_dyn, Args> + _dyn : '_ + @TraitClause1_0::Output = Ty0))),
+  super_trait_0: &'static (core::marker::MetaSized::{vtable}),
+}
+
 // Full name: core::ops::function::FnMut
 #[lang_item("fn_mut")]
 pub trait FnMut<Self, Args>
@@ -57,6 +64,15 @@ pub trait FnMut<Self, Args>
     parent_clause3 : [@TraitClause3]: Tuple<Args>
     fn call_mut<'_0> = core::ops::function::FnMut::call_mut<'_0_0, Self, Args>[Self]
     vtable: core::ops::function::FnMut::{vtable}<Args, Self::parent_clause1::Output>
+}
+
+struct core::ops::function::FnMut::{vtable}<Args, Ty0> {
+  size: usize,
+  align: usize,
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0))),
+  method_call_mut: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0)), Args) -> FnMut<(dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0), Args>::parent_clause1::Output,
+  super_trait_0: &'static (core::marker::MetaSized::{vtable}),
+  super_trait_1: &'static (core::ops::function::FnOnce::{vtable}<Args, FnMut<(dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = Ty0), Args>::parent_clause1::Output>),
 }
 
 struct core::ops::function::Fn::{vtable}<Args, Ty0> {
@@ -249,6 +265,78 @@ fn gives_fn()
     return
 }
 
+fn {{impl FnOnce<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1>(@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnOnce<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::Output = bool)))
+{
+    let ret@0: (); // return
+    let self@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnOnce<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::Output = bool)); // arg #1
+    let concrete@2: &'_0 mut (closure); // local
+
+    storage_live(concrete@2)
+    concrete@2 := concretize<&'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnOnce<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::Output = bool)), &'_0 mut (closure)>(move (self@1))
+    panic
+}
+
+// Full name: test_crate::gives_fn::{impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}
+fn {impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::FnOnce::{vtable}<(&'_ mut (u32)), bool>
+{
+    let ret@0: core::ops::function::FnOnce::{vtable}<(&'_ mut (u32)), bool>; // return
+    let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
+
+    storage_live(@1)
+    @1 := &core::marker::MetaSized::{vtable}
+    ret@0 := core::ops::function::FnOnce::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl FnOnce<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), super_trait_0: move (@1) }
+    return
+}
+
+// Full name: test_crate::gives_fn::{impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}
+static {impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}: core::ops::function::FnOnce::{vtable}<(&'_ mut (u32)), bool> = {impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}()
+
+fn {{impl FnMut<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1>(@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)))
+{
+    let ret@0: (); // return
+    let self@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)); // arg #1
+    let concrete@2: &'_0 mut (closure); // local
+
+    storage_live(concrete@2)
+    concrete@2 := concretize<&'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)), &'_0 mut (closure)>(move (self@1))
+    panic
+}
+
+// Full name: test_crate::gives_fn::closure::{vtable_method}
+fn {vtable_method}<'_0, '_1>(@1: &'_1 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)), @2: (&'_0 mut (u32))) -> bool
+{
+    let @0: bool; // return
+    let @1: &'_1 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)); // arg #1
+    let @2: (&'_0 mut (u32)); // arg #2
+    let @3: &'_1 mut (closure); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := concretize<&'_1 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)), &'_1 mut (closure)>(move (@1))
+    @0 := {impl FnMut<(&'_ mut (u32))> for closure}::call_mut<'_0, '_1>(move (@3), move (@2))
+    return
+}
+
+// Full name: test_crate::gives_fn::{impl FnMut<(&'_ mut (u32))> for closure}::{vtable}
+fn {impl FnMut<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::FnMut::{vtable}<(&'_ mut (u32)), bool>
+{
+    let ret@0: core::ops::function::FnMut::{vtable}<(&'_ mut (u32)), bool>; // return
+    let @1: &'static (core::marker::MetaSized::{vtable}); // anonymous local
+    let @2: &'static (core::ops::function::FnOnce::{vtable}<(&'_ mut (u32)), FnMut<(dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool), (&'_ mut (u32))>::parent_clause1::Output>); // anonymous local
+
+    storage_live(@1)
+    storage_live(@2)
+    @1 := &core::marker::MetaSized::{vtable}
+    @2 := &{impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}
+    ret@0 := core::ops::function::FnMut::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl FnMut<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call_mut: const ({vtable_method}<'_, '_>), super_trait_0: move (@1), super_trait_1: move (@2) }
+    return
+}
+
+// Full name: test_crate::gives_fn::{impl FnMut<(&'_ mut (u32))> for closure}::{vtable}
+static {impl FnMut<(&'_ mut (u32))> for closure}::{vtable}: core::ops::function::FnMut::{vtable}<(&'_ mut (u32)), bool> = {impl FnMut<(&'_ mut (u32))> for closure}::{vtable}()
+
 fn {{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1>(@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)))
 {
     let ret@0: (); // return
@@ -286,7 +374,7 @@ fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn
 
     storage_live(@1)
     storage_live(@2)
-    @1 := &core::marker::MetaSized::{vtable}<closure>
+    @1 := &core::marker::MetaSized::{vtable}
     @2 := &{impl FnMut<(&'_ mut (u32))> for closure}::{vtable}
     ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call: const ({vtable_method}<'_, '_>), super_trait_0: move (@1), super_trait_1: move (@2) }
     return

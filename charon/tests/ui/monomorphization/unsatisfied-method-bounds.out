@@ -1,4 +1,194 @@
-disabled backtrace
+   0: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/utils/error_macros.rs:29:29
+   1: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:457:13
+   2: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:646:24
+   3: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:65
+   4: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:312:13
+   5: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:40
+   6: hax_frontend_exporter::state::WithGlobalCacheExt::with_global_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:294:9
+   7: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:14
+   8: hax_frontend_exporter::state::WithItemCacheExt::with_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:308:14
+   9: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:311:14
+  10: hax_frontend_exporter::traits::solve_trait
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:11
+  11: hax_frontend_exporter::traits::solve_item_traits_inner::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:321:26
+  12: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:305:21
+  13: core::option::Option<T>::map
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1146:29
+  14: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:26
+  15: alloc::vec::Vec<T,A>::extend_desugared
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3633:44
+  16: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:19:14
+  17: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:42:9
+  18: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  19: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  20: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  21: hax_frontend_exporter::traits::solve_item_traits_inner
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:322:10
+  22: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}::accumulate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:278:27
+  23: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:281:5
+  24: hax_frontend_exporter::traits::solve_item_required_traits
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:256:1
+  25: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:532:30
+  26: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  27: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  28: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1115:68
+  29: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  30: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyFnSig> for rustc_type_ir::ty_kind::FnSig<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1372:27
+  31: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Binder<T2>> for rustc_type_ir::binder::Binder<rustc_middle::ty::context::TyCtxt,T1>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1639:41
+  32: hax_frontend_exporter::types::new::full_def::translate_full_def_kind::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:632:54
+  33: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  34: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  35: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  36: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  37: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  38: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  39: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  40: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  41: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  42: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  43: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  44: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  45: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  46: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  47: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:653:26
+  48: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  49: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  50: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::ty::ItemRef>::instantiated_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:203:21
+  51: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:144:51
+  52: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  53: __rust_try
+  54: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  55: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  56: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  57: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_item
+             at ./src/bin/charon-driver/translate/translate_meta.rs:304:28
+  58: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_src
+             at ./src/bin/charon-driver/translate/translate_meta.rs:332:18
+  59: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_name
+             at ./src/bin/charon-driver/translate/translate_meta.rs:378:29
+  60: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::register_no_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:293:40
+  61: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::register_and_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:311:23
+  62: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::register_and_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:385:20
+  63: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::register_item_maybe_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:412:18
+  64: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_item_maybe_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:446:35
+  65: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_crate.rs:466:14
+  66: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_impl_ref
+             at ./src/bin/charon-driver/translate/translate_crate.rs:576:14
+  67: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_impl_expr_aux
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:208:26
+  68: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_impl_expr
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:183:20
+  69: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_fn_ptr
+             at ./src/bin/charon-driver/translate/translate_crate.rs:539:38
+  70: charon_driver::translate::translate_bodies::BodyTransCtx::translate_function_call
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:1071:39
+  71: charon_driver::translate::translate_bodies::BodyTransCtx::translate_terminator
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:910:23
+  72: charon_driver::translate::translate_bodies::BodyTransCtx::translate_basic_block
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:199:31
+  73: charon_driver::translate::translate_bodies::BodyTransCtx::translate_body_aux
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:1241:30
+  74: charon_driver::translate::translate_bodies::BodyTransCtx::translate_body::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:1206:52
+  75: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  76: __rust_try
+  77: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  78: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  79: charon_driver::translate::translate_bodies::BodyTransCtx::translate_body
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:1206:19
+  80: charon_driver::translate::translate_bodies::BodyTransCtx::translate_def_body
+             at ./src/bin/charon-driver/translate/translate_bodies.rs:1194:14
+  81: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_function
+             at ./src/bin/charon-driver/translate/translate_items.rs:429:26
+  82: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:92:39
+  83: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  84: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  85: __rust_try
+  86: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  87: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  88: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  89: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  90: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  91: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  92: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  93: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  94: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+  95: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+  96: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  97: std::sys::pal::unix::thread::Thread::new::thread_start
+  98: <unknown>
+  99: <unknown>
+
 warning[E9999]: Could not find a clause for `Binder { value: <std::string::String as std::marker::Copy>, bound_vars: [] }` in the current context: `Unimplemented`
   --> tests/ui/monomorphization/unsatisfied-method-bounds.rs:21:1
    |
@@ -8,7 +198,122 @@ warning[E9999]: Could not find a clause for `Binder { value: <std::string::Strin
    = note: ⚠️ This is a bug in Hax's frontend.
            Please report this error to https://github.com/hacspec/hax/issues with some context (e.g. the current crate)!
 
-disabled backtrace
+   0: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/utils/error_macros.rs:29:29
+   1: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:457:13
+   2: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:646:24
+   3: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:65
+   4: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:312:13
+   5: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:40
+   6: hax_frontend_exporter::state::WithGlobalCacheExt::with_global_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:294:9
+   7: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:14
+   8: hax_frontend_exporter::state::WithItemCacheExt::with_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:308:14
+   9: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:311:14
+  10: hax_frontend_exporter::traits::solve_trait
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:11
+  11: hax_frontend_exporter::traits::solve_item_traits_inner::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:321:26
+  12: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:305:21
+  13: core::option::Option<T>::map
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1146:29
+  14: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:26
+  15: alloc::vec::Vec<T,A>::extend_desugared
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3633:44
+  16: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:19:14
+  17: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:42:9
+  18: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  19: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  20: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  21: hax_frontend_exporter::traits::solve_item_traits_inner
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:322:10
+  22: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}::accumulate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:278:27
+  23: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:281:5
+  24: hax_frontend_exporter::traits::solve_item_required_traits
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:256:1
+  25: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:532:30
+  26: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  27: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  28: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1115:68
+  29: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  30: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyFnSig> for rustc_type_ir::ty_kind::FnSig<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1372:27
+  31: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Binder<T2>> for rustc_type_ir::binder::Binder<rustc_middle::ty::context::TyCtxt,T1>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1639:41
+  32: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:690:72
+  33: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  34: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  35: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::ty::ItemRef>::instantiated_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:203:21
+  36: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:144:51
+  37: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  38: __rust_try
+  39: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  40: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  41: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  42: charon_driver::translate::translate_ctx::ItemTransCtx::hax_def
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:215:20
+  43: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_decl
+             at ./src/bin/charon-driver/translate/translate_items.rs:588:41
+  44: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:106:41
+  45: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  46: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  47: __rust_try
+  48: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  49: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  50: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  51: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  52: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  53: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  54: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  55: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  56: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+  57: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+  58: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  59: std::sys::pal::unix::thread::Thread::new::thread_start
+  60: <unknown>
+  61: <unknown>
+
 warning[E9999]: Could not find a clause for `Binder { value: <std::string::String as std::marker::Copy>, bound_vars: [] }` in the current context: `Unimplemented`
   --> tests/ui/monomorphization/unsatisfied-method-bounds.rs:9:5
    |
@@ -21,7 +326,174 @@ warning[E9999]: Could not find a clause for `Binder { value: <std::string::Strin
    = note: ⚠️ This is a bug in Hax's frontend.
            Please report this error to https://github.com/hacspec/hax/issues with some context (e.g. the current crate)!
 
-disabled backtrace
+   0: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/utils/error_macros.rs:29:29
+   1: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:457:13
+   2: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:646:24
+   3: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:65
+   4: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:312:13
+   5: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:40
+   6: hax_frontend_exporter::state::WithGlobalCacheExt::with_global_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:294:9
+   7: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:14
+   8: hax_frontend_exporter::state::WithItemCacheExt::with_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:308:14
+   9: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:311:14
+  10: hax_frontend_exporter::traits::solve_trait
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:11
+  11: hax_frontend_exporter::traits::solve_item_traits_inner::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:321:26
+  12: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:305:21
+  13: core::option::Option<T>::map
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1146:29
+  14: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:26
+  15: alloc::vec::Vec<T,A>::extend_desugared
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3633:44
+  16: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:19:14
+  17: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:42:9
+  18: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  19: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  20: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  21: hax_frontend_exporter::traits::solve_item_traits_inner
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:322:10
+  22: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}::accumulate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:278:27
+  23: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:281:5
+  24: hax_frontend_exporter::traits::solve_item_required_traits
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:256:1
+  25: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:532:30
+  26: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  27: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  28: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1115:68
+  29: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  30: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::boxed::Box<hax_frontend_exporter::types::ty::Ty>> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1020:23
+  31: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1122:12
+  32: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  33: hax_frontend_exporter::types::mir::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::mir::LocalDecl> for rustc_middle::mir::LocalDecl>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/mir.rs:22:13
+  34: hax_frontend_exporter::types::mir::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::mir::MirBody<KIND>> for rustc_middle::mir::Body>::sinto::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/mir.rs:315:45
+  35: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  36: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  37: <core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::fold::enumerate::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/enumerate.rs:140:27
+  38: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  39: <core::iter::adapters::enumerate::Enumerate<I> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/enumerate.rs:146:19
+  40: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  41: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  42: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  43: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  44: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  45: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  46: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  47: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  48: <hax_frontend_exporter::index_vec::IndexVec<I,T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/index_vec.rs:67:18
+  49: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  50: hax_frontend_exporter::types::mir::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::mir::MirBody<KIND>> for rustc_middle::mir::Body>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/mir.rs:318:12
+  51: hax_frontend_exporter::body::module::implementations::<impl hax_frontend_exporter::body::module::IsBody for hax_frontend_exporter::types::mir::MirBody<MirKind>>::from_mir
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/body.rs:244:27
+  52: hax_frontend_exporter::types::new::full_def::get_drop_glue_shim
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:1106:16
+  53: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:476:28
+  54: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  55: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  56: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::ty::ItemRef>::instantiated_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:203:21
+  57: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:144:51
+  58: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  59: __rust_try
+  60: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  61: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  62: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  63: charon_driver::translate::translate_ctx::ItemTransCtx::hax_def
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:215:20
+  64: charon_driver::translate::translate_types::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::recognize_builtin_type
+             at ./src/bin/charon-driver/translate/translate_types.rs:354:24
+  65: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_type_decl_ref
+             at ./src/bin/charon-driver/translate/translate_crate.rs:485:20
+  66: charon_driver::translate::translate_types::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_ty_inner
+             at ./src/bin/charon-driver/translate/translate_types.rs:135:33
+  67: charon_driver::translate::translate_types::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_ty
+             at ./src/bin/charon-driver/translate/translate_types.rs:87:14
+  68: charon_driver::translate::translate_functions::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_function_signature
+             at ./src/bin/charon-driver/translate/translate_functions.rs:75:27
+  69: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_function
+             at ./src/bin/charon-driver/translate/translate_items.rs:383:30
+  70: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:92:39
+  71: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  72: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  73: __rust_try
+  74: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  75: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  76: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  77: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  78: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  79: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  80: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  81: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  82: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+  83: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+  84: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  85: std::sys::pal::unix::thread::Thread::new::thread_start
+  86: <unknown>
+  87: <unknown>
+
 warning[E9999]: Could not find a clause for `Binder { value: <std::string::String as std::marker::Copy>, bound_vars: [] }` in the current context: `Unimplemented`
   --> tests/ui/monomorphization/unsatisfied-method-bounds.rs:18:1
    |
@@ -55,9 +527,196 @@ error: Error during trait resolution: Could not find a clause for `Binder { valu
 18 | struct Flatten<I: MyIterator<Item: Copy>>(I);
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-disabled backtrace
+   0: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/utils/error_macros.rs:29:29
+   1: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:457:13
+   2: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:646:24
+   3: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:65
+   4: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:312:13
+   5: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:40
+   6: hax_frontend_exporter::state::WithGlobalCacheExt::with_global_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:294:9
+   7: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:14
+   8: hax_frontend_exporter::state::WithItemCacheExt::with_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:308:14
+   9: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:311:14
+  10: hax_frontend_exporter::traits::solve_trait
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:11
+  11: hax_frontend_exporter::traits::solve_item_traits_inner::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:321:26
+  12: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:305:21
+  13: core::option::Option<T>::map
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1146:29
+  14: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:26
+  15: alloc::vec::Vec<T,A>::extend_desugared
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3633:44
+  16: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:19:14
+  17: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:42:9
+  18: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  19: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  20: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  21: hax_frontend_exporter::traits::solve_item_traits_inner
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:322:10
+  22: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}::accumulate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:278:27
+  23: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:281:5
+  24: hax_frontend_exporter::traits::solve_item_required_traits
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:256:1
+  25: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:532:30
+  26: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  27: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  28: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1115:68
+  29: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  30: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericArg> for rustc_type_ir::generic_arg::GenericArgKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:444:10
+  31: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericArg> for rustc_middle::ty::generic_args::GenericArg>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:681:21
+  32: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<U>> for rustc_middle::ty::list::RawList<(),T>>::sinto::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:842:31
+  33: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  34: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  35: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  36: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  37: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  38: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  39: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  40: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  41: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  42: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  43: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<U>> for rustc_middle::ty::list::RawList<(),T>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:842:41
+  44: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:533:41
+  45: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  46: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  47: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::ItemRef> for rustc_type_ir::predicate::TraitRef<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1392:9
+  48: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TraitPredicate> for rustc_type_ir::predicate::TraitPredicate<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1402:20
+  49: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::ClauseKind> for rustc_type_ir::predicate_kind::ClauseKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1502:11
+  50: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Binder<T2>> for rustc_type_ir::binder::Binder<rustc_middle::ty::context::TyCtxt,T1>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1639:41
+  51: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Clause> for rustc_middle::ty::predicate::Clause>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1525:32
+  52: <(L,R) as hax_frontend_exporter::sinto::SInto<S,(LL,RR)>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/sinto.rs:64:17
+  53: <[T] as hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<D>>>::sinto::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/sinto.rs:93:31
+  54: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  55: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  56: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  57: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  58: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  59: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  60: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  61: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  62: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  63: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  64: <[T] as hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<D>>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/sinto.rs:93:41
+  65: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericPredicates> for alloc::borrow::Cow<[(rustc_middle::ty::predicate::Clause,rustc_span::span_encoding::Span)]>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1625:39
+  66: hax_frontend_exporter::types::new::full_def::get_implied_predicates
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:1168:24
+  67: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:507:33
+  68: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  69: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  70: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::ty::ItemRef>::instantiated_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:203:21
+  71: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:144:51
+  72: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  73: __rust_try
+  74: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  75: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  76: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  77: charon_driver::translate::translate_ctx::ItemTransCtx::hax_def
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:215:20
+  78: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_virtual_trait_impl
+             at ./src/bin/charon-driver/translate/translate_items.rs:1054:30
+  79: charon_driver::translate::translate_drops::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_drop_impl
+             at ./src/bin/charon-driver/translate/translate_drops.rs:121:30
+  80: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:121:57
+  81: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  82: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  83: __rust_try
+  84: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  85: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  86: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  87: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  88: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  89: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  90: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  91: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  92: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+  93: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+  94: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  95: std::sys::pal::unix::thread::Thread::new::thread_start
+  96: <unknown>
+  97: <unknown>
+
 warning[E9999]: Could not find a clause for `Binder { value: <std::string::String as std::marker::Copy>, bound_vars: [] }` in the current context: `Unimplemented`
-   --> /home/runner/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/drop.rs:208:1
+   --> /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/drop.rs:208:1
     |
 208 | pub trait Drop {
     | ^^^^^^^^^^^^^^
@@ -65,9 +724,190 @@ warning[E9999]: Could not find a clause for `Binder { value: <std::string::Strin
     = note: ⚠️ This is a bug in Hax's frontend.
             Please report this error to https://github.com/hacspec/hax/issues with some context (e.g. the current crate)!
 
-disabled backtrace
+   0: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/utils/error_macros.rs:29:29
+   1: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:457:13
+   2: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:646:24
+   3: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:65
+   4: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:312:13
+   5: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:40
+   6: hax_frontend_exporter::state::WithGlobalCacheExt::with_global_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:294:9
+   7: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:14
+   8: hax_frontend_exporter::state::WithItemCacheExt::with_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:308:14
+   9: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:311:14
+  10: hax_frontend_exporter::traits::solve_trait
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:11
+  11: hax_frontend_exporter::traits::solve_item_traits_inner::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:321:26
+  12: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:305:21
+  13: core::option::Option<T>::map
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1146:29
+  14: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:26
+  15: alloc::vec::Vec<T,A>::extend_desugared
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3633:44
+  16: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:19:14
+  17: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:42:9
+  18: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  19: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  20: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  21: hax_frontend_exporter::traits::solve_item_traits_inner
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:322:10
+  22: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}::accumulate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:278:27
+  23: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:281:5
+  24: hax_frontend_exporter::traits::solve_item_required_traits
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:256:1
+  25: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:532:30
+  26: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  27: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  28: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1115:68
+  29: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  30: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericArg> for rustc_type_ir::generic_arg::GenericArgKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:444:10
+  31: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericArg> for rustc_middle::ty::generic_args::GenericArg>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:681:21
+  32: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<U>> for rustc_middle::ty::list::RawList<(),T>>::sinto::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:842:31
+  33: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  34: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  35: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  36: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  37: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  38: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  39: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  40: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  41: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  42: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  43: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<U>> for rustc_middle::ty::list::RawList<(),T>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:842:41
+  44: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:533:41
+  45: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  46: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  47: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::ItemRef> for rustc_type_ir::predicate::TraitRef<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1392:9
+  48: hax_frontend_exporter::types::ty::AssocItem::sfrom_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1785:84
+  49: hax_frontend_exporter::types::new::full_def::translate_full_def_kind::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:520:21
+  50: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  51: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  52: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  53: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  54: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  55: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  56: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  57: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  58: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  59: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  60: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  61: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  62: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  63: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  64: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:522:18
+  65: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  66: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  67: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::ty::ItemRef>::instantiated_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:203:21
+  68: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:144:51
+  69: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  70: __rust_try
+  71: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  72: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  73: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  74: charon_driver::translate::translate_ctx::ItemTransCtx::hax_def
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:215:20
+  75: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_virtual_trait_impl
+             at ./src/bin/charon-driver/translate/translate_items.rs:1054:30
+  76: charon_driver::translate::translate_drops::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_drop_impl
+             at ./src/bin/charon-driver/translate/translate_drops.rs:121:30
+  77: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:121:57
+  78: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  79: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  80: __rust_try
+  81: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  82: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  83: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  84: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  85: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  86: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  87: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  88: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  89: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+  90: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+  91: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+  92: std::sys::pal::unix::thread::Thread::new::thread_start
+  93: <unknown>
+  94: <unknown>
+
 warning[E9999]: Could not find a clause for `Binder { value: <std::string::String as std::marker::Copy>, bound_vars: [] }` in the current context: `Unimplemented`
-   --> /home/runner/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/drop.rs:241:5
+   --> /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/drop.rs:241:5
     |
 241 |     fn drop(&mut self);
     |     ^^^^^^^^^^^^^^^^^^^
@@ -75,9 +915,230 @@ warning[E9999]: Could not find a clause for `Binder { value: <std::string::Strin
     = note: ⚠️ This is a bug in Hax's frontend.
             Please report this error to https://github.com/hacspec/hax/issues with some context (e.g. the current crate)!
 
-disabled backtrace
+   0: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/utils/error_macros.rs:29:29
+   1: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:457:13
+   2: hax_frontend_exporter::traits::resolution::PredicateSearcher::resolve
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits/resolution.rs:646:24
+   3: hax_frontend_exporter::traits::solve_trait::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:65
+   4: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:312:13
+   5: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:40
+   6: hax_frontend_exporter::state::WithGlobalCacheExt::with_global_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:294:9
+   7: hax_frontend_exporter::state::WithGlobalCacheExt::with_item_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:299:14
+   8: hax_frontend_exporter::state::WithItemCacheExt::with_cache
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:308:14
+   9: hax_frontend_exporter::state::WithItemCacheExt::with_predicate_searcher
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/state.rs:311:14
+  10: hax_frontend_exporter::traits::solve_trait
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:232:11
+  11: hax_frontend_exporter::traits::solve_item_traits_inner::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:321:26
+  12: core::ops::function::impls::<impl core::ops::function::FnOnce<A> for &mut F>::call_once
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:305:21
+  13: core::option::Option<T>::map
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:1146:29
+  14: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:26
+  15: alloc::vec::Vec<T,A>::extend_desugared
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3633:44
+  16: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:19:14
+  17: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:42:9
+  18: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  19: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  20: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  21: hax_frontend_exporter::traits::solve_item_traits_inner
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:322:10
+  22: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}::accumulate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:278:27
+  23: hax_frontend_exporter::traits::solve_item_required_traits::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:281:5
+  24: hax_frontend_exporter::traits::solve_item_required_traits
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:256:1
+  25: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:532:30
+  26: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  27: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  28: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TyKind> for rustc_type_ir::ty_kind::TyKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1115:68
+  29: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::Ty> for rustc_middle::ty::Ty>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1057:40
+  30: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericArg> for rustc_type_ir::generic_arg::GenericArgKind<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:444:10
+  31: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::GenericArg> for rustc_middle::ty::generic_args::GenericArg>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:681:21
+  32: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<U>> for rustc_middle::ty::list::RawList<(),T>>::sinto::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:842:31
+  33: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  34: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  35: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  36: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  37: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  38: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  39: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  40: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  41: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  42: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  43: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,alloc::vec::Vec<U>> for rustc_middle::ty::list::RawList<(),T>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:842:41
+  44: hax_frontend_exporter::types::ty::ItemRef::translate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:533:41
+  45: hax_frontend_exporter::traits::translate_item_ref::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:249:5
+  46: hax_frontend_exporter::traits::translate_item_ref
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/traits.rs:243:1
+  47: hax_frontend_exporter::types::ty::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::ItemRef> for rustc_type_ir::predicate::TraitRef<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1392:9
+  48: hax_frontend_exporter::types::ty::_::<impl hax_frontend_exporter::sinto::SInto<S,hax_frontend_exporter::types::ty::TraitPredicate> for rustc_type_ir::predicate::TraitPredicate<rustc_middle::ty::context::TyCtxt>>::sinto
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/ty.rs:1402:20
+  49: hax_frontend_exporter::types::new::full_def::get_self_predicate
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:1014:10
+  50: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:508:29
+  51: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  52: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  53: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::ty::ItemRef>::instantiated_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:203:21
+  54: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:144:51
+  55: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  56: __rust_try
+  57: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  58: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  59: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  60: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_item
+             at ./src/bin/charon-driver/translate/translate_meta.rs:304:28
+  61: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_src
+             at ./src/bin/charon-driver/translate/translate_meta.rs:332:18
+  62: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_name
+             at ./src/bin/charon-driver/translate/translate_meta.rs:378:29
+  63: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::register_no_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:293:40
+  64: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::register_and_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:311:23
+  65: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::register_and_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:385:20
+  66: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::register_item_maybe_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:412:18
+  67: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_item_maybe_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:446:35
+  68: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_crate.rs:466:14
+  69: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_decl_ref
+             at ./src/bin/charon-driver/translate/translate_crate.rs:567:14
+  70: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_ref
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:79:14
+  71: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_poly_trait_ref::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:50:17
+  72: charon_driver::translate::translate_generics::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_region_binder
+             at ./src/bin/charon-driver/translate/translate_generics.rs:543:19
+  73: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_poly_trait_ref
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:49:14
+  74: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_impl_expr
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:181:35
+  75: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_impl_exprs::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:171:27
+  76: core::iter::adapters::map::map_try_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:95:28
+  77: core::iter::traits::iterator::Iterator::try_fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2426:21
+  78: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::try_fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:121:19
+  79: <core::iter::adapters::by_ref_sized::ByRefSized<I> as core::iter::traits::iterator::Iterator>::try_fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/by_ref_sized.rs:54:9
+  80: <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::try_fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/mod.rs:192:14
+  81: core::iter::traits::iterator::Iterator::try_for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2487:14
+  82: <core::iter::adapters::GenericShunt<I,R> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/mod.rs:174:14
+  83: <core::iter::adapters::inspect::Inspect<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/inspect.rs:78:30
+  84: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::next
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:107:19
+  85: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:25:41
+  86: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  87: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  88: <index_vec::IndexVec<I,T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/lib.rs:543:18
+  89: <charon_lib::ids::vector::Vector<I,T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at ./src/ids/vector.rs:415:22
+  90: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  91: core::iter::traits::iterator::Iterator::try_collect::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2107:45
+  92: core::iter::adapters::try_process
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/mod.rs:160:17
+  93: core::iter::traits::iterator::Iterator::try_collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2107:9
+  94: charon_driver::translate::translate_predicates::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_trait_impl_exprs
+             at ./src/bin/charon-driver/translate/translate_predicates.rs:172:14
+  95: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_virtual_trait_impl
+             at ./src/bin/charon-driver/translate/translate_items.rs:1063:38
+  96: charon_driver::translate::translate_drops::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_drop_impl
+             at ./src/bin/charon-driver/translate/translate_drops.rs:121:30
+  97: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:121:57
+  98: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  99: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+ 100: __rust_try
+ 101: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+ 102: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+ 103: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+ 104: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+ 105: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+ 106: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+ 107: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+ 108: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+ 109: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+ 110: std::sys::backtrace::__rust_begin_short_backtrace::<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>
+ 111: <<std::thread::Builder>::spawn_unchecked_<rustc_interface::util::run_in_thread_with_globals<rustc_interface::util::run_in_thread_pool_with_globals<rustc_interface::interface::run_compiler<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}, ()>::{closure#0}, ()>::{closure#0}::{closure#0}, ()>::{closure#1} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}
+ 112: std::sys::pal::unix::thread::Thread::new::thread_start
+ 113: <unknown>
+ 114: <unknown>
+
 warning[E9999]: Could not find a clause for `Binder { value: <std::string::String as std::marker::Copy>, bound_vars: [] }` in the current context: `Unimplemented`
-   --> /home/runner/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/marker.rs:179:1
+   --> /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/marker.rs:179:1
     |
 179 | pub trait MetaSized: PointeeSized {
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

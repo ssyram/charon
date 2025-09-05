@@ -1,7 +1,115 @@
 
 thread 'rustc' panicked at /rustc-dev/a2d45f73c70d9dec57140c9412f83586eda895f8/compiler/rustc_type_ir/src/binder.rs:764:9:
 type parameter `U/#1` (U/#1/1) out of range when instantiating, args=[()]
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: <rustc_type_ir::binder::ArgFolder<rustc_middle::ty::context::TyCtxt>>::type_param_out_of_range
+   3: rustc_type_ir::binder::ArgFolder<I>::ty_for_param
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:742:26
+   4: <rustc_type_ir::binder::ArgFolder<I> as rustc_type_ir::fold::TypeFolder<I>>::fold_ty
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:713:34
+   5: rustc_middle::ty::structural_impls::<impl rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt> for rustc_middle::ty::Ty>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/structural_impls.rs:373:16
+   6: <rustc_middle::ty::generic_args::GenericArg as rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt>>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/generic_args.rs:353:44
+   7: rustc_middle::ty::generic_args::<impl rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt> for &rustc_middle::ty::list::RawList<(),rustc_middle::ty::generic_args::GenericArg>>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/generic_args.rs:638:38
+   8: rustc_middle::ty::structural_impls::<impl rustc_type_ir::fold::TypeSuperFoldable<rustc_middle::ty::context::TyCtxt> for rustc_middle::ty::Ty>::super_fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/structural_impls.rs:439:53
+   9: <rustc_type_ir::binder::ArgFolder<I> as rustc_type_ir::fold::TypeFolder<I>>::fold_ty
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:714:20
+  10: rustc_middle::ty::structural_impls::<impl rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt> for rustc_middle::ty::Ty>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/structural_impls.rs:373:16
+  11: rustc_type_ir::binder::EarlyBinder<I,T>::instantiate
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:637:20
+  12: hax_frontend_exporter::types::new::full_def::translate_full_def_kind::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:619:50
+  13: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  14: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  15: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  16: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  17: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  18: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  19: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  20: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  21: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  22: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  23: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  24: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  25: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  26: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  27: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:653:26
+  28: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  29: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  30: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:161:14
+  31: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:143:47
+  32: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  33: __rust_try
+  34: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  35: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  36: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  37: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_item
+             at ./src/bin/charon-driver/translate/translate_meta.rs:304:28
+  38: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_src
+             at ./src/bin/charon-driver/translate/translate_meta.rs:332:18
+  39: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_name
+             at ./src/bin/charon-driver/translate/translate_meta.rs:378:29
+  40: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::register_no_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:293:40
+  41: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::register_and_enqueue
+             at ./src/bin/charon-driver/translate/translate_crate.rs:311:23
+  42: charon_driver::translate::translate_crate::<impl charon_driver::translate::translate_ctx::TranslateCtx>::enqueue_module_item
+             at ./src/bin/charon-driver/translate/translate_crate.rs:260:42
+  43: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::register_module
+             at ./src/bin/charon-driver/translate/translate_items.rs:220:32
+  44: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:79:24
+  45: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  46: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  47: __rust_try
+  48: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  49: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  50: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  51: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  52: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  53: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  54: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  55: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  56: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
 error: Hax panicked when translating `test_crate::{impl#0}`.
  --> tests/ui/simple/gat-default.rs:9:1
   |
@@ -23,6 +131,107 @@ error: Item `test_crate::Collection` caused errors; ignoring.
 
 thread 'rustc' panicked at /rustc-dev/a2d45f73c70d9dec57140c9412f83586eda895f8/compiler/rustc_type_ir/src/binder.rs:764:9:
 type parameter `U/#1` (U/#1/1) out of range when instantiating, args=[()]
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: <rustc_type_ir::binder::ArgFolder<rustc_middle::ty::context::TyCtxt>>::type_param_out_of_range
+   3: rustc_type_ir::binder::ArgFolder<I>::ty_for_param
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:742:26
+   4: <rustc_type_ir::binder::ArgFolder<I> as rustc_type_ir::fold::TypeFolder<I>>::fold_ty
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:713:34
+   5: rustc_middle::ty::structural_impls::<impl rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt> for rustc_middle::ty::Ty>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/structural_impls.rs:373:16
+   6: <rustc_middle::ty::generic_args::GenericArg as rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt>>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/generic_args.rs:353:44
+   7: rustc_middle::ty::generic_args::<impl rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt> for &rustc_middle::ty::list::RawList<(),rustc_middle::ty::generic_args::GenericArg>>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/generic_args.rs:638:38
+   8: rustc_middle::ty::structural_impls::<impl rustc_type_ir::fold::TypeSuperFoldable<rustc_middle::ty::context::TyCtxt> for rustc_middle::ty::Ty>::super_fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/structural_impls.rs:439:53
+   9: <rustc_type_ir::binder::ArgFolder<I> as rustc_type_ir::fold::TypeFolder<I>>::fold_ty
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:714:20
+  10: rustc_middle::ty::structural_impls::<impl rustc_type_ir::fold::TypeFoldable<rustc_middle::ty::context::TyCtxt> for rustc_middle::ty::Ty>::fold_with
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_middle/src/ty/structural_impls.rs:373:16
+  11: rustc_type_ir::binder::EarlyBinder<I,T>::instantiate
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/rustc-src/rust/compiler/rustc_type_ir/src/binder.rs:637:20
+  12: hax_frontend_exporter::types::new::full_def::translate_full_def_kind::{{closure}}
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:619:50
+  13: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:28
+  14: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  15: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:88:21
+  16: <core::slice::iter::Iter<T> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/slice/iter/macros.rs:255:27
+  17: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  18: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  19: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:128:19
+  20: core::iter::traits::iterator::Iterator::for_each
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:827:14
+  21: alloc::vec::Vec<T,A>::extend_trusted
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3666:26
+  22: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:29:14
+  23: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:62:16
+  24: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:34:9
+  25: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3525:9
+  26: core::iter::traits::iterator::Iterator::collect
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2027:9
+  27: hax_frontend_exporter::types::new::full_def::translate_full_def_kind
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:653:26
+  28: hax_frontend_exporter::types::new::full_def::translate_full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:62:20
+  29: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def_maybe_instantiated
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:182:28
+  30: hax_frontend_exporter::types::new::full_def::<impl hax_frontend_exporter::types::def_id::DefId>::full_def
+             at /home/ssyram/.cargo/git/checkouts/hax-c5ea2928c640208b/79faad1/frontend/exporter/src/types/new/full_def.rs:161:14
+  31: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:143:47
+  32: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  33: __rust_try
+  34: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  35: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  36: charon_driver::translate::translate_ctx::TranslateCtx::hax_def_for_item
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:142:9
+  37: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_item
+             at ./src/bin/charon-driver/translate/translate_meta.rs:304:28
+  38: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::name_for_src
+             at ./src/bin/charon-driver/translate/translate_meta.rs:332:18
+  39: charon_driver::translate::translate_meta::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_name
+             at ./src/bin/charon-driver/translate/translate_meta.rs:378:29
+  40: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:63:25
+  41: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  42: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  43: __rust_try
+  44: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  45: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  46: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  47: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  48: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  49: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  50: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  51: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  52: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
 error: Hax panicked when translating `test_crate::{impl#0}`.
  --> tests/ui/simple/gat-default.rs:9:1
   |

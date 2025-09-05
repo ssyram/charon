@@ -232,6 +232,18 @@ impl ItemTransCtx<'_, '_> {
         else {
             return Ok(());
         };
+        // The `FnOnce::call_once` is not compatible with the dyn-compatibility as described in:
+        // https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
+        // But the Rustc offers a special backdoor for this and allows this method to be `vtable_safe`.
+        // The only way to call such a function seems to be with `Box<dyn FnOnce>`.
+        // The implementation of `Box<dyn FnOnce>::call_once` is a special case and should translate specially with some special magic.
+        // TODO(ssyram): in the future we may implement the function with type `fn call_once(self: Box<Self>, Args) -> Output`
+        //               This function is the vtable-specific version of the `call_once` method.
+        //               A very special case that the type signature differs from the original signature.
+        // Anyway, if we allow this to happen, there will be a severe breakage in that we can perform concretization on `dyn FnOnce`,
+        // This will make the life in backend tools, especially Eurydice much harder.
+        // Likewise, we skip translation of the `call_once` method below in the instance.
+        if trait_def.lang_item == Some("fn_once".into()) { return Ok(()); }
 
         let item_name = self.t_ctx.translate_trait_item_name(item_def_id)?;
         // It's ok to translate the method signature in the context of the trait because
@@ -507,7 +519,7 @@ impl ItemTransCtx<'_, '_> {
                         .erase(),
                 )
             }
-            _ => unreachable!(),
+            _ => panic!("Unknown type of impl full def: {:?}", def.kind()),
         };
         let vtable_struct_ref = self
             .translate_vtable_struct_ref(span, implemented_trait)?
@@ -730,7 +742,7 @@ impl ItemTransCtx<'_, '_> {
                             closure_ty.kind()
                     {
                         // Register the closure vtable instance
-                        let vtable_instance_ref: GlobalDeclRef = self.translate_item_no_enqueue(
+                        let vtable_instance_ref: GlobalDeclRef = self.translate_item(
                             span,
                             &closure_args.item,
                             TransItemSourceKind::VTableInstance(
@@ -742,23 +754,25 @@ impl ItemTransCtx<'_, '_> {
                             ty: fn_ptr_ty,
                         });
                         RawConstantExpr::Ref(global)
-                    } else if let Some(_vtable_struct_ref) = self
-                        .translate_vtable_struct_ref(span, &impl_expr.r#trait.hax_skip_binder_ref())?
+                    } else if self.translate_vtable_struct_ref(span, impl_expr.r#trait.hax_skip_binder_ref())?.is_some()
                     {
                         // For other builtin traits that are dyn-compatible, try to create a vtable instance
                         trace!("Handling dyn-compatible builtin trait: {:?}", trait_def.lang_item);
                         
-                        // For builtin marker traits, we need to create a vtable instance reference
+                        // TODO(ssyram): for now, we don't know how to translate other kinds of built-in traits, just take their names
                         // The challenge is that we need an impl_ref, but builtin traits don't have concrete impls
                         // Let's try using the trait reference itself as the impl reference
-                        let trait_ref = &impl_expr.r#trait.hax_skip_binder_ref();
-                        let vtable_instance_ref: GlobalDeclRef = self.translate_item_no_enqueue(
+                        // A simple case would be that they are all marker traits like `core::marker::MetaSized`
+                        let trait_ref = impl_expr.r#trait.hax_skip_binder_ref();
+                        let mut vtable_instance_ref: GlobalDeclRef = self.translate_item_no_enqueue(
                             span,
                             trait_ref,
                             TransItemSourceKind::VTableInstance(
-                                TraitImplSource::Normal, // Builtin traits are normal impls
+                                TraitImplSource::Normal,  // Builtin traits are normal impls
                             ),
                         )?;
+                        // Remove the first `Self` argument
+                        vtable_instance_ref.generics.types.remove_and_shift_ids(TypeVarId::ZERO);
                         let global = Box::new(ConstantExpr {
                             value: RawConstantExpr::Global(vtable_instance_ref),
                             ty: fn_ptr_ty,
@@ -1017,20 +1031,22 @@ impl ItemTransCtx<'_, '_> {
             next_ty(),
         );
 
-        let call_method_ty = next_ty();
-        let dyn_self = self.compute_closure_dyn_self(span, &call_method_ty, &vtable_struct_ref)?;
+        // Add the closure method (call, call_mut)
+        // We do not translate `call_once` for the reason discussed above -- the function is not dyn-compatible
+        if closure_kind != ClosureKind::FnOnce {
+            let call_method_ty = next_ty();
+            let dyn_self = self.compute_closure_dyn_self(span, &call_method_ty, &vtable_struct_ref)?;
 
-        // Add the closure method (call, call_mut, or call_once)
-        // For now, use a placeholder - we'll improve this later
-        mk_field(self.generate_closure_method_shim_ref(
-                span,
-                impl_def,
-                &self_ty,
-                &dyn_self,
-                closure_kind,
-            )?,
-            call_method_ty,
-        );
+            mk_field(self.generate_closure_method_shim_ref(
+                    span,
+                    impl_def,
+                    &self_ty,
+                    &dyn_self,
+                    closure_kind,
+                )?,
+                call_method_ty,
+            );
+        }
 
         let trait_def = self.hax_def(&trait_impl.trait_pred.trait_ref)?;
         self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, next_ty, mk_field)?;
@@ -1079,7 +1095,7 @@ impl ItemTransCtx<'_, '_> {
                     _ => unreachable!(),
                 }
             },
-            _ => unreachable!(),
+            _ => panic!("Unexpected call method type for closure: {}, Raw: {call_method_ty:?}", call_method_ty.with_ctx(&self.into_fmt())),
         };
         Ok(raw_dyn_self.substitute(&vtable_struct_ref.generics))
     }
