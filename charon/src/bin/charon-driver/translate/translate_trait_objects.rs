@@ -697,7 +697,7 @@ impl ItemTransCtx<'_, '_> {
                     });
                     RawConstantExpr::Ref(global)
                 }
-                hax::ImplExprAtom::Builtin { .. } => {
+                hax::ImplExprAtom::Builtin { trait_data, .. } => {
                     // Handle built-in implementations, including closures
                     let tref = &impl_expr.r#trait;
                     let hax_state = self.hax_state_with_id();
@@ -705,8 +705,8 @@ impl ItemTransCtx<'_, '_> {
                         &tref.hax_skip_binder_ref().erase(&hax_state),
                     )?;
                     
-                    trace!("Processing builtin impl for trait {:?}, lang_item: {:?}", 
-                           trait_def.def_id(), trait_def.lang_item);
+                    trace!("Processing builtin impl for trait {:?}, lang_item: {:?}, trait_data: {:?}", 
+                           trait_def.def_id(), trait_def.lang_item, trait_data);
                            
                     let closure_kind =
                         trait_def.lang_item.as_deref().and_then(|lang| {
@@ -742,27 +742,33 @@ impl ItemTransCtx<'_, '_> {
                             ty: fn_ptr_ty,
                         });
                         RawConstantExpr::Ref(global)
-                    } else if trait_def.lang_item.as_deref() == Some("meta_sized") {
-                        // For MetaSized marker trait, we need to create a reference to its vtable
-                        // Even though it's a marker trait, it can have a vtable for consistency
-                        trace!("Handling MetaSized builtin trait");
+                    } else if let Some(_vtable_struct_ref) = self
+                        .translate_vtable_struct_ref(span, &impl_expr.r#trait.hax_skip_binder_ref())?
+                    {
+                        // For other builtin traits that are dyn-compatible, try to create a vtable instance
+                        trace!("Handling dyn-compatible builtin trait: {:?}", trait_def.lang_item);
                         
-                        // Try to use the trait reference to get the vtable struct reference
-                        if let Some(vtable_struct_ref) = self
-                            .translate_vtable_struct_ref(span, &impl_expr.r#trait.hax_skip_binder_ref())?
-                        {
-                            // For builtin marker traits, we need to create a minimal vtable instance
-                            // Since we don't have a concrete impl_ref, we'll need to handle this as a special case
-                            RawConstantExpr::Opaque("meta_sized vtable placeholder".into())
-                        } else {
-                            RawConstantExpr::Opaque("meta_sized trait not dyn compatible".into())
-                        }
+                        // For builtin marker traits, we need to create a vtable instance reference
+                        // The challenge is that we need an impl_ref, but builtin traits don't have concrete impls
+                        // Let's try using the trait reference itself as the impl reference
+                        let trait_ref = &impl_expr.r#trait.hax_skip_binder_ref();
+                        let vtable_instance_ref: GlobalDeclRef = self.translate_item_no_enqueue(
+                            span,
+                            trait_ref,
+                            TransItemSourceKind::VTableInstance(
+                                TraitImplSource::Normal, // Builtin traits are normal impls
+                            ),
+                        )?;
+                        let global = Box::new(ConstantExpr {
+                            value: RawConstantExpr::Global(vtable_instance_ref),
+                            ty: fn_ptr_ty,
+                        });
+                        RawConstantExpr::Ref(global)
                     } else {
-                        // For other non-closure builtin impls, we might not need a vtable instance
-                        // since these are typically marker traits without methods
-                        trace!("Unhandled builtin impl for trait {:?}", trait_def.lang_item);
-                        RawConstantExpr::Opaque(format!("unknown builtin impl for trait {:?}", 
-                                                        trait_def.lang_item.as_deref().unwrap_or("no_lang_item")).into())
+                        // For non-dyn-compatible builtin traits, we don't need vtable instances
+                        trace!("Non-dyn-compatible builtin trait: {:?}", trait_def.lang_item);
+                        RawConstantExpr::Opaque(format!("non-dyn-compatible builtin trait {:?}", 
+                                                        trait_def.lang_item.as_deref().unwrap_or("unknown")).into())
                     }
                 }
                 hax::ImplExprAtom::LocalBound { .. } => {
