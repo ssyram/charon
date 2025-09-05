@@ -72,7 +72,7 @@ pub enum TransItemSourceKind {
     ///
     /// For technical reasons, it takes the `self_type` and `dyn_self_type`:
     /// the former is the type being implemented now while the latter is the `dyn Trait<...>` type.
-    VTableMethod(Ty, Ty),
+    VTableMethod(Ty, Ty, TraitImplSource),
 }
 
 /// The kind of a [`TransItemSourceKind::TraitImpl`].

@@ -1,3 +1,4 @@
+
 use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
     translate_predicates::PredicateLocation,
@@ -587,7 +588,7 @@ impl ItemTransCtx<'_, '_> {
                 let mut shim_ref: FnPtr = self.translate_item(
                     span,
                     &item_ref,
-                    TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
+                    TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone(), TraitImplSource::Normal),
                 )?;
                 let ty = next_ty();
                 match ty.kind() {
@@ -875,9 +876,6 @@ impl ItemTransCtx<'_, '_> {
         let trait_ref = self.translate_trait_ref(span, &trait_impl.trait_pred.trait_ref)?;
         let self_ty = trait_ref.generics.types[0].clone(); // This should be the closure type
 
-        // Create a simplified dyn trait type (we'll use the closure type as self for now)
-        let dyn_self = self_ty.clone(); // For closures, we use the closure type itself
-
         // Retreive the expected field types from the struct definition. This avoids complicated
         // substitutions.
         let field_tys = {
@@ -922,11 +920,19 @@ impl ItemTransCtx<'_, '_> {
             next_ty(),
         );
 
+        let call_method_ty = next_ty();
+        let dyn_self = self.compute_closure_dyn_self(span, &call_method_ty, &vtable_struct_ref)?;
+
         // Add the closure method (call, call_mut, or call_once)
         // For now, use a placeholder - we'll improve this later
-        mk_field(
-            RawConstantExpr::Opaque(format!("closure exec {} method", closure_kind.method_name())),
-            next_ty(),
+        mk_field(self.generate_closure_method_shim_ref(
+                span,
+                impl_def,
+                &self_ty,
+                &dyn_self,
+                closure_kind,
+            )?,
+            call_method_ty,
         );
 
         let trait_def = self.hax_def(&trait_impl.trait_pred.trait_ref)?;
@@ -959,26 +965,64 @@ impl ItemTransCtx<'_, '_> {
         }))
     }
 
-    fn generate_closure_method_shim(
+    /// Rebuild the `dyn_self` type from the `call_method_ty` and the args from the final `vtable-ref`
+    /// The `call_method_ty` will have form: `([&'_0] [mut] dyn Fn[Once|Mut]<...>, Args) -> Output`
+    /// While the actual `Args` & `Output` types are recorded in the vtable-ref
+    /// The `vtable_struct_ref` is `{vtable}<Actual_Args, Actual_Output>`
+    fn compute_closure_dyn_self(&self, _span: Span, call_method_ty: &Ty, vtable_struct_ref: &TypeDeclRef) -> Result<Ty, Error> {
+        let raw_dyn_self = match call_method_ty.kind() {
+            TyKind::FnPtr(binder) => {
+                let receiver = &binder.clone().erase().0[0];
+                match receiver.kind() {
+                    TyKind::Ref(_, inner, _) => {
+                        assert!(matches!(inner.kind(), TyKind::DynTrait(_)));
+                        inner.clone()
+                    },
+                    TyKind::DynTrait(_) => receiver.clone(),
+                    _ => unreachable!(),
+                }
+            },
+            _ => unreachable!(),
+        };
+        Ok(raw_dyn_self.substitute(&vtable_struct_ref.generics))
+    }
+
+    fn generate_closure_method_shim_ref(
         &mut self,
         span: Span,
         impl_def: &hax::FullDef,
         self_ty: &Ty,
         dyn_self: &Ty,
-        _closure_kind: ClosureKind,
+        closure_kind: ClosureKind,
     ) -> Result<RawConstantExpr, Error> {
         // Register the closure method shim
         let shim_id: FunDeclId = self.register_item(
             span,
             impl_def.this(),
-            TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
+            TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone(), TraitImplSource::Closure(closure_kind)),
         );
+
+        let mut generics = Box::new(self.the_only_binder().params.identity_args());
+
+        // Add the arguments for region binders of the closure
+        let hax::FullDefKind::Closure { args, .. } = impl_def.kind() else {
+            unreachable!()
+        };
+        // The signature can only contain region binders
+        let sig = &args.fn_sig;
+        for _ in &sig.bound_vars {
+            // The late-bound region binders are at last, for the whole closure, as per `translate_closures`, use push
+            generics.regions.push(Region::Erased);
+        }
+        // Finally, one more region for the receiver, this is at first, as it is the region of the function itself, use insert at head
+        generics.regions.insert_and_shift_ids(RegionId::ZERO, Region::Erased);
 
         // Create function pointer to the shim
         let fn_ptr = FnPtr {
             func: Box::new(shim_id.into()),
-            generics: Box::new(GenericArgs::empty()), // TODO: Handle generics properly
+            generics,
         };
+
         Ok(RawConstantExpr::FnPtr(fn_ptr))
     }
 
@@ -1123,6 +1167,7 @@ impl ItemTransCtx<'_, '_> {
         target_receiver: &Ty,
         shim_signature: &FunSig,
         impl_func_def: &hax::FullDef,
+        impl_kind: &TraitImplSource,
     ) -> Result<Body, Error> {
         let mut locals = Locals {
             arg_count: shim_signature.inputs.len(),
@@ -1151,7 +1196,15 @@ impl ItemTransCtx<'_, '_> {
         self.generate_concretization(span, &mut statements, &shim_self, &target_self)?;
 
         let call = {
-            let fun_id = self.register_item(span, &impl_func_def.this(), TransItemSourceKind::Fun);
+            let fun_id = self.register_item(
+                span,
+                &impl_func_def.this(),
+                match impl_kind {
+                    TraitImplSource::Normal => TransItemSourceKind::Fun,
+                    TraitImplSource::Closure(kind) => TransItemSourceKind::ClosureMethod(*kind),
+                    _ => unreachable!(),
+                },
+            );
             let generics = Box::new(self.outermost_binder().params.identity_args());
             Call {
                 func: FnOperand::Regular(FnPtr {
@@ -1211,17 +1264,31 @@ impl ItemTransCtx<'_, '_> {
         self_ty: &Ty,
         dyn_self: &Ty,
         impl_func_def: &hax::FullDef,
+        impl_kind: &TraitImplSource,
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
         // compute the correct signature for the shim
-        let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
+        let mut signature = match impl_kind {
+            TraitImplSource::Normal => self.translate_function_signature(impl_func_def, &item_meta)?,
+            TraitImplSource::Closure(kind) => {
+                self.translate_def_generics(span, impl_func_def)?;
+                let hax::FullDefKind::Closure { args, .. } = impl_func_def.kind() else {
+                    unreachable!()
+                };
+                // Following practice in `translate_closures`, add the new param
+                self.innermost_binder_mut()
+                    .push_params_from_binder(args.fn_sig.rebind(()))?;
+                self.translate_closure_method_sig(impl_func_def, span, args, *kind)?
+            },
+            _ => raise_error!(&self, item_meta.span, "vtable shims for non-closure virtual impls aren't supported, actual kind: {impl_kind:?}")
+        };
         let target_receiver = signature.inputs[0].clone();
         // dynify the receiver type, e.g., &T -> &dyn Trait when `impl ... for T`
         // Pin<Box<i32>> -> Pin<Box<dyn Trait>> when `impl ... for i32`
         signature.inputs[0].substitute_ty(self_ty, dyn_self);
 
         let body =
-            self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
+            self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def, impl_kind)?;
 
         Ok(FunDecl {
             def_id: fun_id,

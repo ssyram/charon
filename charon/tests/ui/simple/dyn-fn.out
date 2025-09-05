@@ -260,12 +260,29 @@ fn {{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1>(@
     panic
 }
 
+// Full name: test_crate::gives_fn::closure::{vtable_method}
+fn {vtable_method}<'_0, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)), @2: (&'_0 mut (u32))) -> bool
+{
+    let @0: bool; // return
+    let @1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)); // arg #1
+    let @2: (&'_0 mut (u32)); // arg #2
+    let @3: &'_1 (closure); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := concretize<&'_1 ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)), &'_1 (closure)>(move (@1))
+    @0 := {impl Fn<(&'_ mut (u32))> for closure}::call<'_0, '_1>(move (@3), move (@2))
+    return
+}
+
 // Full name: test_crate::gives_fn::{impl Fn<(&'_ mut (u32))> for closure}::{vtable}
 fn {impl Fn<(&'_ mut (u32))> for closure}::{vtable}() -> core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>
 {
     let ret@0: core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>; // return
 
-    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call: const (Opaque(closure exec call method)), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: const (Opaque(missing supertrait vtable)) }
+    ret@0 := core::ops::function::Fn::{vtable} { size: const (0 : usize), align: const (1 : usize), drop: const ({{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_, '_>), method_call: const ({vtable_method}<'_, '_>), super_trait_0: const (Opaque(missing supertrait vtable)), super_trait_1: const (Opaque(missing supertrait vtable)) }
     return
 }
 
