@@ -269,11 +269,9 @@ fn {{impl FnOnce<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_
 {
     let ret@0: (); // return
     let self@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnOnce<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::Output = bool)); // arg #1
-    let concrete@2: &'_0 mut (closure); // local
 
-    storage_live(concrete@2)
-    concrete@2 := concretize<&'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnOnce<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::Output = bool)), &'_0 mut (closure)>(move (self@1))
-    panic
+    ret@0 := ()
+    return
 }
 
 // Full name: test_crate::gives_fn::{impl FnOnce<(&'_ mut (u32))> for closure}::{vtable}
@@ -295,11 +293,9 @@ fn {{impl FnMut<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1
 {
     let ret@0: (); // return
     let self@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)); // arg #1
-    let concrete@2: &'_0 mut (closure); // local
 
-    storage_live(concrete@2)
-    concrete@2 := concretize<&'_0 mut ((dyn exists<_dyn> [@TraitClause0]: FnMut<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::Output = bool)), &'_0 mut (closure)>(move (self@1))
-    panic
+    ret@0 := ()
+    return
 }
 
 // Full name: test_crate::gives_fn::closure::{vtable_method}
@@ -341,11 +337,9 @@ fn {{impl Fn<(&'_ mut (u32))> for closure}}::{vtable}::{drop_method}<'_0, '_1>(@
 {
     let ret@0: (); // return
     let self@1: &'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)); // arg #1
-    let concrete@2: &'_0 mut (closure); // local
 
-    storage_live(concrete@2)
-    concrete@2 := concretize<&'_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, (&'_ mut (u32))> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = bool)), &'_0 mut (closure)>(move (self@1))
-    panic
+    ret@0 := ()
+    return
 }
 
 // Full name: test_crate::gives_fn::closure::{vtable_method}
