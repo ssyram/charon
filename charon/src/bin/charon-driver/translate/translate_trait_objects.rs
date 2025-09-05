@@ -697,8 +697,99 @@ impl ItemTransCtx<'_, '_> {
                     });
                     RawConstantExpr::Ref(global)
                 }
-                // TODO(dyn): builtin impls
-                _ => RawConstantExpr::Opaque("missing supertrait vtable".into()),
+                hax::ImplExprAtom::Builtin { .. } => {
+                    // Handle built-in implementations, including closures
+                    let tref = &impl_expr.r#trait;
+                    let hax_state = self.hax_state_with_id();
+                    let trait_def = self.hax_def(
+                        &tref.hax_skip_binder_ref().erase(&hax_state),
+                    )?;
+                    
+                    trace!("Processing builtin impl for trait {:?}, lang_item: {:?}", 
+                           trait_def.def_id(), trait_def.lang_item);
+                           
+                    let closure_kind =
+                        trait_def.lang_item.as_deref().and_then(|lang| {
+                            match lang {
+                                "fn_once" => Some(ClosureKind::FnOnce),
+                                "fn_mut" => Some(ClosureKind::FnMut),
+                                "fn" | "r#fn" => Some(ClosureKind::Fn),
+                                _ => None,
+                            }
+                        });
+
+                    // Check if this is a closure trait implementation
+                    if let Some(closure_kind) = closure_kind
+                        && let Some(hax::GenericArg::Type(closure_ty)) =
+                            impl_expr
+                                .r#trait
+                                .hax_skip_binder_ref()
+                                .generic_args
+                                .first()
+                        && let hax::TyKind::Closure(closure_args) =
+                            closure_ty.kind()
+                    {
+                        // Register the closure vtable instance
+                        let vtable_instance_ref: GlobalDeclRef = self.translate_item_no_enqueue(
+                            span,
+                            &closure_args.item,
+                            TransItemSourceKind::VTableInstance(
+                                TraitImplSource::Closure(closure_kind),
+                            ),
+                        )?;
+                        let global = Box::new(ConstantExpr {
+                            value: RawConstantExpr::Global(vtable_instance_ref),
+                            ty: fn_ptr_ty,
+                        });
+                        RawConstantExpr::Ref(global)
+                    } else if trait_def.lang_item.as_deref() == Some("meta_sized") {
+                        // For MetaSized marker trait, we need to create a reference to its vtable
+                        // Even though it's a marker trait, it can have a vtable for consistency
+                        trace!("Handling MetaSized builtin trait");
+                        
+                        // Try to use the trait reference to get the vtable struct reference
+                        if let Some(vtable_struct_ref) = self
+                            .translate_vtable_struct_ref(span, &impl_expr.r#trait.hax_skip_binder_ref())?
+                        {
+                            // For builtin marker traits, we need to create a minimal vtable instance
+                            // Since we don't have a concrete impl_ref, we'll need to handle this as a special case
+                            RawConstantExpr::Opaque("meta_sized vtable placeholder".into())
+                        } else {
+                            RawConstantExpr::Opaque("meta_sized trait not dyn compatible".into())
+                        }
+                    } else {
+                        // For other non-closure builtin impls, we might not need a vtable instance
+                        // since these are typically marker traits without methods
+                        trace!("Unhandled builtin impl for trait {:?}", trait_def.lang_item);
+                        RawConstantExpr::Opaque(format!("unknown builtin impl for trait {:?}", 
+                                                        trait_def.lang_item.as_deref().unwrap_or("no_lang_item")).into())
+                    }
+                }
+                hax::ImplExprAtom::LocalBound { .. } => {
+                    // No need to register anything here as there is no concrete impl
+                    // This results in that: the vtable instance in generic case might not exist
+                    // But this case should not happen in the monomorphized case
+                    if self.monomorphize() {
+                        raise_error!(
+                            self,
+                            span,
+                            "Unexpected `LocalBound` in monomorphized context"
+                        )
+                    } else {
+                        RawConstantExpr::Opaque("generic supertrait vtable".into())
+                    }
+                }
+                hax::ImplExprAtom::Dyn | hax::ImplExprAtom::Error(..) => {
+                    // No need to register anything for these cases
+                    RawConstantExpr::Opaque("dyn or error supertrait vtable".into())
+                }
+                hax::ImplExprAtom::SelfImpl { .. } => {
+                    raise_error!(
+                        self,
+                        span,
+                        "`SelfImpl` should not appear in vtable construction"
+                    )
+                }
             };
             mk_field(kind, next_ty());
         }
