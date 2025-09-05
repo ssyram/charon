@@ -232,6 +232,18 @@ impl ItemTransCtx<'_, '_> {
         else {
             return Ok(());
         };
+        // The `FnOnce::call_once` is not compatible with the dyn-compatibility as described in:
+        // https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
+        // But the Rustc offers a special backdoor for this and allows this method to be `vtable_safe`.
+        // The only way to call such a function seems to be with `Box<dyn FnOnce>`.
+        // The implementation of `Box<dyn FnOnce>::call_once` is a special case and should translate specially with some special magic.
+        // TODO(ssyram): in the future we may implement the function with type `fn call_once(self: Box<Self>, Args) -> Output`
+        //               This function is the vtable-specific version of the `call_once` method.
+        //               A very special case that the type signature differs from the original signature.
+        // Anyway, if we allow this to happen, there will be a severe breakage in that we can perform concretization on `dyn FnOnce`,
+        // This will make the life in backend tools, especially Eurydice much harder.
+        // Likewise, we skip translation of the `call_once` method below in the instance.
+        if trait_def.lang_item == Some("fn_once".into()) { return Ok(()); }
 
         let item_name = self.t_ctx.translate_trait_item_name(item_def_id)?;
         // It's ok to translate the method signature in the context of the trait because
@@ -507,7 +519,7 @@ impl ItemTransCtx<'_, '_> {
                         .erase(),
                 )
             }
-            _ => unreachable!(),
+            _ => panic!("Unknown type of impl full def: {:?}", def.kind()),
         };
         let vtable_struct_ref = self
             .translate_vtable_struct_ref(span, implemented_trait)?
@@ -697,8 +709,107 @@ impl ItemTransCtx<'_, '_> {
                     });
                     RawConstantExpr::Ref(global)
                 }
-                // TODO(dyn): builtin impls
-                _ => RawConstantExpr::Opaque("missing supertrait vtable".into()),
+                hax::ImplExprAtom::Builtin { trait_data, .. } => {
+                    // Handle built-in implementations, including closures
+                    let tref = &impl_expr.r#trait;
+                    let hax_state = self.hax_state_with_id();
+                    let trait_def = self.hax_def(
+                        &tref.hax_skip_binder_ref().erase(&hax_state),
+                    )?;
+                    
+                    trace!("Processing builtin impl for trait {:?}, lang_item: {:?}, trait_data: {:?}", 
+                           trait_def.def_id(), trait_def.lang_item, trait_data);
+                           
+                    let closure_kind =
+                        trait_def.lang_item.as_deref().and_then(|lang| {
+                            match lang {
+                                "fn_once" => Some(ClosureKind::FnOnce),
+                                "fn_mut" => Some(ClosureKind::FnMut),
+                                "fn" | "r#fn" => Some(ClosureKind::Fn),
+                                _ => None,
+                            }
+                        });
+
+                    // Check if this is a closure trait implementation
+                    if let Some(closure_kind) = closure_kind
+                        && let Some(hax::GenericArg::Type(closure_ty)) =
+                            impl_expr
+                                .r#trait
+                                .hax_skip_binder_ref()
+                                .generic_args
+                                .first()
+                        && let hax::TyKind::Closure(closure_args) =
+                            closure_ty.kind()
+                    {
+                        // Register the closure vtable instance
+                        let vtable_instance_ref: GlobalDeclRef = self.translate_item(
+                            span,
+                            &closure_args.item,
+                            TransItemSourceKind::VTableInstance(
+                                TraitImplSource::Closure(closure_kind),
+                            ),
+                        )?;
+                        let global = Box::new(ConstantExpr {
+                            value: RawConstantExpr::Global(vtable_instance_ref),
+                            ty: fn_ptr_ty,
+                        });
+                        RawConstantExpr::Ref(global)
+                    } else if self.translate_vtable_struct_ref(span, impl_expr.r#trait.hax_skip_binder_ref())?.is_some()
+                    {
+                        // For other builtin traits that are dyn-compatible, try to create a vtable instance
+                        trace!("Handling dyn-compatible builtin trait: {:?}", trait_def.lang_item);
+                        
+                        // TODO(ssyram): for now, we don't know how to translate other kinds of built-in traits, just take their names
+                        // The challenge is that we need an impl_ref, but builtin traits don't have concrete impls
+                        // Let's try using the trait reference itself as the impl reference
+                        // A simple case would be that they are all marker traits like `core::marker::MetaSized`
+                        let trait_ref = impl_expr.r#trait.hax_skip_binder_ref();
+                        let mut vtable_instance_ref: GlobalDeclRef = self.translate_item_no_enqueue(
+                            span,
+                            trait_ref,
+                            TransItemSourceKind::VTableInstance(
+                                TraitImplSource::Normal,  // Builtin traits are normal impls
+                            ),
+                        )?;
+                        // Remove the first `Self` argument
+                        vtable_instance_ref.generics.types.remove_and_shift_ids(TypeVarId::ZERO);
+                        let global = Box::new(ConstantExpr {
+                            value: RawConstantExpr::Global(vtable_instance_ref),
+                            ty: fn_ptr_ty,
+                        });
+                        RawConstantExpr::Ref(global)
+                    } else {
+                        // For non-dyn-compatible builtin traits, we don't need vtable instances
+                        trace!("Non-dyn-compatible builtin trait: {:?}", trait_def.lang_item);
+                        RawConstantExpr::Opaque(format!("non-dyn-compatible builtin trait {:?}", 
+                                                        trait_def.lang_item.as_deref().unwrap_or("unknown")).into())
+                    }
+                }
+                hax::ImplExprAtom::LocalBound { .. } => {
+                    // No need to register anything here as there is no concrete impl
+                    // This results in that: the vtable instance in generic case might not exist
+                    // But this case should not happen in the monomorphized case
+                    if self.monomorphize() {
+                        raise_error!(
+                            self,
+                            span,
+                            "Unexpected `LocalBound` in monomorphized context"
+                        )
+                    } else {
+                        RawConstantExpr::Opaque("generic supertrait vtable".into())
+                    }
+                }
+                hax::ImplExprAtom::Dyn | hax::ImplExprAtom::Error(..) => {
+                    // No need to register anything for these cases
+                    RawConstantExpr::Opaque("dyn or error supertrait vtable".into())
+                }
+                hax::ImplExprAtom::SelfImpl { .. } => {
+                    raise_error!(
+                        self,
+                        span,
+                        "`SelfImpl` should not appear in vtable construction"
+                    )
+                }
             };
             mk_field(kind, next_ty());
         }
@@ -920,20 +1031,22 @@ impl ItemTransCtx<'_, '_> {
             next_ty(),
         );
 
-        let call_method_ty = next_ty();
-        let dyn_self = self.compute_closure_dyn_self(span, &call_method_ty, &vtable_struct_ref)?;
+        // Add the closure method (call, call_mut)
+        // We do not translate `call_once` for the reason discussed above -- the function is not dyn-compatible
+        if closure_kind != ClosureKind::FnOnce {
+            let call_method_ty = next_ty();
+            let dyn_self = self.compute_closure_dyn_self(span, &call_method_ty, &vtable_struct_ref)?;
 
-        // Add the closure method (call, call_mut, or call_once)
-        // For now, use a placeholder - we'll improve this later
-        mk_field(self.generate_closure_method_shim_ref(
-                span,
-                impl_def,
-                &self_ty,
-                &dyn_self,
-                closure_kind,
-            )?,
-            call_method_ty,
-        );
+            mk_field(self.generate_closure_method_shim_ref(
+                    span,
+                    impl_def,
+                    &self_ty,
+                    &dyn_self,
+                    closure_kind,
+                )?,
+                call_method_ty,
+            );
+        }
 
         let trait_def = self.hax_def(&trait_impl.trait_pred.trait_ref)?;
         self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, next_ty, mk_field)?;
@@ -982,7 +1095,7 @@ impl ItemTransCtx<'_, '_> {
                     _ => unreachable!(),
                 }
             },
-            _ => unreachable!(),
+            _ => panic!("Unexpected call method type for closure: {}, Raw: {call_method_ty:?}", call_method_ty.with_ctx(&self.into_fmt())),
         };
         Ok(raw_dyn_self.substitute(&vtable_struct_ref.generics))
     }

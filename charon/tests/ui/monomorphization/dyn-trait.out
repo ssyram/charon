@@ -124,9 +124,46 @@ note: the error occurred when translating `core::marker::MetaSized::<type_error(
 7 |     x.to_string()
   |     -------------
 
-thread 'rustc' panicked at /Users/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10:
+thread 'rustc' panicked at /home/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10:
 index out of bounds: the len is 0 but the index is 0
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::panicking::panic_bounds_check
+   3: <usize as index_vec::indexing::IdxSliceIndex<I,T>>::index
+             at /home/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10
+   4: index_vec::indexing::<impl core::ops::index::Index<R> for index_vec::idxslice::IndexSlice<I,[T]>>::index
+             at /home/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:218:15
+   5: <charon_lib::ids::vector::Vector<I,T> as core::ops::index::Index<R>>::index
+             at ./src/ids/vector.rs:357:20
+   6: charon_driver::translate::translate_trait_objects::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::gen_vtable_instance_init_body
+             at ./src/bin/charon-driver/translate/translate_trait_objects.rs:857:47
+   7: charon_driver::translate::translate_trait_objects::<impl charon_driver::translate::translate_ctx::ItemTransCtx>::translate_vtable_instance_init
+             at ./src/bin/charon-driver/translate/translate_trait_objects.rs:1228:33
+   8: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item_aux
+             at ./src/bin/charon-driver/translate/translate_items.rs:166:28
+   9: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:54
+  10: std::panicking::catch_unwind::do_call
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:589:40
+  11: __rust_try
+  12: std::panicking::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:552:19
+  13: std::panic::catch_unwind
+             at /home/ssyram/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14
+  14: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item::{{closure}}
+             at ./src/bin/charon-driver/translate/translate_items.rs:37:17
+  15: charon_driver::translate::translate_ctx::TranslateCtx::with_def_id
+             at ./src/bin/charon-driver/translate/translate_ctx.rs:162:19
+  16: charon_driver::translate::translate_items::<impl charon_driver::translate::translate_ctx::TranslateCtx>::translate_item
+             at ./src/bin/charon-driver/translate/translate_items.rs:31:14
+  17: charon_driver::translate::translate_crate::translate
+             at ./src/bin/charon-driver/translate/translate_crate.rs:668:17
+  18: <charon_driver::driver::CharonCallbacks as rustc_driver_impl::Callbacks>::after_expansion
+             at ./src/bin/charon-driver/driver.rs:157:29
+  19: rustc_interface::passes::create_and_enter_global_ctxt::<core::option::Option<rustc_interface::queries::Linker>, rustc_driver_impl::run_compiler::{closure#0}::{closure#2}>::{closure#2}::{closure#0}
+  20: rustc_interface::interface::run_compiler::<(), rustc_driver_impl::run_compiler::{closure#0}>::{closure#1}
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
 error: Thread panicked when extracting item `alloc::string::{impl#23}`.
  --> /rustc/library/alloc/src/string.rs:2623:1
 
