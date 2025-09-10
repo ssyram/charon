@@ -133,8 +133,7 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
             unreachable!("Expected monomorphic item for dyn trait")
         };
         
-        eprintln!("DEBUG: Processing dyn trait item: {:?}", item_ref.def_id);
-        eprintln!("DEBUG: Item has synthetic params - attempting translation with substitution");
+        trace!("Processing dyn trait item: {:?}", item_ref.def_id);
         
         // Try to create a resolved version by substituting synthetic parameters
         let resolved_item_ref = self.resolve_synthetic_parameters(item_ref)?;
@@ -167,11 +166,11 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
     fn resolve_synthetic_parameters(&mut self, item_ref: &hax::ItemRef) -> Result<hax::ItemRef, Error> {
         let _span = self.def_span(&item_ref.def_id);
         
-        eprintln!("DEBUG: Resolving synthetic parameters for: {:?}", item_ref.def_id);
+        trace!("Resolving synthetic parameters for: {:?}", item_ref.def_id);
         
         // For now, we'll just return a clone since creating a new ItemRef is complex
         // In a complete implementation, we would extract concrete types from the call site context
-        eprintln!("DEBUG: Using original ItemRef (synthetic parameter resolution not fully implemented)");
+        trace!("Using original ItemRef (synthetic parameter resolution not fully implemented)");
         Ok(item_ref.clone())
     }
     
@@ -223,7 +222,7 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
             let reason = if has_synthetic_params { "synthetic params" } 
                         else if has_problematic_lifetimes { "bound lifetimes" }
                         else { "vtable" };
-            eprintln!("DEBUG: Found dyn trait/vtable ItemRef: {:?} (reason: {})", item_ref, reason);
+            trace!("Found dyn trait/vtable ItemRef: {:?} (reason: {})", item_ref, reason);
         }
         final_result
     }

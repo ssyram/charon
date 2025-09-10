@@ -1,238 +1,157 @@
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
-  --> tests/ui/monomorphization/dyn-trait.rs:12:27
-   |
-12 |     let _ = dyn_to_string(&str);
-   |                           ^^^^
+warning: variable does not need to be mutable
+   --> /home/runner/work/charon/charon/hax/frontend/exporter/src/types/ty.rs:541:13
+    |
+541 |         let mut assoc_type_assignments = Vec::new();
+    |             ----^^^^^^^^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
 
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> tests/ui/monomorphization/dyn-trait.rs:6:1
-  |
-6 | / fn dyn_to_string(x: &dyn Display) -> String {
-7 | |     x.to_string()
-8 | | }
-  | |_^
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> tests/ui/monomorphization/dyn-trait.rs:6:18
-  |
-6 | fn dyn_to_string(x: &dyn Display) -> String {
-  |                  ^
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2780:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2805:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/marker.rs:179:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
+warning: `hax-frontend-exporter` (lib) generated 1 warning (run `cargo fix --lib -p hax-frontend-exporter` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
+     Running `target/debug/charon rustc --monomorphize '--start-from=crate::main' -- tests/ui/monomorphization/dyn-trait.rs`
+warning: Unexpected error: could not find the type variable _dyn
  --> /rustc/library/core/src/fmt/mod.rs:1003:1
 
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
+warning: Unexpected error: could not find the type variable _dyn
  --> /rustc/library/core/src/fmt/mod.rs:1003:1
 
-note: the error occurred when translating `core::fmt::Display::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
+
+note: the error occurred when translating `core::fmt::Display::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
+ --> tests/ui/monomorphization/dyn-trait.rs:1:1
   |
-7 |     x.to_string()
+1 | //@ charon-args=--monomorphize
+  | -
+...
+6 |     x.to_string()
   |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+disabled backtrace
+warning[E9999]: Could not find a clause for `Binder { value: <_dyn as std::fmt::Display>, bound_vars: [] }` in the current context: `Unimplemented`
+    --> /home/runner/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:1028:5
+     |
+1028 |     fn fmt(&self, f: &mut Formatter<'_>) -> Result;
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: ⚠️ This is a bug in Hax's frontend.
+             Please report this error to https://github.com/hacspec/hax/issues with some context (e.g. the current crate)!
 
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
+warning: Unexpected error: could not find the type variable _dyn
  --> /rustc/library/core/src/fmt/mod.rs:1028:5
 
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
+warning: Unexpected error: could not find the type variable _dyn
  --> /rustc/library/core/src/fmt/mod.rs:1003:1
 
-note: the error occurred when translating `core::fmt::Display::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
+note: the error occurred when translating `core::fmt::Display::<(dyn exists<_dyn> [@TraitClause0]: core::fmt::Display::<type_error("Unexpected error: could not find the type variable _dyn")> + _dyn : '_)>`, which is (transitively) used at the following location(s):
+ --> tests/ui/monomorphization/dyn-trait.rs:6:5
   |
-7 |     x.to_string()
+6 |     x.to_string()
   |     -------------
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 498 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
 
-note: the error occurred when translating `core::fmt::Display::fmt::<Str>`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:11:23
-   |
-11 |     let str: String = "hello".to_string();
-   |                       -------------------
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 498 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
 
-note: the error occurred when translating `core::fmt::Display::fmt::<alloc::string::String>`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:12:27
-   |
-12 |     let _ = dyn_to_string(&str);
-   |                           ----
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
+note: the error occurred when translating `core::fmt::Display::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
+ --> tests/ui/monomorphization/dyn-trait.rs:6:5
+  |
+6 |     x.to_string()
+  |     -------------
+disabled backtrace
+warning: Unexpected error: could not find the type variable _dyn
  --> /rustc/library/core/src/fmt/mod.rs:1028:5
 
-note: the error occurred when translating `core::fmt::Display::fmt::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
+
+note: the error occurred when translating `core::fmt::Display::{vtable}::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
+  --> tests/ui/monomorphization/dyn-trait.rs:1:1
+   |
+ 1 |   //@ charon-args=--monomorphize
+   |   -
+...
+ 5 |   fn dyn_to_string(x: &dyn Display) -> String {
+   |  _-                -
+ 6 | |     x.to_string()
+   | |     -------------
+ 7 | | }
+   | |_-
+...
+11 |       let _ = dyn_to_string(&str);
+   |                             ----
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
+
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
+
+note: the error occurred when translating `core::fmt::Display::{vtable}::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
+  --> tests/ui/monomorphization/dyn-trait.rs:1:1
+   |
+ 1 |   //@ charon-args=--monomorphize
+   |   -
+...
+ 5 |   fn dyn_to_string(x: &dyn Display) -> String {
+   |  _-                -
+ 6 | |     x.to_string()
+   | |     -------------
+ 7 | | }
+   | |_-
+...
+11 |       let _ = dyn_to_string(&str);
+   |                             ----
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1003:1
+
+warning: Unexpected error: could not find the type variable _dyn
  --> /rustc/library/core/src/fmt/mod.rs:1028:5
 
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 498 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
-
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 598 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
-
-note: the error occurred when translating `core::fmt::{impl core::fmt::Display::<Str>}::fmt`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:11:23
-   |
-11 |     let str: String = "hello".to_string();
-   |                       -------------------
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 498 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
-
-note: the error occurred when translating `core::fmt::Display::fmt`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:11:23
-   |
-11 |     let str: String = "hello".to_string();
-   |                       -------------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/marker.rs:179:1
-
-note: the error occurred when translating `core::marker::MetaSized::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
+note: the error occurred when translating `core::fmt::Display::fmt::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
+ --> tests/ui/monomorphization/dyn-trait.rs:1:1
   |
-7 |     x.to_string()
+1 | //@ charon-args=--monomorphize
+  | -
+...
+6 |     x.to_string()
   |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/marker.rs:179:1
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1028:5
 
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/marker.rs:179:1
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1028:5
 
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/core/src/marker.rs:179:1
+note: the error occurred when translating `core::fmt::Display::fmt::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
+  --> tests/ui/monomorphization/dyn-trait.rs:1:1
+   |
+ 1 |   //@ charon-args=--monomorphize
+   |   -
+...
+ 5 |   fn dyn_to_string(x: &dyn Display) -> String {
+   |  _-                -
+ 6 | |     x.to_string()
+   | |     -------------
+ 7 | | }
+   | |_-
+...
+11 |       let _ = dyn_to_string(&str);
+   |                             ----
+warning: Unexpected error: could not find the type variable _dyn
+ --> /rustc/library/core/src/fmt/mod.rs:1028:5
 
-note: the error occurred when translating `core::marker::MetaSized::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-
-thread 'rustc' panicked at /Users/ssyram/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/index_vec-0.1.4/src/indexing.rs:128:10:
-index out of bounds: the len is 0 but the index is 0
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
-error: Thread panicked when extracting item `alloc::string::{impl#23}`.
+warning: Cannot generate vtable for trait implementation with unresolved type parameters (this is likely due to synthetic dyn trait parameters in monomorphization mode)
  --> /rustc/library/alloc/src/string.rs:2623:1
 
 note: the error occurred when translating `alloc::string::{impl core::fmt::Display::<alloc::string::String>}::{vtable}`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:12:27
+  --> tests/ui/monomorphization/dyn-trait.rs:11:27
    |
-12 |     let _ = dyn_to_string(&str);
+11 |     let _ = dyn_to_string(&str);
    |                           ----
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 729 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
+warning: Item `alloc::string::{impl#23}` caused errors; ignoring.
+ --> /rustc/library/alloc/src/string.rs:2623:1
 
-note: the error occurred when translating `alloc::string::{impl core::fmt::Display::<alloc::string::String>}::fmt`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:12:27
-   |
-12 |     let _ = dyn_to_string(&str);
-   |                           ----
-error: Item is not monomorphic: Mono(ItemRef { contents: Node { id: Id { id: 498 }, value: ItemRefContents { def_id: core::fmt::Formatter, generic_args: [Lifetime(Region { kind: ReBound(0, BoundRegion { var: 2, kind: Anon }) })], impl_exprs: [], in_trait: None, has_param: true } } })
- --> /rustc/library/core/src/fmt/mod.rs:562:1
+warning: 1 warning emitted
 
-note: the error occurred when translating `core::fmt::Display::fmt`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:12:27
-   |
-12 |     let _ = dyn_to_string(&str);
-   |                           ----
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2780:1
-
-note: the error occurred when translating `alloc::string::ToString::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2780:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2780:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2794:5
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2780:1
-
-note: the error occurred when translating `alloc::string::ToString::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2794:5
-
-note: the error occurred when translating `alloc::string::ToString::to_string`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2794:5
-
-note: the error occurred when translating `alloc::string::ToString::to_string::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2794:5
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2805:1
-
-note: the error occurred when translating `alloc::string::{impl#4}::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2805:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2805:1
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2807:5
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2805:1
-
-note: the error occurred when translating `alloc::string::{impl#7}::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2807:5
-
-note: the error occurred when translating `alloc::string::{impl alloc::string::ToString::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>}::to_string::<type_error("`dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2807:5
-
-error: `dyn Trait` is not yet supported with `--monomorphize`; use `--monomorphize-conservative` instead
- --> /rustc/library/alloc/src/string.rs:2794:5
-
-note: the error occurred when translating `alloc::string::ToString::to_string`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:7:5
-  |
-7 |     x.to_string()
-  |     -------------
-ERROR Charon failed to translate this code (42 errors)
+warning: The extraction generated 18 warnings
