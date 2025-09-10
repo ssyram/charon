@@ -1,0 +1,32 @@
+name: Ensure formatting
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  ocamlformat:
+    name: ocamlformat
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: DeterminateSystems/nix-installer-action@main
+    - name: Run OCaml formatter
+      run: |
+        nix shell ..#ocamlformat -c \
+          ocamlformat --check $(find . -name '*.ml')
+      working-directory: engine
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: DeterminateSystems/nix-installer-action@main
+    - name: Run Rust formatter
+      run: |
+        nix shell .#rustfmt -c \
+          rustfmt --edition 2021 --check $(find . -name '*.rs')
+

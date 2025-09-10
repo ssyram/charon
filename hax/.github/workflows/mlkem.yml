@@ -1,0 +1,58 @@
+name: Extract and TC ML-Kem
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  extract-mlkem:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group' }}
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - name: ⤵ Clone Libcrux repository
+        uses: actions/checkout@v4
+        with:
+          repository: cryspen/libcrux
+
+      - uses: actions/checkout@v4
+        with:
+          path: hax
+
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Set up Cachix
+        uses: cachix/cachix-action@v15
+        with:
+          name: fstar-nix-versions
+          push: false
+    
+      - name: ⤵ Install hax
+        run: |
+          nix profile install ./hax
+
+      - name: ⤵ Install FStar
+        run: nix profile install github:FStarLang/FStar/v2025.02.17
+
+      - name: ⤵ Clone HACL-star repository
+        uses: actions/checkout@v4
+        with:
+          repository: hacl-star/hacl-star
+          path: hacl-star
+      - name: 🏃 Extract ML-KEM crate
+        working-directory: libcrux-ml-kem
+        run: ./hax.py extract
+  
+      - name: 🏃 Lax ML-KEM crate
+        working-directory: libcrux-ml-kem
+        run: |
+          env FSTAR_HOME=${{ github.workspace }}/fstar \
+              HACL_HOME=${{ github.workspace }}/hacl-star \
+              HAX_HOME=${{ github.workspace }}/hax \
+              PATH="${PATH}:${{ github.workspace }}/fstar/bin" \
+              ./hax.py prove --admit
