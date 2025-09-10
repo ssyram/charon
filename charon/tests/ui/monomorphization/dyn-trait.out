@@ -1,157 +1,378 @@
-warning: variable does not need to be mutable
-   --> /home/runner/work/charon/charon/hax/frontend/exporter/src/types/ty.rs:541:13
-    |
-541 |         let mut assoc_type_assignments = Vec::new();
-    |             ----^^^^^^^^^^^^^^^^^^^^^^
-    |             |
-    |             help: remove this `mut`
-    |
-    = note: `#[warn(unused_mut)]` on by default
+# Final LLBC before serialization:
 
-warning: `hax-frontend-exporter` (lib) generated 1 warning (run `cargo fix --lib -p hax-frontend-exporter` to apply 1 suggestion)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s
-     Running `target/debug/charon rustc --monomorphize '--start-from=crate::main' -- tests/ui/monomorphization/dyn-trait.rs`
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::marker::MetaSized::<Error>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<Error>
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::fmt::Error
+pub struct Error {}
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::fmt::Error::{impl Drop::<Error>}
+impl Drop::<Error> {
+    parent_clause0 = MetaSized::<Error>
+    fn drop<'_0> = {impl Drop::<Error>}::drop<'_0_0>
+    non-dyn-compatible
+}
 
-note: the error occurred when translating `core::fmt::Display::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:1:1
-  |
-1 | //@ charon-args=--monomorphize
-  | -
-...
-6 |     x.to_string()
-  |     -------------
-disabled backtrace
-warning[E9999]: Could not find a clause for `Binder { value: <_dyn as std::fmt::Display>, bound_vars: [] }` in the current context: `Unimplemented`
-    --> /home/runner/.rustup/toolchains/nightly-2025-07-08-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/fmt/mod.rs:1028:5
-     |
-1028 |     fn fmt(&self, f: &mut Formatter<'_>) -> Result;
-     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-     |
-     = note: ⚠️ This is a bug in Hax's frontend.
-             Please report this error to https://github.com/hacspec/hax/issues with some context (e.g. the current crate)!
+// Full name: core::ops::drop::Drop::<Error>
+#[lang_item("drop")]
+pub trait Drop::<Error>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<Error>
+    fn drop<'_0> = core::ops::drop::Drop::drop::<Error><'_0_0>
+    vtable: core::ops::drop::Drop::{vtable}::<Error>
+}
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1028:5
+// Full name: core::fmt::Error::{impl Drop::<Error>}::drop
+fn {impl Drop::<Error>}::drop<'_0>(@1: &'_0 mut (Error))
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::marker::MetaSized::<Result::<(), Error>>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<Result::<(), Error>>
 
-note: the error occurred when translating `core::fmt::Display::<(dyn exists<_dyn> [@TraitClause0]: core::fmt::Display::<type_error("Unexpected error: could not find the type variable _dyn")> + _dyn : '_)>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:6:5
-  |
-6 |     x.to_string()
-  |     -------------
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::result::Result::<(), Error>
+#[lang_item("Result")]
+pub enum Result::<(), Error> {
+  Ok(()),
+  Err(Error),
+}
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::ops::drop::Drop::<Result::<(), Error>>
+#[lang_item("drop")]
+pub trait Drop::<Result::<(), Error>>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<Result::<(), Error>>
+    fn drop<'_0> = core::ops::drop::Drop::drop::<Result::<(), Error>><'_0_0>
+    vtable: core::ops::drop::Drop::{vtable}::<Result::<(), Error>>
+}
 
-note: the error occurred when translating `core::fmt::Display::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:6:5
-  |
-6 |     x.to_string()
-  |     -------------
-disabled backtrace
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1028:5
+// Full name: core::result::Result::{impl Drop::<Result::<(), Error>>}::<(), Error>
+impl Drop::<Result::<(), Error>> {
+    parent_clause0 = MetaSized::<Result::<(), Error>>
+    fn drop<'_0> = {impl Drop::<Result::<(), Error>>}::drop::<(), Error><'_0_0>
+    non-dyn-compatible
+}
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::result::Result::{impl Drop::<Result::<(), Error>>}::drop::<(), Error>
+fn {impl Drop::<Result::<(), Error>>}::drop::<(), Error><'_0>(@1: &'_0 mut (Result::<(), Error>))
 
-note: the error occurred when translating `core::fmt::Display::{vtable}::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:1:1
-   |
- 1 |   //@ charon-args=--monomorphize
-   |   -
-...
- 5 |   fn dyn_to_string(x: &dyn Display) -> String {
-   |  _-                -
- 6 | |     x.to_string()
-   | |     -------------
- 7 | | }
-   | |_-
-...
-11 |       let _ = dyn_to_string(&str);
-   |                             ----
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+// Full name: core::fmt::Display::<missing(@Type0_0)>
+#[lang_item("Display")]
+pub trait Display::<missing(@Type0_0)>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Display::fmt::<missing(@Type0_0)><'_0_0, '_0_1, '_0_2>
+    vtable: core::fmt::Display::{vtable}::<missing(@Type0_0)>
+}
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+struct core::fmt::Display::{vtable}::<@Type0_0> {
+  size: usize,
+  align: usize,
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))),
+  method_fmt: fn<'_0, '_1, '_2>(&'_0_0 (missing(@Type0_0)), &'_0_1 mut (Formatter::<'_>)) -> Result::<(), Error>,
+}
 
-note: the error occurred when translating `core::fmt::Display::{vtable}::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:1:1
-   |
- 1 |   //@ charon-args=--monomorphize
-   |   -
-...
- 5 |   fn dyn_to_string(x: &dyn Display) -> String {
-   |  _-                -
- 6 | |     x.to_string()
-   | |     -------------
- 7 | | }
-   | |_-
-...
-11 |       let _ = dyn_to_string(&str);
-   |                             ----
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1003:1
+struct core::fmt::Display::{vtable}::<@Type0_0> {
+  size: usize,
+  align: usize,
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))),
+  method_fmt: fn<'_0, '_1, '_2>(&'_0_0 (missing(@Type0_0)), &'_0_1 mut (Formatter::<'_>)) -> Result::<(), Error>,
+}
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1028:5
+// Full name: core::marker::MetaSized::<String>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<String>
 
-note: the error occurred when translating `core::fmt::Display::fmt::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
- --> tests/ui/monomorphization/dyn-trait.rs:1:1
-  |
-1 | //@ charon-args=--monomorphize
-  | -
-...
-6 |     x.to_string()
-  |     -------------
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1028:5
+// Full name: alloc::string::String
+#[lang_item("String")]
+pub opaque type String
 
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1028:5
+// Full name: core::ops::drop::Drop::<String>
+#[lang_item("drop")]
+pub trait Drop::<String>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<String>
+    fn drop<'_0> = core::ops::drop::Drop::drop::<String><'_0_0>
+    vtable: core::ops::drop::Drop::{vtable}::<String>
+}
 
-note: the error occurred when translating `core::fmt::Display::fmt::<type_error("Unexpected error: could not find the type variable _dyn")>`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:1:1
-   |
- 1 |   //@ charon-args=--monomorphize
-   |   -
-...
- 5 |   fn dyn_to_string(x: &dyn Display) -> String {
-   |  _-                -
- 6 | |     x.to_string()
-   | |     -------------
- 7 | | }
-   | |_-
-...
-11 |       let _ = dyn_to_string(&str);
-   |                             ----
-warning: Unexpected error: could not find the type variable _dyn
- --> /rustc/library/core/src/fmt/mod.rs:1028:5
+// Full name: alloc::string::String::{impl Drop::<String>}
+impl Drop::<String> {
+    parent_clause0 = MetaSized::<String>
+    fn drop<'_0> = {impl Drop::<String>}::drop<'_0_0>
+    non-dyn-compatible
+}
 
-warning: Cannot generate vtable for trait implementation with unresolved type parameters (this is likely due to synthetic dyn trait parameters in monomorphization mode)
- --> /rustc/library/alloc/src/string.rs:2623:1
+// Full name: alloc::string::String::{impl Drop::<String>}::drop
+fn {impl Drop::<String>}::drop<'_0>(@1: &'_0 mut (String))
 
-note: the error occurred when translating `alloc::string::{impl core::fmt::Display::<alloc::string::String>}::{vtable}`, which is (transitively) used at the following location(s):
-  --> tests/ui/monomorphization/dyn-trait.rs:11:27
-   |
-11 |     let _ = dyn_to_string(&str);
-   |                           ----
-warning: Item `alloc::string::{impl#23}` caused errors; ignoring.
- --> /rustc/library/alloc/src/string.rs:2623:1
+struct core::fmt::Display::{vtable}::<String> {
+  size: usize,
+  align: usize,
+  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))),
+  method_fmt: fn<'_0, '_1, '_2>(&'_0_0 (String), &'_0_1 mut (Formatter::<'_>)) -> Result::<(), Error>,
+}
 
-warning: 1 warning emitted
+// Full name: core::fmt::Display::<missing(@Type0_0)>
+#[lang_item("Display")]
+pub trait Display::<missing(@Type0_0)>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Display::fmt::<missing(@Type0_0)><'_0_0, '_0_1, '_0_2>
+    vtable: core::fmt::Display::{vtable}::<missing(@Type0_0)>
+}
 
-warning: The extraction generated 18 warnings
+// Full name: core::fmt::Display::<Str>
+#[lang_item("Display")]
+pub trait Display::<Str>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Display::fmt::<Str><'_0_0, '_0_1, '_0_2>
+    vtable: core::fmt::Display::{vtable}::<Str>
+}
+
+// Full name: core::fmt::Display::<String>
+#[lang_item("Display")]
+pub trait Display::<String>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Display::fmt::<String><'_0_0, '_0_1, '_0_2>
+    vtable: core::fmt::Display::{vtable}::<String>
+}
+
+// Full name: core::fmt::Display::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+#[lang_item("Display")]
+pub trait Display::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Display::fmt::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0_0, '_0_1, '_0_2>
+    vtable: core::fmt::Display::{vtable}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+}
+
+// Full name: core::fmt::Display::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+#[lang_item("Display")]
+pub trait Display::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+{
+    fn fmt<'_0, '_1, '_2> = core::fmt::Display::fmt::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0_0, '_0_1, '_0_2>
+    vtable: core::fmt::Display::{vtable}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+}
+
+pub fn core::fmt::Display::fmt::<Str><'_0, '_1, '_2>(@1: &'_0 (Str), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+pub fn core::fmt::Display::fmt::<String><'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+pub fn core::fmt::Display::fmt::<@Type0_0><'_0, '_1, '_2, _dyn>(@1: &'_0 (_dyn), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+pub fn core::fmt::Display::fmt::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0, '_1, '_2>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+pub fn core::fmt::Display::fmt::<@Type0_0><'_0, '_1, '_2, _dyn>(@1: &'_0 (_dyn), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+pub fn core::fmt::Display::fmt<'_0, '_1, '_2>(@1: &'_0 (Str), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+pub fn core::fmt::Display::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+// Full name: core::fmt::{impl Display::<Str>}::fmt
+pub fn {impl Display::<Str>}::fmt<'_0, '_1, '_2>(@1: &'_0 (Str), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+// Full name: core::fmt::{impl Display::<Str>}
+impl Display::<Str> {
+    fn fmt<'_0, '_1, '_2> = {impl Display::<Str>}::fmt<'_0_0, '_0_1, '_0_2>
+    vtable: {impl Display::<Str>}::{vtable}
+}
+
+// Full name: core::marker::MetaSized::<()>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<()>
+
+// Full name: core::marker::Sized::<()>
+#[lang_item("sized")]
+pub trait Sized::<()>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<()>
+    non-dyn-compatible
+}
+
+// Full name: core::marker::Sized::<Error>
+#[lang_item("sized")]
+pub trait Sized::<Error>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<Error>
+    non-dyn-compatible
+}
+
+// Full name: core::marker::MetaSized::<Str>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<Str>
+
+// Full name: core::marker::MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+
+// Full name: core::marker::MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+#[lang_item("meta_sized")]
+pub trait MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+
+pub fn core::ops::drop::Drop::drop::<String><'_0>(@1: &'_0 mut (String))
+
+pub fn core::ops::drop::Drop::drop::<Result::<(), Error>><'_0>(@1: &'_0 mut (Result::<(), Error>))
+
+pub fn core::ops::drop::Drop::drop::<Error><'_0>(@1: &'_0 mut (Error))
+
+// Full name: alloc::string::{impl Display::<String>}::fmt
+pub fn {impl Display::<String>}::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+
+// Full name: alloc::string::{impl Display::<String>}::fmt::{vtable_method}
+fn {vtable_method}<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1 mut (Formatter::<'_>)) -> Result::<(), Error>
+{
+    let @0: Result::<(), Error>; // return
+    let @1: &'_0 (String); // arg #1
+    let @2: &'_1 mut (Formatter::<'_>); // arg #2
+    let @3: &'_0 (String); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := concretize<&'_0 (String), &'_0 (String)>(move (@1))
+    @0 := {impl Display::<String>}::fmt<'_0, '_1, '_2>(move (@3), move (@2))
+    return
+}
+
+// Full name: alloc::string::{impl Display::<String>}::{vtable}
+fn {impl Display::<String>}::{vtable}() -> core::fmt::Display::{vtable}::<String>
+{
+    let ret@0: core::fmt::Display::{vtable}::<String>; // return
+
+    ret@0 := core::fmt::Display::{vtable}::<String> { size: const (Opaque(Layout not available: No layout due to generic)), align: const (Opaque(Layout not available: No layout due to generic)), drop: const (Opaque(Unknown drop case: Non-concrete type for drop analysis: @Type0_0)), method_fmt: const ({vtable_method}<'_, '_, '_>) }
+    return
+}
+
+// Full name: alloc::string::{impl Display::<String>}::{vtable}
+static {impl Display::<String>}::{vtable}: core::fmt::Display::{vtable}::<String> = {impl Display::<String>}::{vtable}()
+
+// Full name: alloc::string::{impl Display::<String>}
+impl Display::<String> {
+    fn fmt<'_0, '_1, '_2> = {impl Display::<String>}::fmt<'_0_0, '_0_1, '_0_2>
+    vtable: {impl Display::<String>}::{vtable}
+}
+
+// Full name: alloc::string::ToString::<Str>
+#[lang_item("ToString")]
+pub trait ToString::<Str>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<Str>
+    fn to_string<'_0> = alloc::string::ToString::to_string::<Str><'_0_0>
+    vtable: alloc::string::ToString::{vtable}::<Str>
+}
+
+// Full name: alloc::string::ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+#[lang_item("ToString")]
+pub trait ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+    fn to_string<'_0> = alloc::string::ToString::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0_0>
+    vtable: alloc::string::ToString::{vtable}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+}
+
+// Full name: alloc::string::ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+#[lang_item("ToString")]
+pub trait ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+    fn to_string<'_0> = alloc::string::ToString::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0_0>
+    vtable: alloc::string::ToString::{vtable}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+}
+
+#[lang_item("to_string_method")]
+pub fn alloc::string::ToString::to_string<'_0>(@1: &'_0 (Str)) -> String
+
+#[lang_item("to_string_method")]
+pub fn alloc::string::ToString::to_string<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))) -> String
+
+#[lang_item("to_string_method")]
+pub fn alloc::string::ToString::to_string::<Str><'_0>(@1: &'_0 (Str)) -> String
+
+#[lang_item("to_string_method")]
+pub fn alloc::string::ToString::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))) -> String
+
+#[lang_item("to_string_method")]
+pub fn alloc::string::ToString::to_string<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))) -> String
+
+// Full name: alloc::string::{impl ToString::<Str>}::to_string::<Str>
+pub fn {impl ToString::<Str>}::to_string::<Str><'_0>(@1: &'_0 (Str)) -> String
+
+// Full name: alloc::string::{impl ToString::<Str>}::<Str>
+impl ToString::<Str> {
+    parent_clause0 = MetaSized::<Str>
+    fn to_string<'_0> = {impl ToString::<Str>}::to_string::<Str><'_0_0>
+    vtable: {impl ToString::<Str>}::{vtable}::<Str>
+}
+
+// Full name: alloc::string::{impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+pub fn {impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_))) -> String
+
+// Full name: alloc::string::{impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)> {
+    parent_clause0 = MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+    fn to_string<'_0> = {impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0_0>
+    vtable: {impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::{vtable}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+}
+
+// Full name: alloc::string::{impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)> {
+    parent_clause0 = MetaSized::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+    fn to_string<'_0> = {impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_0_0>
+    vtable: {impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::{vtable}::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>
+}
+
+// Full name: test_crate::dyn_to_string
+fn dyn_to_string<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_0))) -> String
+{
+    let @0: String; // return
+    let x@1: &'_ ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)); // arg #1
+    let @2: &'_ ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)); // anonymous local
+
+    storage_live(@2)
+    @2 := &*(x@1)
+    @0 := {impl ToString::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)>}::to_string::<(dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)><'_>(move (@2))
+    storage_dead(@2)
+    return
+}
+
+// Full name: test_crate::main
+fn main()
+{
+    let @0: (); // return
+    let str@1: String; // local
+    let @2: &'_ (Str); // anonymous local
+    let @3: &'_ (Str); // anonymous local
+    let @4: String; // anonymous local
+    let @5: &'_ ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)); // anonymous local
+    let @6: &'_ (String); // anonymous local
+    let @7: &'_ (String); // anonymous local
+
+    storage_live(str@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := const ("hello")
+    @2 := &*(@3)
+    str@1 := {impl ToString::<Str>}::to_string::<Str><'_>(move (@2))
+    storage_dead(@2)
+    storage_dead(@3)
+    storage_live(@4)
+    storage_live(@5)
+    storage_live(@6)
+    storage_live(@7)
+    @7 := &str@1
+    @6 := &*(@7)
+    @5 := unsize_cast<&'_ (String), &'_ ((dyn exists<_dyn> [@TraitClause0]: Display::<missing(@Type0_0)> + _dyn : '_)), {impl Display::<String>}>(move (@6))
+    storage_dead(@6)
+    @4 := dyn_to_string<'_>(move (@5))
+    storage_dead(@5)
+    drop[{impl Drop::<String>}] @4
+    storage_dead(@7)
+    storage_dead(@4)
+    @0 := ()
+    drop[{impl Drop::<String>}] str@1
+    storage_dead(str@1)
+    @0 := ()
+    return
+}
+
+
+

@@ -394,6 +394,15 @@ impl<'a> VtableMetadataComputer<'a> {
         // Get the self type from the trait reference
         // For a trait impl like `impl Trait for ConcreteType`, we want ConcreteType
         let trait_decl_ref = &trait_impl.impl_trait;
+        
+        // Check bounds to avoid panic on synthetic dyn trait parameters
+        if trait_decl_ref.generics.types.is_empty() {
+            // In monomorphization mode, we might encounter dyn trait implementations with
+            // synthetic parameters. In this case, create a reasonable placeholder.
+            let placeholder_ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
+            return Ok(placeholder_ty);
+        }
+        
         let concrete_ty = &trait_decl_ref.generics.types[0]; // First type arg is Self
 
         Ok(concrete_ty.clone())

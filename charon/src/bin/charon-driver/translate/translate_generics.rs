@@ -226,10 +226,24 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         span: Span,
         param: &hax::ParamTy,
     ) -> Result<TypeDbVar, Error> {
+        // Special handling for synthetic dyn trait parameters in monomorphization mode
+        if param.name == "_dyn" && self.monomorphize() {
+            // This is a synthetic parameter created by hax for dyn traits
+            // In monomorphization mode, we create a proper type variable for it
+            let type_var_id = self.innermost_binder_mut().push_type_var(param.index, param.name.clone());
+            return Ok(DeBruijnVar::new_at_zero(type_var_id));
+        }
+        
         self.lookup_param(
             span,
             |bl| bl.type_vars_map.get(&param.index).copied(),
-            || format!("the type variable {}", param.name),
+            || {
+                if param.name == "_dyn" {
+                    format!("the synthetic dyn trait type variable {}", param.name)
+                } else {
+                    format!("the type variable {}", param.name)
+                }
+            },
         )
     }
 

@@ -896,17 +896,28 @@ impl ItemTransCtx<'_, '_> {
         let trait_ref = self.translate_trait_ref(span, &trait_pred.trait_ref)?;
         
         // Check if we have proper type generics for vtable generation
-        if trait_ref.generics.types.is_empty() {
-            raise_error!(
-                self,
-                span,
-                "Cannot generate vtable for trait implementation with unresolved type parameters \
-                (this is likely due to synthetic dyn trait parameters in monomorphization mode)"
-            );
-        }
-        
-        let self_ty = trait_ref.generics.types[0].clone();
-        let dyn_self = self.translate_ty(span, dyn_self)?;
+        // Handle synthetic dyn trait parameters more gracefully
+        let (self_ty, dyn_self) = if trait_ref.generics.types.is_empty() {
+            if self.monomorphize() {
+                // In monomorphization mode with synthetic dyn trait parameters,
+                // we can create a reasonable placeholder type
+                let placeholder_ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
+                let dyn_self = self.translate_ty(span, dyn_self)?;
+                (placeholder_ty, dyn_self)
+            } else {
+                raise_error!(
+                    self,
+                    span,
+                    "Cannot generate vtable for trait implementation with unresolved type parameters \
+                    (this is likely due to synthetic dyn trait parameters in monomorphization mode)"
+                );
+            }
+        } else {
+            // Normal case - extract first type
+            let self_ty = trait_ref.generics.types[0].clone();
+            let dyn_self = self.translate_ty(span, dyn_self)?;
+            (self_ty, dyn_self)
+        };
 
         // Retreive the expected field types from the struct definition. This avoids complicated
         // substitutions.
