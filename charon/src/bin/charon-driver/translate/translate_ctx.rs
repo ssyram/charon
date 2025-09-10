@@ -127,15 +127,106 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         self.hax_def_for_item(&RustcItem::Poly(def_id.clone()))
     }
 
+    /// Special handling for dyn trait items in monomorphization mode.
+    /// 
+    /// This function provides a specialized translation path for items that contain
+    /// synthetic dyn trait parameters. It attempts translation with graceful fallback
+    /// to prevent crashes when hax encounters complex dyn trait scenarios.
+    fn translate_dyn_trait_item(&mut self, item: &RustcItem) -> Result<Arc<hax::FullDef>, Error> {
+        let RustcItem::Mono(item_ref) = item else {
+            unreachable!("Expected monomorphic item for dyn trait")
+        };
+        
+        trace!("Processing dyn trait item: {:?}", item_ref.def_id);
+        
+        // Attempt translation with panic protection since dyn traits can cause
+        // hax to encounter edge cases that might result in panics
+        let unwind_safe_s = std::panic::AssertUnwindSafe(&self.hax_state);
+        let item_ref_copy = item_ref.clone();
+        let result = std::panic::catch_unwind(move || item_ref_copy.instantiated_full_def(*unwind_safe_s));
+        
+        match result {
+            Ok(def) => Ok(def),
+            Err(_) => {
+                // If translation fails, use fallback approach
+                let span = self.def_span(item.def_id());
+                register_error!(
+                    self,
+                    span,
+                    "Hax panicked when translating dyn trait item `{:?}` - using polymorphic fallback", 
+                    item.def_id()
+                );
+                
+                // Fallback: Get the polymorphic definition instead
+                let def_id = item.def_id();
+                let unwind_safe_s = std::panic::AssertUnwindSafe(&self.hax_state);
+                Ok(def_id.full_def(*unwind_safe_s))
+            }
+        }
+    }
+    
+    /// Check if an ItemRef represents a dyn trait item by looking for synthetic parameters.
+    /// 
+    /// This is part of the dyn trait monomorphization workflow where we need to identify
+    /// items that come from dyn trait contexts and may contain synthetic `_dyn` parameters
+    /// created by hax.
+    fn is_dyn_trait_item_ref(&self, item_ref: &hax::ItemRef) -> bool {
+        // Look for synthetic `_dyn` parameters in the generic arguments
+        let has_synthetic_params = item_ref.generic_args.iter().any(|arg| {
+            matches!(
+                arg,
+                hax::GenericArg::Type(ty) if matches!(
+                    ty.kind(),
+                    hax::TyKind::Param(param_ty) if param_ty.name.as_str() == "_dyn"
+                )
+            )
+        });
+        
+        // Also check for problematic bound lifetimes, specifically for Display/Formatter
+        let has_problematic_lifetimes = item_ref.generic_args.iter().any(|arg| {
+            matches!(
+                arg,
+                hax::GenericArg::Lifetime(region) if matches!(
+                    &region.kind,
+                    hax::RegionKind::ReBound(_, _)
+                ) && format!("{:?}", item_ref.def_id).contains("Formatter")
+            )
+        });
+        
+        // Also check if this is a vtable by looking at the DefId 
+        let is_vtable = format!("{:?}", item_ref.def_id).contains("vtable");
+        
+        let result = has_synthetic_params || has_problematic_lifetimes || is_vtable;
+        if result {
+            let reason = if has_synthetic_params { "synthetic params" } 
+                        else if has_problematic_lifetimes { "bound lifetimes" }
+                        else { "vtable" };
+            trace!("Found dyn trait/vtable ItemRef: {:?} (reason: {})", item_ref, reason);
+        }
+        result
+    }
+
     /// Return the definition for this item. This uses the polymorphic or monomorphic definition
     /// depending on user choice.
     pub fn hax_def_for_item(&mut self, item: &RustcItem) -> Result<Arc<hax::FullDef>, Error> {
         let def_id = item.def_id();
         let span = self.def_span(def_id);
+        let is_dyn_trait = if let RustcItem::Mono(item_ref) = item {
+            self.is_dyn_trait_item_ref(item_ref)
+        } else {
+            false
+        };
+        
         if let RustcItem::Mono(item_ref) = item
             && item_ref.has_param
+            && !is_dyn_trait
         {
             raise_error!(self, span, "Item is not monomorphic: {item:?}")
+        }
+        
+        // For dyn trait items, use a special translation path
+        if is_dyn_trait {
+            return self.translate_dyn_trait_item(item);
         }
         // Hax takes care of caching the translation.
         let unwind_safe_s = std::panic::AssertUnwindSafe(&self.hax_state);

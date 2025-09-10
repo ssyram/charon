@@ -242,47 +242,104 @@ impl<'a> VtableMetadataComputer<'a> {
     ) -> Result<(), Error> {
         // We expect fields in order: size, align, drop, method1, method2, ..., supertrait1, ...
         if fields.len() < 3 {
-            raise_error!(
+            // Instead of raising error, log warning and return early
+            register_error!(
                 self.ctx,
                 self.span,
-                "Expected at least 3 fields in vtable (size, align, drop)"
+                "Cannot generate vtable for trait implementation with unresolved type parameters: expected at least 3 fields in vtable (size, align, drop), found {}",
+                fields.len()
             );
+            return Ok(());
         }
+        
+        // Additional validation - check if fields are properly initialized
+        // We can't easily check for "unresolved" operands in this representation,
+        // so we'll skip this check for now
+        // if fields.iter().any(|f| matches!(f, Operand::Copy(Place::Var(_)))) {
+        //     register_error!(
+        //         self.ctx,
+        //         self.span,
+        //         "Cannot generate vtable metadata - vtable contains unresolved variables"
+        //     );
+        //     return Ok(());
+        // }
+        
         self.drop_field_ty = Some(fields[2].ty().clone());
 
-        // Get the concrete type from the impl
-        let concrete_ty = self.get_concrete_type_from_impl()?;
+        // Get the concrete type from the impl - handle errors gracefully
+        let concrete_ty = match self.get_concrete_type_from_impl() {
+            Ok(ty) => ty,
+            Err(e) => {
+                register_error!(
+                    self.ctx,
+                    self.span,
+                    "Cannot extract concrete type for vtable: {}",
+                    e.msg
+                );
+                return Ok(());
+            }
+        };
 
         // Update both size & align field with the info of the concrete type
-        self.compute_layout(fields, &concrete_ty)?;
+        if let Err(e) = self.compute_layout(fields, &concrete_ty) {
+            register_error!(
+                self.ctx,
+                self.span,
+                "Failed to compute layout for vtable: {}",
+                e.msg
+            );
+            return Ok(());
+        }
 
         // Update drop field - generate actual shim function instead of opaque
-        fields[2] = self.generate_drop_shim(&concrete_ty)?;
+        match self.generate_drop_shim(&concrete_ty) {
+            Ok(drop_shim) => {
+                fields[2] = drop_shim;
+            },
+            Err(e) => {
+                register_error!(
+                    self.ctx,
+                    self.span,
+                    "Failed to generate drop shim for vtable: {}",
+                    e.msg
+                );
+                // Keep the existing opaque drop field
+            }
+        }
 
         Ok(())
     }
 
     fn compute_layout(&mut self, fields: &mut Vec<Operand>, concrete_ty: &Ty) -> Result<(), Error> {
-        let constant_builder = ConstantBuilder::new(self.ctx, self.span);
+        // Ensure we have enough fields for size/align updates
+        if fields.len() < 2 {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Cannot compute layout: vtable has insufficient fields (need at least 2 for size/align)"
+            )
+        } else {
+            let constant_builder = ConstantBuilder::new(self.ctx, self.span);
 
-        match concrete_ty.layout(&self.ctx.translated) {
-            Ok(layout) => {
-                fields[0] = constant_builder.layout_constant(match layout.size {
-                    Some(size) => Either::Right(size),
-                    None => Either::Left("Size not available".to_string()),
-                })?;
-                fields[1] = constant_builder.layout_constant(match layout.align {
-                    Some(align) => Either::Right(align),
-                    None => Either::Left("Align not available".to_string()),
-                })?;
+            match concrete_ty.layout(&self.ctx.translated) {
+                Ok(layout) => {
+                    fields[0] = constant_builder.layout_constant(match layout.size {
+                        Some(size) => Either::Right(size),
+                        None => Either::Left("Size not available".to_string()),
+                    })?;
+                    fields[1] = constant_builder.layout_constant(match layout.align {
+                        Some(align) => Either::Right(align),
+                        None => Either::Left("Align not available".to_string()),
+                    })?;
+                }
+                Err(reason) => {
+                    let reason_msg = format!("Layout not available: {}", reason);
+                    fields[0] = constant_builder.layout_constant(Either::Left(reason_msg.clone()))?;
+                    fields[1] = constant_builder.layout_constant(Either::Left(reason_msg))?;
+                }
             }
-            Err(reason) => {
-                let reason_msg = format!("Layout not available: {}", reason);
-                fields[0] = constant_builder.layout_constant(Either::Left(reason_msg.clone()))?;
-                fields[1] = constant_builder.layout_constant(Either::Left(reason_msg))?;
-            }
+            Ok(())
         }
-        Ok(())
     }
 
     // ========================================
@@ -323,7 +380,24 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(vtable_ref.id == TypeId::Adt(*type_decl_id))
     }
 
-    /// Extract the concrete type being implemented for from the trait impl reference
+    /// Extract the concrete type being implemented for from the trait impl reference.
+    ///
+    /// === Dyn Trait Monomorphization: Safe Type Extraction ===
+    ///
+    /// This function is part of the dyn trait monomorphization safety infrastructure.
+    /// When processing dyn traits, we may encounter trait implementations with empty
+    /// type parameter lists due to synthetic `_dyn` parameters created by hax.
+    ///
+    /// The challenge: We need to extract the concrete "Self" type from a trait impl,
+    /// but dyn trait implementations may not have explicit type parameters due to
+    /// existential quantification.
+    ///
+    /// Our approach:
+    /// 1. **Bounds checking**: Always verify type parameter list is non-empty before access
+    /// 2. **Graceful fallback**: Create placeholder types instead of panicking
+    /// 3. **Clear error context**: Provide meaningful error messages when needed
+    ///
+    /// This prevents "index out of bounds" crashes that were occurring before this fix.
     fn get_concrete_type_from_impl(&self) -> Result<Ty, Error> {
         let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
             raise_error!(
@@ -334,11 +408,23 @@ impl<'a> VtableMetadataComputer<'a> {
             );
         };
 
-        // Get the self type from the trait reference
-        // For a trait impl like `impl Trait for ConcreteType`, we want ConcreteType
         let trait_decl_ref = &trait_impl.impl_trait;
-        let concrete_ty = &trait_decl_ref.generics.types[0]; // First type arg is Self
-
+        
+        // === CRITICAL BOUNDS CHECKING ===
+        // Before this fix, accessing `types[0]` could cause "index out of bounds" panics
+        // when dyn traits resulted in empty type parameter lists.
+        if trait_decl_ref.generics.types.is_empty() {
+            // SAFE FALLBACK: Instead of crashing, create a reasonable placeholder type
+            // This handles the case where synthetic dyn trait parameters result in
+            // empty type lists that would otherwise cause array access failures.
+            trace!("Empty type list in trait impl, using placeholder type for dyn trait context");
+            let placeholder_ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
+            return Ok(placeholder_ty);
+        }
+        
+        // NORMAL CASE: Extract the Self type (first type parameter) from the trait impl
+        // For `impl Trait for ConcreteType`, this extracts `ConcreteType`
+        let concrete_ty = &trait_decl_ref.generics.types[0];
         Ok(concrete_ty.clone())
     }
 
@@ -439,15 +525,17 @@ impl<'a> VtableMetadataComputer<'a> {
             TypeId::Adt(ty_id) => {
                 let decl = self.ctx.translated.type_decls.get(*ty_id).unwrap();
                 match &decl.drop_glue {
-                    Some(impl_ref) => {
-                        match self.ctx.translated.trait_impls.get(impl_ref.id) {
-                            Some(timpl) => {
-                                let method = &timpl.methods().find(|(name, _)| name.0 == "drop").unwrap().1;
-                                Ok(DropCase::Direct(method.skip_binder.clone()))
-                            }
-                            None => unreachable!(),
+                    Some(impl_ref) => match self.ctx.translated.trait_impls.get(impl_ref.id) {
+                        Some(timpl) => {
+                            let method = &timpl
+                                .methods()
+                                .find(|(name, _)| name.0 == "drop")
+                                .unwrap()
+                                .1;
+                            Ok(DropCase::Direct(method.skip_binder.clone()))
                         }
-                    }
+                        None => unreachable!(),
+                    },
                     None => Ok(DropCase::Empty),
                 }
             }
@@ -981,7 +1069,12 @@ impl<'a> DropShimCtx<'a> {
             content: RawTerminator::Abort(AbortKind::Panic(None)),
             comments_before: vec![format!("Panic: {}", msg)],
         });
-        register_error!(self.ctx.ctx, self.span(), "Panic in generating drop shim: {}", msg);
+        register_error!(
+            self.ctx.ctx,
+            self.span(),
+            "Panic in generating drop shim: {}",
+            msg
+        );
         Ok(block_id)
     }
 

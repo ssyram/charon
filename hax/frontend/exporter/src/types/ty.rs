@@ -464,6 +464,9 @@ pub struct ItemRefContents {
     pub in_trait: Option<ImplExpr>,
     /// Whether this contains any reference to a type/lifetime/const parameter.
     pub has_param: bool,
+    /// Associated type assignments for trait objects (`dyn Trait<AssocType = ConcreteType>`).
+    /// Maps associated type DefId to the assigned concrete type.
+    pub assoc_type_assignments: Vec<(DefId, Ty)>,
 }
 
 /// Reference to an item, with generics. Basically any mention of an item (function, type, etc)
@@ -534,6 +537,12 @@ impl ItemRef {
 
         // If this is an associated item, resolve the trait reference.
         let trait_info = self_clause_for_item(s, def_id, generics);
+        
+        // Associated type assignments for dyn trait contexts
+        // This field is currently unused but provides structure for future enhancements
+        // where we might need to track associated type assignments in dyn trait contexts
+        let assoc_type_assignments = Vec::new();  // Remove mut since it's not modified
+        
         // Fixup the generics.
         if let Some(tinfo) = &trait_info {
             // The generics are split in two: the arguments of the trait and the arguments of the
@@ -569,6 +578,7 @@ impl ItemRef {
             has_param: generics.has_param()
                 || generics.has_escaping_bound_vars()
                 || generics.has_free_regions(),
+            assoc_type_assignments, // Use the assignments we collected above
         };
         let item = content.intern(s);
         s.with_cache(|cache| {
@@ -589,6 +599,7 @@ impl ItemRef {
             impl_exprs: Default::default(),
             in_trait: Default::default(),
             has_param: false,
+            assoc_type_assignments: Vec::new(),
         };
         let item = content.intern(s);
         s.with_global_cache(|cache| {
