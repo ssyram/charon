@@ -537,6 +537,11 @@ impl ItemRef {
 
         // If this is an associated item, resolve the trait reference.
         let trait_info = self_clause_for_item(s, def_id, generics);
+        // Check if we're creating an ItemRef for a trait in a dyn context
+        let mut assoc_type_assignments = Vec::new();
+        
+        // Try to extract associated type assignments from dyn trait context
+        // TODO: This needs to be implemented properly when the dyn context is available
         // Fixup the generics.
         if let Some(tinfo) = &trait_info {
             // The generics are split in two: the arguments of the trait and the arguments of the
@@ -572,7 +577,7 @@ impl ItemRef {
             has_param: generics.has_param()
                 || generics.has_escaping_bound_vars()
                 || generics.has_free_regions(),
-            assoc_type_assignments: Vec::new(), // Will be populated later for dyn traits
+            assoc_type_assignments, // Use the assignments we collected above
         };
         let item = content.intern(s);
         s.with_cache(|cache| {

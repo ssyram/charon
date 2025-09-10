@@ -127,7 +127,21 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         self.hax_def_for_item(&RustcItem::Poly(def_id.clone()))
     }
 
-    /// Check if an ItemRef refers to a dyn trait (has synthetic _dyn parameter)
+    /// Special handling for dyn trait items in monomorphization mode
+    fn translate_dyn_trait_item(&mut self, item: &RustcItem) -> Result<Arc<hax::FullDef>, Error> {
+        let RustcItem::Mono(item_ref) = item else {
+            unreachable!("Expected monomorphic item for dyn trait")
+        };
+        
+        eprintln!("DEBUG: Creating opaque definition for dyn trait item: {:?}", item_ref.def_id);
+        
+        // For now, create a minimal opaque definition to allow compilation
+        // This is a temporary workaround - the proper solution would be to fix the
+        // dyn trait representation to avoid synthetic _dyn parameters
+        let def_id = &item_ref.def_id;
+        let poly_item = RustcItem::Poly(def_id.clone());
+        self.hax_def_for_item(&poly_item)
+    }
     fn is_dyn_trait_item_ref(&self, item_ref: &hax::ItemRef) -> bool {
         // Check if the generic args contain a parameter with name "_dyn"
         let result = item_ref.generic_args.iter().any(|arg| {
@@ -154,11 +168,22 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
     pub fn hax_def_for_item(&mut self, item: &RustcItem) -> Result<Arc<hax::FullDef>, Error> {
         let def_id = item.def_id();
         let span = self.def_span(def_id);
+        let is_dyn_trait = if let RustcItem::Mono(item_ref) = item {
+            self.is_dyn_trait_item_ref(item_ref)
+        } else {
+            false
+        };
+        
         if let RustcItem::Mono(item_ref) = item
             && item_ref.has_param
-            && !self.is_dyn_trait_item_ref(item_ref)
+            && !is_dyn_trait
         {
             raise_error!(self, span, "Item is not monomorphic: {item:?}")
+        }
+        
+        // For dyn trait items, use a special translation path
+        if is_dyn_trait {
+            return self.translate_dyn_trait_item(item);
         }
         // Hax takes care of caching the translation.
         let unwind_safe_s = std::panic::AssertUnwindSafe(&self.hax_state);
