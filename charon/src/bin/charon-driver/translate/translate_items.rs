@@ -170,8 +170,8 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                 let Some(AnyTransId::Fun(id)) = trans_id else {
                     unreachable!()
                 };
-                let fun_decl =
-                    bt_ctx.translate_vtable_shim(id, item_meta, &self_ty, &dyn_self, &def, impl_kind)?;
+                let fun_decl = bt_ctx
+                    .translate_vtable_shim(id, item_meta, &self_ty, &dyn_self, &def, impl_kind)?;
                 self.translated.fun_decls.set_slot(id, fun_decl);
             }
         }
