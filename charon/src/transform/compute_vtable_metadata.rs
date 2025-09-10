@@ -242,47 +242,104 @@ impl<'a> VtableMetadataComputer<'a> {
     ) -> Result<(), Error> {
         // We expect fields in order: size, align, drop, method1, method2, ..., supertrait1, ...
         if fields.len() < 3 {
-            raise_error!(
+            // Instead of raising error, log warning and return early
+            register_error!(
                 self.ctx,
                 self.span,
-                "Expected at least 3 fields in vtable (size, align, drop)"
+                "Cannot generate vtable for trait implementation with unresolved type parameters: expected at least 3 fields in vtable (size, align, drop), found {}",
+                fields.len()
             );
+            return Ok(());
         }
+        
+        // Additional validation - check if fields are properly initialized
+        // We can't easily check for "unresolved" operands in this representation,
+        // so we'll skip this check for now
+        // if fields.iter().any(|f| matches!(f, Operand::Copy(Place::Var(_)))) {
+        //     register_error!(
+        //         self.ctx,
+        //         self.span,
+        //         "Cannot generate vtable metadata - vtable contains unresolved variables"
+        //     );
+        //     return Ok(());
+        // }
+        
         self.drop_field_ty = Some(fields[2].ty().clone());
 
-        // Get the concrete type from the impl
-        let concrete_ty = self.get_concrete_type_from_impl()?;
+        // Get the concrete type from the impl - handle errors gracefully
+        let concrete_ty = match self.get_concrete_type_from_impl() {
+            Ok(ty) => ty,
+            Err(e) => {
+                register_error!(
+                    self.ctx,
+                    self.span,
+                    "Cannot extract concrete type for vtable: {}",
+                    e.msg
+                );
+                return Ok(());
+            }
+        };
 
         // Update both size & align field with the info of the concrete type
-        self.compute_layout(fields, &concrete_ty)?;
+        if let Err(e) = self.compute_layout(fields, &concrete_ty) {
+            register_error!(
+                self.ctx,
+                self.span,
+                "Failed to compute layout for vtable: {}",
+                e.msg
+            );
+            return Ok(());
+        }
 
         // Update drop field - generate actual shim function instead of opaque
-        fields[2] = self.generate_drop_shim(&concrete_ty)?;
+        match self.generate_drop_shim(&concrete_ty) {
+            Ok(drop_shim) => {
+                fields[2] = drop_shim;
+            },
+            Err(e) => {
+                register_error!(
+                    self.ctx,
+                    self.span,
+                    "Failed to generate drop shim for vtable: {}",
+                    e.msg
+                );
+                // Keep the existing opaque drop field
+            }
+        }
 
         Ok(())
     }
 
     fn compute_layout(&mut self, fields: &mut Vec<Operand>, concrete_ty: &Ty) -> Result<(), Error> {
-        let constant_builder = ConstantBuilder::new(self.ctx, self.span);
+        // Ensure we have enough fields for size/align updates
+        if fields.len() < 2 {
+            raise_error!(
+                self.ctx,
+                self.span,
+                "Cannot compute layout: vtable has insufficient fields (need at least 2 for size/align)"
+            )
+        } else {
+            let constant_builder = ConstantBuilder::new(self.ctx, self.span);
 
-        match concrete_ty.layout(&self.ctx.translated) {
-            Ok(layout) => {
-                fields[0] = constant_builder.layout_constant(match layout.size {
-                    Some(size) => Either::Right(size),
-                    None => Either::Left("Size not available".to_string()),
-                })?;
-                fields[1] = constant_builder.layout_constant(match layout.align {
-                    Some(align) => Either::Right(align),
-                    None => Either::Left("Align not available".to_string()),
-                })?;
+            match concrete_ty.layout(&self.ctx.translated) {
+                Ok(layout) => {
+                    fields[0] = constant_builder.layout_constant(match layout.size {
+                        Some(size) => Either::Right(size),
+                        None => Either::Left("Size not available".to_string()),
+                    })?;
+                    fields[1] = constant_builder.layout_constant(match layout.align {
+                        Some(align) => Either::Right(align),
+                        None => Either::Left("Align not available".to_string()),
+                    })?;
+                }
+                Err(reason) => {
+                    let reason_msg = format!("Layout not available: {}", reason);
+                    fields[0] = constant_builder.layout_constant(Either::Left(reason_msg.clone()))?;
+                    fields[1] = constant_builder.layout_constant(Either::Left(reason_msg))?;
+                }
             }
-            Err(reason) => {
-                let reason_msg = format!("Layout not available: {}", reason);
-                fields[0] = constant_builder.layout_constant(Either::Left(reason_msg.clone()))?;
-                fields[1] = constant_builder.layout_constant(Either::Left(reason_msg))?;
-            }
+            Ok(())
         }
-        Ok(())
     }
 
     // ========================================

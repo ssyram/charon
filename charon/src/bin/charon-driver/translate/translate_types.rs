@@ -85,7 +85,21 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         // Catch the error to avoid a single error stopping the translation of a whole item.
         let ty = self
             .translate_ty_inner(span, ty)
-            .unwrap_or_else(|e| TyKind::Error(e.msg).into_ty());
+            .unwrap_or_else(|e| {
+                // Check if this is a dyn trait related error that we can handle more gracefully
+                if e.msg.contains("dyn Trait") && e.msg.contains("monomorphize") {
+                    // For dyn trait errors, create a specialized error type that can be processed later
+                    register_error!(
+                        self, 
+                        span, 
+                        "Converting dyn trait error to placeholder: {}", 
+                        e.msg
+                    );
+                    TyKind::Error(format!("dyn_trait: {}", e.msg)).into_ty()
+                } else {
+                    TyKind::Error(e.msg).into_ty()
+                }
+            });
         self.innermost_binder_mut()
             .type_trans_cache
             .insert(cache_key, ty.clone());
@@ -263,7 +277,20 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 raise_error!(self, span, "Type checking error")
             }
             hax::TyKind::Todo(s) => {
-                raise_error!(self, span, "Unsupported type: {:?}", s)
+                // Check if this is a dyn trait related todo/error that we can handle
+                let s_str = format!("{:?}", s);
+                if s_str.contains("dyn Trait") && s_str.contains("monomorphize") {
+                    register_error!(
+                        self, 
+                        span, 
+                        "Dyn trait encountered in monomorphization mode - using placeholder type: {:?}", 
+                        s
+                    );
+                    // Return a placeholder type instead of failing
+                    TyKind::Error(format!("dyn_trait_placeholder: {}", s_str))
+                } else {
+                    raise_error!(self, span, "Unsupported type: {:?}", s)
+                }
             }
         };
         Ok(kind.into_ty())
