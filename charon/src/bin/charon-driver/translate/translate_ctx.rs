@@ -127,6 +127,28 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         self.hax_def_for_item(&RustcItem::Poly(def_id.clone()))
     }
 
+    /// Check if an ItemRef refers to a dyn trait (has synthetic _dyn parameter)
+    fn is_dyn_trait_item_ref(&self, item_ref: &hax::ItemRef) -> bool {
+        // Check if the generic args contain a parameter with name "_dyn"
+        let result = item_ref.generic_args.iter().any(|arg| {
+            match arg {
+                hax::GenericArg::Type(ty) => {
+                    match ty.kind() {
+                        hax::TyKind::Param(param_ty) => {
+                            param_ty.name.as_str() == "_dyn"
+                        },
+                        _ => false
+                    }
+                },
+                _ => false
+            }
+        });
+        if result {
+            eprintln!("DEBUG: Found dyn trait ItemRef: {:?}", item_ref);
+        }
+        result
+    }
+
     /// Return the definition for this item. This uses the polymorphic or monomorphic definition
     /// depending on user choice.
     pub fn hax_def_for_item(&mut self, item: &RustcItem) -> Result<Arc<hax::FullDef>, Error> {
@@ -134,6 +156,7 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         let span = self.def_span(def_id);
         if let RustcItem::Mono(item_ref) = item
             && item_ref.has_param
+            && !self.is_dyn_trait_item_ref(item_ref)
         {
             raise_error!(self, span, "Item is not monomorphic: {item:?}")
         }

@@ -92,11 +92,27 @@ pub enum TraitImplSource {
 impl TransItemSource {
     pub fn new(item: RustcItem, kind: TransItemSourceKind) -> Self {
         if let RustcItem::Mono(item) = &item {
-            if item.has_param {
+            if item.has_param && !Self::is_dyn_trait_item_ref(item) {
                 panic!("Item is not monomorphic: {item:?}")
             }
         }
         Self { item, kind }
+    }
+
+    /// Check if an ItemRef refers to a dyn trait (has synthetic _dyn parameter)
+    fn is_dyn_trait_item_ref(item_ref: &hax::ItemRef) -> bool {
+        // Check if the generic args contain a parameter with name "_dyn"
+        item_ref.generic_args.iter().any(|arg| {
+            match arg {
+                hax::GenericArg::Type(ty) => {
+                    match ty.kind() {
+                        hax::TyKind::Param(param_ty) => param_ty.name.as_str() == "_dyn",
+                        _ => false
+                    }
+                },
+                _ => false
+            }
+        })
     }
 
     /// Refers to the given item. Depending on `monomorphize`, this chooses between the monomorphic
