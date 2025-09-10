@@ -537,11 +537,12 @@ impl ItemRef {
 
         // If this is an associated item, resolve the trait reference.
         let trait_info = self_clause_for_item(s, def_id, generics);
-        // Check if we're creating an ItemRef for a trait in a dyn context
-        let mut assoc_type_assignments = Vec::new();
         
-        // Try to extract associated type assignments from dyn trait context
-        // TODO: This needs to be implemented properly when the dyn context is available
+        // Associated type assignments for dyn trait contexts
+        // This field is currently unused but provides structure for future enhancements
+        // where we might need to track associated type assignments in dyn trait contexts
+        let assoc_type_assignments = Vec::new();  // Remove mut since it's not modified
+        
         // Fixup the generics.
         if let Some(tinfo) = &trait_info {
             // The generics are split in two: the arguments of the trait and the arguments of the

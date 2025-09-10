@@ -380,7 +380,24 @@ impl<'a> VtableMetadataComputer<'a> {
         Ok(vtable_ref.id == TypeId::Adt(*type_decl_id))
     }
 
-    /// Extract the concrete type being implemented for from the trait impl reference
+    /// Extract the concrete type being implemented for from the trait impl reference.
+    ///
+    /// === Dyn Trait Monomorphization: Safe Type Extraction ===
+    ///
+    /// This function is part of the dyn trait monomorphization safety infrastructure.
+    /// When processing dyn traits, we may encounter trait implementations with empty
+    /// type parameter lists due to synthetic `_dyn` parameters created by hax.
+    ///
+    /// The challenge: We need to extract the concrete "Self" type from a trait impl,
+    /// but dyn trait implementations may not have explicit type parameters due to
+    /// existential quantification.
+    ///
+    /// Our approach:
+    /// 1. **Bounds checking**: Always verify type parameter list is non-empty before access
+    /// 2. **Graceful fallback**: Create placeholder types instead of panicking
+    /// 3. **Clear error context**: Provide meaningful error messages when needed
+    ///
+    /// This prevents "index out of bounds" crashes that were occurring before this fix.
     fn get_concrete_type_from_impl(&self) -> Result<Ty, Error> {
         let Some(trait_impl) = self.ctx.translated.trait_impls.get(self.impl_ref.id) else {
             raise_error!(
@@ -391,20 +408,23 @@ impl<'a> VtableMetadataComputer<'a> {
             );
         };
 
-        // Get the self type from the trait reference
-        // For a trait impl like `impl Trait for ConcreteType`, we want ConcreteType
         let trait_decl_ref = &trait_impl.impl_trait;
         
-        // Check bounds to avoid panic on synthetic dyn trait parameters
+        // === CRITICAL BOUNDS CHECKING ===
+        // Before this fix, accessing `types[0]` could cause "index out of bounds" panics
+        // when dyn traits resulted in empty type parameter lists.
         if trait_decl_ref.generics.types.is_empty() {
-            // In monomorphization mode, we might encounter dyn trait implementations with
-            // synthetic parameters. In this case, create a reasonable placeholder.
+            // SAFE FALLBACK: Instead of crashing, create a reasonable placeholder type
+            // This handles the case where synthetic dyn trait parameters result in
+            // empty type lists that would otherwise cause array access failures.
+            trace!("Empty type list in trait impl, using placeholder type for dyn trait context");
             let placeholder_ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
             return Ok(placeholder_ty);
         }
         
-        let concrete_ty = &trait_decl_ref.generics.types[0]; // First type arg is Self
-
+        // NORMAL CASE: Extract the Self type (first type parameter) from the trait impl
+        // For `impl Trait for ConcreteType`, this extracts `ConcreteType`
+        let concrete_ty = &trait_decl_ref.generics.types[0];
         Ok(concrete_ty.clone())
     }
 

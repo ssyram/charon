@@ -221,28 +221,73 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         )
     }
 
+    /// Handle synthetic dyn trait parameters in monomorphization mode.
+    /// 
+    /// === Dyn Trait Monomorphization: Synthetic Parameter Registration ===
+    /// 
+    /// This function is a cornerstone of the dyn trait monomorphization workflow.
+    /// It addresses a fundamental impedance mismatch between how hax represents
+    /// dyn traits and how charon's type system expects parameters to be registered.
+    /// 
+    /// **The Problem:**
+    /// When hax processes dyn trait objects like `&dyn Display`, it creates synthetic
+    /// type parameters named `_dyn` to represent the existentially quantified self type.
+    /// These parameters are not present in the original Rust code but are necessary
+    /// for hax's internal representation of the type erasure that occurs with dyn traits.
+    /// 
+    /// **The Challenge:**
+    /// Charon's type system expects all type parameters to be properly registered in
+    /// the binding environment before they can be resolved. Without registration,
+    /// lookup attempts fail with "could not find the type variable _dyn" errors.
+    /// 
+    /// **Our Solution:**
+    /// 1. **Dynamic Detection**: Identify synthetic `_dyn` parameters by name
+    /// 2. **On-Demand Registration**: Create and register type variables when encountered
+    /// 3. **Proper Binding**: Add them to the innermost binding context
+    /// 4. **Return Immediately**: Avoid normal lookup path for synthetic parameters
+    /// 
+    /// **Workflow Integration:**
+    /// - Hax creates `_dyn` parameters during dyn trait processing
+    /// - This function detects them during type translation
+    /// - Registers them in charon's binding environment
+    /// - Subsequent type resolution can find and use these variables
+    /// - Vtable generation proceeds without crashes
+    /// 
+    /// **Mode Specificity:**
+    /// This special handling only occurs in monomorphization mode (`--monomorphize`)
+    /// because that's where we need to handle the concrete instantiation of dyn traits.
+    /// In non-monomorphization mode, dyn traits are handled differently and don't
+    /// require this synthetic parameter workaround.
+    /// 
+    /// Returns `Some(TypeDbVar)` if this is a synthetic parameter we handled,
+    /// `None` if normal parameter lookup should be used.
+    fn handle_synthetic_dyn_param(&mut self, param: &hax::ParamTy) -> Option<TypeDbVar> {
+        if param.name == "_dyn" && self.monomorphize() {
+            trace!("Registering synthetic dyn trait parameter: {}", param.name);
+            // Create a proper type variable for the synthetic dyn trait parameter
+            let type_var_id = self.innermost_binder_mut().push_type_var(param.index, param.name.clone());
+            Some(DeBruijnVar::new_at_zero(type_var_id))
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn lookup_type_var(
         &mut self,
         span: Span,
         param: &hax::ParamTy,
     ) -> Result<TypeDbVar, Error> {
-        // Special handling for synthetic dyn trait parameters in monomorphization mode
-        if param.name == "_dyn" && self.monomorphize() {
-            // This is a synthetic parameter created by hax for dyn traits
-            // In monomorphization mode, we create a proper type variable for it
-            let type_var_id = self.innermost_binder_mut().push_type_var(param.index, param.name.clone());
-            return Ok(DeBruijnVar::new_at_zero(type_var_id));
+        // First, check if this is a synthetic dyn trait parameter
+        if let Some(type_var) = self.handle_synthetic_dyn_param(param) {
+            return Ok(type_var);
         }
         
+        // Normal parameter lookup for non-synthetic parameters
         self.lookup_param(
             span,
             |bl| bl.type_vars_map.get(&param.index).copied(),
             || {
-                if param.name == "_dyn" {
-                    format!("the synthetic dyn trait type variable {}", param.name)
-                } else {
-                    format!("the type variable {}", param.name)
-                }
+                format!("the type variable {}", param.name)
             },
         )
     }

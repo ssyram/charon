@@ -127,7 +127,11 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         self.hax_def_for_item(&RustcItem::Poly(def_id.clone()))
     }
 
-    /// Special handling for dyn trait items in monomorphization mode
+    /// Special handling for dyn trait items in monomorphization mode.
+    /// 
+    /// This function provides a specialized translation path for items that contain
+    /// synthetic dyn trait parameters. It attempts translation with graceful fallback
+    /// to prevent crashes when hax encounters complex dyn trait scenarios.
     fn translate_dyn_trait_item(&mut self, item: &RustcItem) -> Result<Arc<hax::FullDef>, Error> {
         let RustcItem::Mono(item_ref) = item else {
             unreachable!("Expected monomorphic item for dyn trait")
@@ -135,26 +139,25 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         
         trace!("Processing dyn trait item: {:?}", item_ref.def_id);
         
-        // Try to create a resolved version by substituting synthetic parameters
-        let resolved_item_ref = self.resolve_synthetic_parameters(item_ref)?;
-        
-        // Use the resolved version for translation
+        // Attempt translation with panic protection since dyn traits can cause
+        // hax to encounter edge cases that might result in panics
         let unwind_safe_s = std::panic::AssertUnwindSafe(&self.hax_state);
-        let result = std::panic::catch_unwind(move || resolved_item_ref.instantiated_full_def(*unwind_safe_s));
+        let item_ref_copy = item_ref.clone();
+        let result = std::panic::catch_unwind(move || item_ref_copy.instantiated_full_def(*unwind_safe_s));
         
         match result {
             Ok(def) => Ok(def),
             Err(_) => {
-                // If translation fails, log warning and try alternative approach
+                // If translation fails, use fallback approach
                 let span = self.def_span(item.def_id());
                 register_error!(
                     self,
                     span,
-                    "Hax panicked when translating dyn trait item `{:?}` - using fallback", 
+                    "Hax panicked when translating dyn trait item `{:?}` - using polymorphic fallback", 
                     item.def_id()
                 );
                 
-                // Fallback: try to get the polymorphic definition instead
+                // Fallback: Get the polymorphic definition instead
                 let def_id = item.def_id();
                 let unwind_safe_s = std::panic::AssertUnwindSafe(&self.hax_state);
                 Ok(def_id.full_def(*unwind_safe_s))
@@ -162,88 +165,45 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         }
     }
     
-    /// Attempt to resolve synthetic parameters like `_dyn` with concrete types
-    fn resolve_synthetic_parameters(&mut self, item_ref: &hax::ItemRef) -> Result<hax::ItemRef, Error> {
-        let _span = self.def_span(&item_ref.def_id);
-        
-        trace!("Resolving synthetic parameters for: {:?}", item_ref.def_id);
-        
-        // For now, we'll just return a clone since creating a new ItemRef is complex
-        // In a complete implementation, we would extract concrete types from the call site context
-        trace!("Using original ItemRef (synthetic parameter resolution not fully implemented)");
-        Ok(item_ref.clone())
-    }
-    
-    /// Check if an ItemRef is in a trait context
-    fn is_trait_context(&self, item_ref: &hax::ItemRef) -> bool {
-        item_ref.in_trait.is_some() || 
-        format!("{:?}", item_ref.def_id).contains("::trait") ||
-        format!("{:?}", item_ref.def_id).contains("Display") ||
-        format!("{:?}", item_ref.def_id).contains("ToString")
-    }
+    /// Check if an ItemRef represents a dyn trait item by looking for synthetic parameters.
+    /// 
+    /// This is part of the dyn trait monomorphization workflow where we need to identify
+    /// items that come from dyn trait contexts and may contain synthetic `_dyn` parameters
+    /// created by hax.
     fn is_dyn_trait_item_ref(&self, item_ref: &hax::ItemRef) -> bool {
-        // Check if the generic args contain a parameter with name "_dyn" or "Self" 
-        // that could be from a dyn trait context
+        // Look for synthetic `_dyn` parameters in the generic arguments
         let has_synthetic_params = item_ref.generic_args.iter().any(|arg| {
-            match arg {
-                hax::GenericArg::Type(ty) => {
-                    match ty.kind() {
-                        hax::TyKind::Param(param_ty) => {
-                            param_ty.name.as_str() == "_dyn" || 
-                            (param_ty.name.as_str() == "Self" && Self::is_trait_item(item_ref))
-                        },
-                        _ => false
-                    }
-                },
-                _ => false
-            }
+            matches!(
+                arg,
+                hax::GenericArg::Type(ty) if matches!(
+                    ty.kind(),
+                    hax::TyKind::Param(param_ty) if param_ty.name.as_str() == "_dyn"
+                )
+            )
         });
         
-        // Also check for problematic bound lifetimes, specifically for Formatter
+        // Also check for problematic bound lifetimes, specifically for Display/Formatter
         let has_problematic_lifetimes = item_ref.generic_args.iter().any(|arg| {
-            match arg {
-                hax::GenericArg::Lifetime(region) => {
-                    match &region.kind {
-                        hax::RegionKind::ReBound(_, _) => {
-                            format!("{:?}", item_ref.def_id).contains("Formatter")
-                        },
-                        _ => false
-                    }
-                },
-                _ => false
-            }
+            matches!(
+                arg,
+                hax::GenericArg::Lifetime(region) if matches!(
+                    &region.kind,
+                    hax::RegionKind::ReBound(_, _)
+                ) && format!("{:?}", item_ref.def_id).contains("Formatter")
+            )
         });
         
         // Also check if this is a vtable by looking at the DefId 
         let is_vtable = format!("{:?}", item_ref.def_id).contains("vtable");
         
-        let final_result = has_synthetic_params || has_problematic_lifetimes || is_vtable;
-        if final_result {
+        let result = has_synthetic_params || has_problematic_lifetimes || is_vtable;
+        if result {
             let reason = if has_synthetic_params { "synthetic params" } 
                         else if has_problematic_lifetimes { "bound lifetimes" }
                         else { "vtable" };
             trace!("Found dyn trait/vtable ItemRef: {:?} (reason: {})", item_ref, reason);
         }
-        final_result
-    }
-
-    /// Check if an ItemRef refers to a trait item (method, associated type, etc.)
-    fn is_trait_item(item_ref: &hax::ItemRef) -> bool {
-        // This is a heuristic - trait items often have trait bounds or are part of trait implementations
-        // For now, we'll consider any item with Self parameter as potentially from a trait context
-        // A more robust solution would check if the def_id corresponds to a trait item
-        item_ref.in_trait.is_some() || 
-        item_ref.generic_args.iter().any(|arg| {
-            match arg {
-                hax::GenericArg::Type(ty) => {
-                    match ty.kind() {
-                        hax::TyKind::Param(param_ty) => param_ty.name.as_str() == "Self",
-                        _ => false
-                    }
-                },
-                _ => false
-            }
-        })
+        result
     }
 
     /// Return the definition for this item. This uses the polymorphic or monomorphic definition

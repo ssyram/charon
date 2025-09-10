@@ -212,17 +212,8 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 // parameter.
                 trace!("Param");
 
-                // Special handling for synthetic dyn trait parameters
-                if param.name == "_dyn" && self.monomorphize() {
-                    // This is a synthetic parameter created by hax for dyn traits
-                    // In monomorphization mode, we need to handle this specially
-                    // Instead of failing, create a synthetic type variable that represents
-                    // the existentially quantified type in the dyn trait
-                    let type_var_id = self.innermost_binder_mut().push_type_var(param.index, param.name.clone());
-                    return Ok(TyKind::TypeVar(DeBruijnVar::new_at_zero(type_var_id)).into_ty());
-                }
-
-                // Retrieve the translation of the substituted type:
+                // Use the centralized synthetic parameter handling from translate_generics
+                // This handles synthetic `_dyn` parameters created by hax for dyn traits
                 let var = self.lookup_type_var(span, param)?;
                 TyKind::TypeVar(var)
             }
