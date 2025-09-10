@@ -92,21 +92,56 @@ pub enum TraitImplSource {
 impl TransItemSource {
     pub fn new(item: RustcItem, kind: TransItemSourceKind) -> Self {
         if let RustcItem::Mono(item) = &item {
-            if item.has_param && !Self::is_dyn_trait_item_ref(item) {
+            if item.has_param && !Self::is_dyn_trait_related_item(item, &kind) {
                 panic!("Item is not monomorphic: {item:?}")
             }
         }
         Self { item, kind }
     }
 
-    /// Check if an ItemRef refers to a dyn trait (has synthetic _dyn parameter)
+    /// Check if an ItemRef or TransItemSourceKind refers to a dyn trait related item
+    fn is_dyn_trait_related_item(item_ref: &hax::ItemRef, kind: &TransItemSourceKind) -> bool {
+        // Check for vtable-related items
+        match kind {
+            TransItemSourceKind::VTable => true,
+            TransItemSourceKind::VTableInstance(_) => true,
+            TransItemSourceKind::VTableInstanceInitializer(_) => true,
+            TransItemSourceKind::VTableMethod(_, _, _) => true,
+            _ => Self::is_dyn_trait_item_ref(item_ref)
+        }
+    }
+
+    /// Check if an ItemRef refers to a dyn trait (has synthetic _dyn parameter or Self in dyn context)
     fn is_dyn_trait_item_ref(item_ref: &hax::ItemRef) -> bool {
-        // Check if the generic args contain a parameter with name "_dyn"
+        // Check if the generic args contain a parameter with name "_dyn" or "Self" 
+        // that could be from a dyn trait context
         item_ref.generic_args.iter().any(|arg| {
             match arg {
                 hax::GenericArg::Type(ty) => {
                     match ty.kind() {
-                        hax::TyKind::Param(param_ty) => param_ty.name.as_str() == "_dyn",
+                        hax::TyKind::Param(param_ty) => {
+                            param_ty.name.as_str() == "_dyn" || 
+                            (param_ty.name.as_str() == "Self" && Self::is_trait_item(item_ref))
+                        },
+                        _ => false
+                    }
+                },
+                _ => false
+            }
+        })
+    }
+
+    /// Check if an ItemRef refers to a trait item (method, associated type, etc.)
+    fn is_trait_item(item_ref: &hax::ItemRef) -> bool {
+        // This is a heuristic - trait items often have trait bounds or are part of trait implementations
+        // For now, we'll consider any item with Self parameter as potentially from a trait context
+        // A more robust solution would check if the def_id corresponds to a trait item
+        item_ref.in_trait.is_some() || 
+        item_ref.generic_args.iter().any(|arg| {
+            match arg {
+                hax::GenericArg::Type(ty) => {
+                    match ty.kind() {
+                        hax::TyKind::Param(param_ty) => param_ty.name.as_str() == "Self",
                         _ => false
                     }
                 },

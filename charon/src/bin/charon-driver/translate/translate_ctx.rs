@@ -133,23 +133,28 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
             unreachable!("Expected monomorphic item for dyn trait")
         };
         
-        eprintln!("DEBUG: Creating opaque definition for dyn trait item: {:?}", item_ref.def_id);
+        eprintln!("DEBUG: Skipping dyn trait item to avoid synthetic parameters: {:?}", item_ref.def_id);
         
-        // For now, create a minimal opaque definition to allow compilation
-        // This is a temporary workaround - the proper solution would be to fix the
-        // dyn trait representation to avoid synthetic _dyn parameters
-        let def_id = &item_ref.def_id;
-        let poly_item = RustcItem::Poly(def_id.clone());
-        self.hax_def_for_item(&poly_item)
+        // Instead of trying to translate items with synthetic parameters,
+        // we return an error to skip them. This prevents the "could not find type variable" errors.
+        // In a complete implementation, these would be handled by vtable dispatch instead.
+        let span = self.def_span(item.def_id());
+        raise_error!(
+            self, 
+            span, 
+            "Dyn trait method calls are not yet fully supported in monomorphization mode - skipping item with synthetic parameters"
+        )
     }
     fn is_dyn_trait_item_ref(&self, item_ref: &hax::ItemRef) -> bool {
-        // Check if the generic args contain a parameter with name "_dyn"
+        // Check if the generic args contain a parameter with name "_dyn" or "Self" 
+        // that could be from a dyn trait context
         let result = item_ref.generic_args.iter().any(|arg| {
             match arg {
                 hax::GenericArg::Type(ty) => {
                     match ty.kind() {
                         hax::TyKind::Param(param_ty) => {
-                            param_ty.name.as_str() == "_dyn"
+                            param_ty.name.as_str() == "_dyn" || 
+                            (param_ty.name.as_str() == "Self" && Self::is_trait_item(item_ref))
                         },
                         _ => false
                     }
@@ -157,10 +162,34 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                 _ => false
             }
         });
-        if result {
-            eprintln!("DEBUG: Found dyn trait ItemRef: {:?}", item_ref);
+        
+        // Also check if this is a vtable by looking at the DefId 
+        let is_vtable = format!("{:?}", item_ref.def_id).contains("vtable");
+        
+        let final_result = result || is_vtable;
+        if final_result {
+            eprintln!("DEBUG: Found dyn trait/vtable ItemRef: {:?} (vtable: {})", item_ref, is_vtable);
         }
-        result
+        final_result
+    }
+
+    /// Check if an ItemRef refers to a trait item (method, associated type, etc.)
+    fn is_trait_item(item_ref: &hax::ItemRef) -> bool {
+        // This is a heuristic - trait items often have trait bounds or are part of trait implementations
+        // For now, we'll consider any item with Self parameter as potentially from a trait context
+        // A more robust solution would check if the def_id corresponds to a trait item
+        item_ref.in_trait.is_some() || 
+        item_ref.generic_args.iter().any(|arg| {
+            match arg {
+                hax::GenericArg::Type(ty) => {
+                    match ty.kind() {
+                        hax::TyKind::Param(param_ty) => param_ty.name.as_str() == "Self",
+                        _ => false
+                    }
+                },
+                _ => false
+            }
+        })
     }
 
     /// Return the definition for this item. This uses the polymorphic or monomorphic definition
