@@ -115,7 +115,7 @@ impl TransItemSource {
     fn is_dyn_trait_item_ref(item_ref: &hax::ItemRef) -> bool {
         // Check if the generic args contain a parameter with name "_dyn" or "Self" 
         // that could be from a dyn trait context
-        item_ref.generic_args.iter().any(|arg| {
+        let has_synthetic_params = item_ref.generic_args.iter().any(|arg| {
             match arg {
                 hax::GenericArg::Type(ty) => {
                     match ty.kind() {
@@ -128,7 +128,27 @@ impl TransItemSource {
                 },
                 _ => false
             }
-        })
+        });
+        
+        // Also check for lifetime-only parameters that might be problematic in dyn contexts
+        // Specifically for core::fmt::Formatter which seems to have bound lifetime issues
+        let has_problematic_lifetimes = item_ref.generic_args.iter().any(|arg| {
+            match arg {
+                hax::GenericArg::Lifetime(region) => {
+                    // Check if this is a bound region that might be problematic
+                    match &region.kind {
+                        hax::RegionKind::ReBound(_, _) => {
+                            // Only consider Formatter as problematic for now to be conservative
+                            format!("{:?}", item_ref.def_id).contains("Formatter")
+                        },
+                        _ => false
+                    }
+                },
+                _ => false
+            }
+        });
+        
+        has_synthetic_params || has_problematic_lifetimes
     }
 
     /// Check if an ItemRef refers to a trait item (method, associated type, etc.)

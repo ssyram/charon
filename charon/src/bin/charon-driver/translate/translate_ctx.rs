@@ -148,7 +148,7 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
     fn is_dyn_trait_item_ref(&self, item_ref: &hax::ItemRef) -> bool {
         // Check if the generic args contain a parameter with name "_dyn" or "Self" 
         // that could be from a dyn trait context
-        let result = item_ref.generic_args.iter().any(|arg| {
+        let has_synthetic_params = item_ref.generic_args.iter().any(|arg| {
             match arg {
                 hax::GenericArg::Type(ty) => {
                     match ty.kind() {
@@ -163,12 +163,30 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
             }
         });
         
+        // Also check for problematic bound lifetimes, specifically for Formatter
+        let has_problematic_lifetimes = item_ref.generic_args.iter().any(|arg| {
+            match arg {
+                hax::GenericArg::Lifetime(region) => {
+                    match &region.kind {
+                        hax::RegionKind::ReBound(_, _) => {
+                            format!("{:?}", item_ref.def_id).contains("Formatter")
+                        },
+                        _ => false
+                    }
+                },
+                _ => false
+            }
+        });
+        
         // Also check if this is a vtable by looking at the DefId 
         let is_vtable = format!("{:?}", item_ref.def_id).contains("vtable");
         
-        let final_result = result || is_vtable;
+        let final_result = has_synthetic_params || has_problematic_lifetimes || is_vtable;
         if final_result {
-            eprintln!("DEBUG: Found dyn trait/vtable ItemRef: {:?} (vtable: {})", item_ref, is_vtable);
+            let reason = if has_synthetic_params { "synthetic params" } 
+                        else if has_problematic_lifetimes { "bound lifetimes" }
+                        else { "vtable" };
+            eprintln!("DEBUG: Found dyn trait/vtable ItemRef: {:?} (reason: {})", item_ref, reason);
         }
         final_result
     }
