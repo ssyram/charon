@@ -1,5 +1,4 @@
 use super::translate_ctx::*;
-use anstream::panic;
 use charon_lib::ast::*;
 use charon_lib::common::hash_by_addr::HashByAddr;
 use charon_lib::ids::Vector;
