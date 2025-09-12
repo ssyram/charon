@@ -382,7 +382,7 @@ impl ItemTransCtx<'_, '_> {
             },
             kind,
             layout: Some(layout),
-            // a vtable must not have unsizing metadata itself
+            // A vtable struct is always sized
             ptr_metadata: PtrMetadata::None,
         })
     }
