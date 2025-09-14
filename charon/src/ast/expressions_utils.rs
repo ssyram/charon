@@ -95,7 +95,7 @@ impl Place {
 impl Operand {
     pub fn mk_const_unit() -> Self {
         Operand::Const(Box::new(ConstantExpr {
-            value: RawConstantExpr::Adt(None, Vec::new()),
+            value: ConstantExprKind::Adt(None, Vec::new()),
             ty: Ty::mk_unit(),
         }))
     }

@@ -71,7 +71,7 @@ fn transform_constant_expr(
         }
         ConstantExprKind::Ref(bval) => {
             match bval.value {
-                RawConstantExpr::Global(global_ref) => {
+                ConstantExprKind::Global(global_ref) => {
                     let unit_metadata = new_var(Rvalue::unit_value(), Ty::mk_unit());
                     Operand::Move(new_var(
                         // This is a reference to a global constant, which must be Sized, so no metadata
@@ -110,7 +110,7 @@ fn transform_constant_expr(
         }
         ConstantExprKind::Ptr(rk, bval) => {
             match bval.value {
-                RawConstantExpr::Global(global_ref) => {
+                ConstantExprKind::Global(global_ref) => {
                     let unit_metadata = new_var(Rvalue::unit_value(), Ty::mk_unit());
                     Operand::Move(new_var(
                         // This is a raw pointer to a global constant, which must be Sized, so no metadata
