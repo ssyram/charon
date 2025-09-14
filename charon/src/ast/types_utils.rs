@@ -664,10 +664,8 @@ impl Ty {
                             Some(ty) => ty.get_ptr_metadata(translated),
                         }
                     }
-                    // Box simply recurse with its sole argument
-                    TypeId::Builtin(BuiltinTy::Box) => {
-                        ty_ref.generics.types[0].get_ptr_metadata(translated)
-                    }
+                    // Box is a pointer like ref & raw ptr, hence no metadata
+                    TypeId::Builtin(BuiltinTy::Box) => PtrMetadata::None,
                     // Array: `[T; N]` has no metadata
                     TypeId::Builtin(BuiltinTy::Array) => PtrMetadata::None,
                     // `[T]` & `str` all have metadata length

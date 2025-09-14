@@ -2,10 +2,10 @@
 
 use crate::llbc_ast::*;
 use crate::transform::TransformCtx;
+use crate::transform::ctx::{place_ptr_metadata_operand, PtrMetadataComputable};
 use derive_generic_visitor::*;
 
 use super::ctx::LlbcPass;
-use crate::transform::insert_ptr_metadata::*;
 
 /// We replace some place constructors with function calls. To do that, we explore all the places
 /// in a body and deconstruct a given place access into intermediate assignments.
