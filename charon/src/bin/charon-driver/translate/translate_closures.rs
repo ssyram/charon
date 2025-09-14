@@ -407,7 +407,7 @@ impl ItemTransCtx<'_, '_> {
                                 ),
                                 ty,
                             );
-                            mk_stt(RawStatement::Assign(
+                            mk_stt(StatementKind::Assign(
                                 locals.place_for_var(LocalId::new(i + 3)),
                                 Rvalue::Use(Operand::Move(nth_field)),
                             ))
@@ -483,7 +483,7 @@ impl ItemTransCtx<'_, '_> {
                     TyKind::Ref(Region::Erased, deref_state.ty.clone(), RefKind::Shared).into_ty();
                 let reborrow = locals.new_var(None, reborrow_ty);
 
-                statements.push(mk_stt(RawStatement::Assign(
+                statements.push(mk_stt(StatementKind::Assign(
                     reborrow.clone(),
                     // the state must be Sized, hence `()` as ptr-metadata
                     Rvalue::Ref {
@@ -494,9 +494,9 @@ impl ItemTransCtx<'_, '_> {
                 )));
 
                 let start_block = blocks.reserve_slot();
-                let ret_block = blocks.push(mk_block(vec![], RawTerminator::Return));
-                let unwind_block = blocks.push(mk_block(vec![], RawTerminator::UnwindResume));
-                let call = RawTerminator::Call {
+                let ret_block = blocks.push(mk_block(vec![], TerminatorKind::Return));
+                let unwind_block = blocks.push(mk_block(vec![], TerminatorKind::UnwindResume));
+                let call = TerminatorKind::Call {
                     target: ret_block,
                     call: Call {
                         func: fn_op,
@@ -739,7 +739,7 @@ impl ItemTransCtx<'_, '_> {
             let args_tupled = locals.new_var(Some("args".to_string()), args_tuple_ty.clone());
             let state = locals.new_var(Some("state".to_string()), state_ty.clone());
 
-            statements.push(mk_stt(RawStatement::Assign(
+            statements.push(mk_stt(StatementKind::Assign(
                 args_tupled.clone(),
                 Rvalue::Aggregate(
                     AggregateKind::Adt(args_tuple_ty.as_adt().unwrap().clone(), None, None),
@@ -748,15 +748,15 @@ impl ItemTransCtx<'_, '_> {
             )));
 
             let state_ty_adt = state_ty.as_adt().unwrap();
-            statements.push(mk_stt(RawStatement::Assign(
+            statements.push(mk_stt(StatementKind::Assign(
                 state.clone(),
                 Rvalue::Aggregate(AggregateKind::Adt(state_ty_adt.clone(), None, None), vec![]),
             )));
 
             let start_block = blocks.reserve_slot();
-            let ret_block = blocks.push(mk_block(vec![], RawTerminator::Return));
-            let unwind_block = blocks.push(mk_block(vec![], RawTerminator::UnwindResume));
-            let call = RawTerminator::Call {
+            let ret_block = blocks.push(mk_block(vec![], TerminatorKind::Return));
+            let unwind_block = blocks.push(mk_block(vec![], TerminatorKind::UnwindResume));
+            let call = TerminatorKind::Call {
                 target: ret_block,
                 call: Call {
                     func: fn_op,
