@@ -1,9 +1,6 @@
-use crate::formatter::IntoFormatter;
-use crate::pretty::FmtWithCtx;
 use crate::transform::TransformCtx;
 use crate::transform::ctx::{place_ptr_metadata_operand, PtrMetadataComputable};
 use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
-use anstream::panic;
 use derive_generic_visitor::*;
 
 #[derive(Visitor)]
@@ -22,13 +19,13 @@ impl PtrMetadataComputable for BodyVisitor<'_, '_> {
 
     fn insert_storage_live_stmt(&mut self, local: LocalId) {
         self.statements
-            .push(Statement::new(self.span, RawStatement::StorageLive(local)));
+            .push(Statement::new(self.span, StatementKind::StorageLive(local)));
     }
 
     fn insert_assn_stmt(&mut self, place: Place, rvalue: Rvalue) {
         self.statements.push(Statement::new(
             self.span,
-            RawStatement::Assign(place, rvalue),
+            StatementKind::Assign(place, rvalue),
         ));
     }
 
