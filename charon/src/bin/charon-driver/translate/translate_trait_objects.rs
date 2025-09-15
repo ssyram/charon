@@ -536,7 +536,7 @@ impl ItemTransCtx<'_, '_> {
         dyn_self: &Ty,
         item: &hax::ImplAssocItem,
         mut next_ty: impl FnMut() -> Ty,
-        mut mk_field: impl FnMut(RawConstantExpr, Ty),
+        mut mk_field: impl FnMut(ConstantExprKind, Ty),
     ) -> Result<(), Error> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
@@ -574,9 +574,9 @@ impl ItemTransCtx<'_, '_> {
                         );
                     }
                 }
-                (RawConstantExpr::FnPtr(shim_ref), ty)
+                (ConstantExprKind::FnPtr(shim_ref), ty)
             }
-            hax::ImplAssocItemValue::DefaultedFn { .. } => (RawConstantExpr::Opaque(
+            hax::ImplAssocItemValue::DefaultedFn { .. } => (ConstantExprKind::Opaque(
                 "shim for default methods \
                     aren't yet supported"
                     .to_string(),
@@ -595,7 +595,7 @@ impl ItemTransCtx<'_, '_> {
         trait_def: &hax::FullDef,
         impl_def: &hax::FullDef,
         mut next_ty: impl FnMut() -> Ty,
-        mut mk_field: impl FnMut(RawConstantExpr, Ty),
+        mut mk_field: impl FnMut(ConstantExprKind, Ty),
     ) -> Result<(), Error> {
         let hax::FullDefKind::TraitImpl {
             implied_impl_exprs, ..
@@ -635,13 +635,13 @@ impl ItemTransCtx<'_, '_> {
                         .erase()
                         .expect("parent trait should be dyn compatible");
                     let global = Box::new(ConstantExpr {
-                        value: RawConstantExpr::Global(vtable_instance_ref),
+                        value: ConstantExprKind::Global(vtable_instance_ref),
                         ty: fn_ptr_ty,
                     });
-                    RawConstantExpr::Ref(global)
+                    ConstantExprKind::Ref(global)
                 }
                 // TODO(dyn): builtin impls
-                _ => RawConstantExpr::Opaque("missing supertrait vtable".into()),
+                _ => ConstantExprKind::Opaque("missing supertrait vtable".into()),
             };
             mk_field(kind, next_ty());
         }
@@ -719,9 +719,9 @@ impl ItemTransCtx<'_, '_> {
         };
 
         // TODO(dyn): provide values
-        mk_field(RawConstantExpr::Opaque("unknown size".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown align".to_string()), next_ty());
-        mk_field(RawConstantExpr::Opaque("unknown drop".to_string()), next_ty());
+        mk_field(ConstantExprKind::Opaque("unknown size".to_string()), next_ty());
+        mk_field(ConstantExprKind::Opaque("unknown align".to_string()), next_ty());
+        mk_field(ConstantExprKind::Opaque("unknown drop".to_string()), next_ty());
 
         for item in items {
             self.add_method_to_vtable_value(
@@ -748,7 +748,7 @@ impl ItemTransCtx<'_, '_> {
         // Construct the final struct.
         statements.push(Statement::new(
             span,
-            RawStatement::Assign(
+            StatementKind::Assign(
                 ret_place,
                 Rvalue::Aggregate(
                     AggregateKind::Adt(vtable_struct_ref.clone(), None, None),
@@ -759,7 +759,7 @@ impl ItemTransCtx<'_, '_> {
 
         let block = BlockData {
             statements,
-            terminator: Terminator::new(span, RawTerminator::Return),
+            terminator: Terminator::new(span, TerminatorKind::Return),
         };
 
         Ok(Body::Unstructured(GExprBody {
@@ -822,7 +822,7 @@ impl ItemTransCtx<'_, '_> {
             )),
             Operand::Move(shim_self.clone()),
         );
-        let stmt = RawStatement::Assign(target_self.clone(), rval);
+        let stmt = StatementKind::Assign(target_self.clone(), rval);
         statements.push(Statement::new(span, stmt));
 
         Ok(())
@@ -911,7 +911,7 @@ impl ItemTransCtx<'_, '_> {
             let ret = locals.new_var(name, ty);
             statements.push(Statement::new(
                 span,
-                RawStatement::StorageLive(ret.as_local().unwrap()),
+                StatementKind::StorageLive(ret.as_local().unwrap()),
             ));
             ret
         };
@@ -950,19 +950,19 @@ impl ItemTransCtx<'_, '_> {
 
         let ret_block = BlockData {
             statements: vec![],
-            terminator: Terminator::new(span, RawTerminator::Return),
+            terminator: Terminator::new(span, TerminatorKind::Return),
         };
 
         let unwind_block = BlockData {
             statements: vec![],
-            terminator: Terminator::new(span, RawTerminator::UnwindResume),
+            terminator: Terminator::new(span, TerminatorKind::UnwindResume),
         };
 
         let call_block = BlockData {
             statements,
             terminator: Terminator::new(
                 span,
-                RawTerminator::Call {
+                TerminatorKind::Call {
                     call,
                     target: BlockId::new(1),    // ret_block
                     on_unwind: BlockId::new(2), // unwind_block
