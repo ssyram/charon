@@ -641,9 +641,9 @@ impl Ty {
                 match ty_ref.id {
                     TypeId::Adt(type_decl_id) => {
                         let Some(decl) = ty_decls.get(type_decl_id) else {
-                            panic!(
+                            return PtrMetadata::InheritFrom(Ty::new(TyKind::Error(format!(
                                 "Internal Error: type decl id not found during getting metadata: {type_decl_id}"
-                            )
+                            ))));
                         };
                         match &decl.ptr_metadata {
                             // if it depends on some type, recursion with the binding env
