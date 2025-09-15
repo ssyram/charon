@@ -1,8 +1,9 @@
 //! Desugar array/slice index operations to function calls.
 
 use crate::llbc_ast::*;
+use crate::transform::insert_ptr_metadata::place_ptr_metadata_operand;
 use crate::transform::TransformCtx;
-use crate::transform::ctx::{place_ptr_metadata_operand, PtrMetadataComputable};
+use crate::transform::ctx::{BodyTransformCtx};
 use derive_generic_visitor::*;
 
 use super::ctx::LlbcPass;
@@ -27,7 +28,7 @@ struct IndexVisitor<'a, 'b> {
     ctx: &'b TransformCtx,
 }
 
-impl PtrMetadataComputable for IndexVisitor<'_, '_> {
+impl BodyTransformCtx for IndexVisitor<'_, '_> {
     fn get_locals_mut(&mut self) -> &mut Locals {
         self.locals
     }
