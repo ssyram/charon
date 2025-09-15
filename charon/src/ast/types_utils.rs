@@ -778,7 +778,6 @@ impl TraitRef {
         });
         TraitRef {
             kind: TraitRefKind::BuiltinOrAuto {
-                trait_decl_ref: trait_decl_ref.clone(),
                 parent_trait_refs: parents,
                 types: Default::default(),
             },
