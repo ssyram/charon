@@ -62,12 +62,15 @@ fn outmost_deref_at_last_field(ctx: &TransformCtx, place: &Place) -> Option<(Pla
         ProjectionElem::Field(proj_kind, field) if is_last_field(ctx, proj_kind, field) => {
             outmost_deref_at_last_field(ctx, subplace)
         }
-        // Otherwise, it could be one of the following cases:
-        // 1. It is a field access, but not the last field, so it does not have metadata;
-        // 2. It is an index / sub-slice access, which must return a reference,
-        //    As we are checking for *outmost*, it means no deref is performed,
-        //    so it must remain a reference, which does not have metadata.
-        _ => None,
+        // This is not the last field, so it will never have metadata
+        ProjectionElem::Field(..) => None,
+        // Indexing for array & slice will only result in sized types, hence no metadata
+        ProjectionElem::Index { .. } => None,
+        // Subslice must have metadata length, but the key is which place to fetch it from?
+        // I.e., in places like `x[..]`, it returns `{[TypeOf<x>] as Index[Mut]}::Output`
+        ProjectionElem::Subslice { .. } => {
+            Some((place.clone(), place.ty().clone()))
+        }
     }
 }
 
