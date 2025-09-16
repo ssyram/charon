@@ -18,7 +18,7 @@ use super::translate_ctx::*;
 use charon_lib::ast::*;
 use charon_lib::options::{CliOpts, TranslateOptions};
 use charon_lib::transform::TransformCtx;
-use hax_frontend_exporter::{self as hax, SInto};
+use hax::SInto;
 use itertools::Itertools;
 use macros::VariantIndexArity;
 use rustc_middle::ty::TyCtxt;
@@ -589,7 +589,10 @@ pub fn translate<'tcx, 'ctx>(
         tcx,
         hax::options::Options {
             inline_anon_consts: true,
-            resolve_drop_bounds: options.add_drop_bounds,
+            bounds_options: hax::options::BoundsOptions {
+                resolve_drop: options.add_drop_bounds,
+                prune_sized: false,
+            },
         },
     );
 
