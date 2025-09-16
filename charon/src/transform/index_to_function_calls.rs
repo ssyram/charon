@@ -1,9 +1,9 @@
 //! Desugar array/slice index operations to function calls.
 
 use crate::llbc_ast::*;
-use crate::transform::insert_ptr_metadata::place_ptr_metadata_operand;
 use crate::transform::TransformCtx;
-use crate::transform::ctx::{BodyTransformCtx};
+use crate::transform::ctx::BodyTransformCtx;
+use crate::transform::insert_ptr_metadata::place_ptr_metadata_operand;
 use derive_generic_visitor::*;
 
 use super::ctx::LlbcPass;

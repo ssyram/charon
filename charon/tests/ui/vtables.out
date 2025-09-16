@@ -465,7 +465,7 @@ where
     let @6: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)); // anonymous local
     let @7: &'_ (T); // anonymous local
     let @8: PtrMetadata<T>; // anonymous local
-    let @9: &'static (test_crate::Modifiable::{vtable}<missing(@Type0_1)>); // anonymous local
+    let @9: &'static (test_crate::Modifiable::{vtable}<T>); // anonymous local
     let @10: (); // anonymous local
     let @11: (); // anonymous local
 
@@ -884,7 +884,7 @@ fn main()
     let @60: &'_ (i64); // anonymous local
     let @61: &'_ (i64); // anonymous local
     let @62: i64; // anonymous local
-    let @63: &'static (test_crate::Checkable::{vtable}<missing(@Type0_1)>); // anonymous local
+    let @63: &'static (test_crate::Checkable::{vtable}<i32>); // anonymous local
     let @64: (); // anonymous local
     let @65: (); // anonymous local
     let @66: usize; // anonymous local
@@ -895,7 +895,7 @@ fn main()
     let @71: (); // anonymous local
     let @72: (); // anonymous local
     let @73: (); // anonymous local
-    let @74: &'static (test_crate::Modifiable::{vtable}<missing(@Type0_1)>); // anonymous local
+    let @74: &'static (test_crate::Modifiable::{vtable}<i32>); // anonymous local
     let @75: (); // anonymous local
     let @76: (); // anonymous local
     let @77: (); // anonymous local

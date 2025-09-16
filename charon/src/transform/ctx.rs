@@ -241,7 +241,7 @@ impl fmt::Display for TransformCtx {
     }
 }
 
-/// A helper trait to compute the metadata for a given place we are to make ref / raw-ptr from.
+/// A helper trait that captures the usual operation in body transformation.
 pub trait BodyTransformCtx {
     /// Create a local & return the place pointing to it
     fn get_locals_mut(&mut self) -> &mut Locals;

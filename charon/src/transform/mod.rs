@@ -33,12 +33,12 @@ pub mod remove_unused_locals;
 pub mod remove_unused_methods;
 pub mod remove_unused_self_clause;
 pub mod reorder_decls;
+pub mod resolve_sized_ptr_metadata_inherit;
 pub mod simplify_constants;
 pub mod skip_trait_refs_when_known;
 pub mod ullbc_to_llbc;
 pub mod unbind_item_vars;
 pub mod update_block_indices;
-pub mod resolve_sized_ptr_metadata_inherit;
 pub mod utils;
 
 use Pass::*;

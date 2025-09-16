@@ -1,7 +1,7 @@
 use crate::formatter::IntoFormatter;
 use crate::pretty::FmtWithCtx;
 use crate::transform::TransformCtx;
-use crate::transform::ctx::{BodyTransformCtx};
+use crate::transform::ctx::BodyTransformCtx;
 use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
 use derive_generic_visitor::*;
 
@@ -28,9 +28,14 @@ fn is_last_field_of_ty_decl_id(
         TypeDeclKind::Union(..) => false,
         TypeDeclKind::Opaque => panic!(
             "Accessing the field {} of an opaque type {}! Cannot tell whether this is the last field. Please consider translating the opaque type definition by `--include`.",
-            field, type_decl_id.with_ctx(&ctx.into_fmt())
+            field,
+            type_decl_id.with_ctx(&ctx.into_fmt())
         ),
-        TypeDeclKind::Alias(ty) => panic!("Alias type {} should have been resolved before this point! Found alias to {}.", type_decl_id.with_ctx(&ctx.into_fmt()), ty.with_ctx(&ctx.into_fmt())),
+        TypeDeclKind::Alias(ty) => panic!(
+            "Alias type {} should have been resolved before this point! Found alias to {}.",
+            type_decl_id.with_ctx(&ctx.into_fmt()),
+            ty.with_ctx(&ctx.into_fmt())
+        ),
         TypeDeclKind::Error(_) => panic!("Accessing the field of an error type!"),
     }
 }
@@ -120,7 +125,6 @@ pub fn place_ptr_metadata_operand<T: BodyTransformCtx>(ctx: &mut T, place: &Plac
         },
     }
 }
-
 
 impl BodyTransformCtx for BodyVisitor<'_, '_> {
     fn get_locals_mut(&mut self) -> &mut Locals {

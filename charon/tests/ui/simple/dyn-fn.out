@@ -105,7 +105,7 @@ fn takes_fn<'_0>(@1: &'_0 ((dyn exists<_dyn> [@TraitClause0]: for<'a> Fn<_dyn, (
     let @7: &'_ mut (u32); // anonymous local
     let @8: (); // anonymous local
     let @9: (); // anonymous local
-    let @10: &'static (core::ops::function::Fn::{vtable}<missing(@Type0_1), Self::parent_clause1::parent_clause1::Output>); // anonymous local
+    let @10: &'static (core::ops::function::Fn::{vtable}<(&'_ mut (u32)), bool>); // anonymous local
 
     storage_live(counter@2)
     counter@2 := const (0 : u32)
