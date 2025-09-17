@@ -744,7 +744,16 @@ impl Ty {
                     TypeId::Builtin(BuiltinTy::Str) => PtrMetadata::Length,
                 }
             }
-            TyKind::DynTrait(pred) => PtrMetadata::VTable(pred.vtable_ref(translated)),
+            TyKind::DynTrait(pred) => match pred.vtable_ref(translated) {
+                Some(vtable) => PtrMetadata::VTable(vtable),
+                None => PtrMetadata::InheritFrom(
+                    TyKind::Error(format!(
+                        "Vtable for dyn trait {} not found",
+                        pred.with_ctx(&translated.into_fmt())
+                    ))
+                    .into(),
+                ),
+            },
             TyKind::TraitType(..) | TyKind::TypeVar(_) => PtrMetadata::InheritFrom(self.clone()),
             TyKind::Literal(_)
             | TyKind::Never
@@ -899,7 +908,7 @@ impl DynPredicate {
     /// Matches associated types from the vtable's generics with the dyn predicates's constraints.
     ///
     /// Rustc guarantees all associated types are specified in a `dyn Trait` type.
-    pub fn vtable_ref(&self, translated: &TranslatedCrate) -> TypeDeclRef {
+    pub fn vtable_ref(&self, translated: &TranslatedCrate) -> Option<TypeDeclRef> {
         // Get vtable_ref's ID with trait-ref's generics from dyn-self applied.
         // Add associated types in correct order following the vtable's generics.
 
@@ -914,10 +923,12 @@ impl DynPredicate {
         // 1. Get vtable ref from trait declaration
         //    Provides: 1) final return ID, 2) correct order of associated types
         // Firstly, get the trait declaration for the vtable ref it stores.
-        let trait_decl = translated
+        let Some(trait_decl) = translated
             .trait_decls
             .get(self.binder.params.trait_clauses[0].trait_.skip_binder.id)
-            .unwrap();
+        else {
+            return None;
+        };
 
         // Get vtable ref from definition for correct ID.
         // Generics in vtable ref are placeholders but provide correct order of the associated types.
@@ -963,9 +974,10 @@ impl DynPredicate {
                     None
                 }
             })
-            .collect::<Vec<_>>();
+            .collect_vec();
 
         // Find correct type argument from dyn trait's constraints for each assoc type.
+        // TODO: use proper normalization here instead of doing it by hand
         for (trait_id, assoc_name) in assoc_tys {
             // Find it
             let Some(assoc_ty) = binder.params.trait_type_constraints.iter().find_map(|c| {
@@ -993,10 +1005,10 @@ impl DynPredicate {
         }
 
         // 5. Return vtable ref's ID with correct generics
-        TypeDeclRef {
+        Some(TypeDeclRef {
             id: vtable_ref.id,
             generics,
-        }
+        })
     }
 }
 

@@ -94,11 +94,11 @@ where
     let self@1: &'_ (F); // arg #1
     let @2: &'_ (F); // anonymous local
     let @3: (); // anonymous local
-    let @4: PtrMetadata<F>; // anonymous local
+    let @4: (); // anonymous local
 
     storage_live(@2)
     storage_live(@4)
-    @4 := ptr_metadata(copy (self@1))
+    @4 := ()
     @2 := &(*(self@1), move (@4))
     storage_live(@3)
     @3 := ()

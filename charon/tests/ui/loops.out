@@ -2298,7 +2298,7 @@ where
     let @10: (); // anonymous local
     let @11: (); // anonymous local
     let @12: (); // anonymous local
-    let @13: PtrMetadata<T>; // anonymous local
+    let @13: (); // anonymous local
     let @14: (); // anonymous local
 
     storage_live(x@4)
@@ -2347,7 +2347,7 @@ where
                 }
                 storage_dead(@7)
                 storage_live(@13)
-                @13 := ptr_metadata(copy (x@4))
+                @13 := ()
                 @0 := &mut (*(x@4), move (@13))
                 storage_dead(@6)
                 storage_dead(tl@5)

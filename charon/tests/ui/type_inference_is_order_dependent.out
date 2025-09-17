@@ -159,7 +159,7 @@ where
     let @10: Array<&'_ (Str), 2 : usize>; // anonymous local
     let @11: &'_ (Array<Argument<'_>, 1 : usize>); // anonymous local
     let @12: &'_ (Array<Argument<'_>, 1 : usize>); // anonymous local
-    let @13: PtrMetadata<U>; // anonymous local
+    let @13: (); // anonymous local
     let @14: (); // anonymous local
     let @15: (); // anonymous local
     let @16: (); // anonymous local
@@ -178,7 +178,7 @@ where
     @14 := ()
     @6 := &(@7, move (@14))
     storage_live(@13)
-    @13 := ptr_metadata(copy (@6))
+    @13 := ()
     @5 := &(*(@6), move (@13))
     @4 := new_debug<'_, '_, U>[@TraitClause1, @TraitClause5](move (@5))
     storage_dead(@5)

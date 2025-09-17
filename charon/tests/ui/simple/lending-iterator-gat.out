@@ -131,8 +131,8 @@ where
     let item@3: &'_ (T); // local
     let @4: Option<&'_ (T)>[Sized<&'_ (T)>]; // anonymous local
     let @5: &'_ (T); // anonymous local
-    let @6: PtrMetadata<T>; // anonymous local
-    let @7: PtrMetadata<T>; // anonymous local
+    let @6: (); // anonymous local
+    let @7: (); // anonymous local
     let @8: (); // anonymous local
 
     match *(self@1) {
@@ -149,7 +149,7 @@ where
     item@2 := &mut ((*(self@1) as variant Option::Some).0, move (@8))
     storage_live(item@3)
     storage_live(@7)
-    @7 := ptr_metadata(copy (*(item@2)))
+    @7 := ()
     item@3 := &(*(*(item@2)), move (@7))
     storage_live(@4)
     @4 := Option::None {  }
@@ -157,7 +157,7 @@ where
     storage_dead(@4)
     storage_live(@5)
     storage_live(@6)
-    @6 := ptr_metadata(copy (item@3))
+    @6 := ()
     @5 := &(*(item@3), move (@6))
     @0 := Option::Some { 0: move (@5) }
     storage_dead(@5)

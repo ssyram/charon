@@ -3,7 +3,9 @@
 use crate::llbc_ast::*;
 use crate::transform::TransformCtx;
 use crate::transform::ctx::BodyTransformCtx;
-use crate::transform::insert_ptr_metadata::place_ptr_metadata_operand;
+use crate::transform::insert_ptr_metadata::{
+    BodyTransformCtxWithParams, place_ptr_metadata_operand,
+};
 use derive_generic_visitor::*;
 
 use super::ctx::LlbcPass;
@@ -26,6 +28,7 @@ struct IndexVisitor<'a, 'b> {
     // Span of the statement.
     span: Span,
     ctx: &'b TransformCtx,
+    params: &'a GenericParams,
 }
 
 impl BodyTransformCtx for IndexVisitor<'_, '_> {
@@ -50,6 +53,12 @@ impl BodyTransformCtx for IndexVisitor<'_, '_> {
     fn insert_storage_dead_stmt(&mut self, local: LocalId) {
         let statement = StatementKind::StorageDead(local);
         self.statements.push(Statement::new(self.span, statement));
+    }
+}
+
+impl BodyTransformCtxWithParams for IndexVisitor<'_, '_> {
+    fn get_params(&self) -> &GenericParams {
+        self.params
     }
 }
 
@@ -295,6 +304,45 @@ impl VisitBodyMut for IndexVisitor<'_, '_> {
 
 pub struct Transform;
 
+impl Transform {
+    fn transform_body_with_param(
+        &self,
+        ctx: &mut TransformCtx,
+        b: &mut ExprBody,
+        params: &GenericParams,
+    ) {
+        b.body.transform(|st: &mut Statement| {
+            let mut visitor = IndexVisitor {
+                locals: &mut b.locals,
+                statements: Vec::new(),
+                place_mutability_stack: Vec::new(),
+                span: st.span,
+                ctx: &ctx,
+                params,
+            };
+            use StatementKind::*;
+            match &mut st.content {
+                Assign(..)
+                | SetDiscriminant(..)
+                | CopyNonOverlapping(_)
+                | Drop(..)
+                | Deinit(..)
+                | Call(..) => {
+                    let _ = visitor.visit_inner_with_mutability(st, true);
+                }
+                Switch(..) => {
+                    let _ = visitor.visit_inner_with_mutability(st, false);
+                }
+                Nop | Error(..) | Assert(..) | Abort(..) | StorageDead(..) | StorageLive(..)
+                | Return | Break(..) | Continue(..) | Loop(..) => {
+                    let _ = st.drive_body_mut(&mut visitor);
+                }
+            }
+            visitor.statements
+        });
+    }
+}
+
 /// We do the following.
 ///
 /// If `p` is a projection (for instance: `var`, `*var`, `var.f`, etc.), we
@@ -354,34 +402,13 @@ pub struct Transform;
 ///   *tmp1 = x
 /// ```
 impl LlbcPass for Transform {
-    fn transform_body(&self, ctx: &mut TransformCtx, b: &mut ExprBody) {
-        b.body.transform(|st: &mut Statement| {
-            let mut visitor = IndexVisitor {
-                locals: &mut b.locals,
-                statements: Vec::new(),
-                place_mutability_stack: Vec::new(),
-                span: st.span,
-                ctx: &ctx,
-            };
-            use StatementKind::*;
-            match &mut st.content {
-                Assign(..)
-                | SetDiscriminant(..)
-                | CopyNonOverlapping(_)
-                | Drop(..)
-                | Deinit(..)
-                | Call(..) => {
-                    let _ = visitor.visit_inner_with_mutability(st, true);
-                }
-                Switch(..) => {
-                    let _ = visitor.visit_inner_with_mutability(st, false);
-                }
-                Nop | Error(..) | Assert(..) | Abort(..) | StorageDead(..) | StorageLive(..)
-                | Return | Break(..) | Continue(..) | Loop(..) => {
-                    let _ = st.drive_body_mut(&mut visitor);
-                }
-            }
-            visitor.statements
-        });
+    fn transform_function(&self, ctx: &mut TransformCtx, decl: &mut FunDecl) {
+        if let Ok(body) = &mut decl.body {
+            self.transform_body_with_param(
+                ctx,
+                body.as_structured_mut().unwrap(),
+                &decl.signature.generics,
+            )
+        }
     }
 }

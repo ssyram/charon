@@ -94,11 +94,11 @@ where
     let f@1: &'_ (impl Fn(u8, u8) -> u8); // arg #1
     let @2: &'_ (impl Fn(u8, u8) -> u8); // anonymous local
     let @3: (u8, u8); // anonymous local
-    let @4: PtrMetadata<impl Fn(u8, u8) -> u8>; // anonymous local
+    let @4: (); // anonymous local
 
     storage_live(@2)
     storage_live(@4)
-    @4 := ptr_metadata(copy (f@1))
+    @4 := ()
     @2 := &(*(f@1), move (@4))
     storage_live(@3)
     @3 := (const (10 : u8), const (20 : u8))
@@ -119,11 +119,11 @@ where
     let f@1: &'_ mut (impl FnMut(u8, u8) -> u8); // arg #1
     let @2: &'_ mut (impl FnMut(u8, u8) -> u8); // anonymous local
     let @3: (u8, u8); // anonymous local
-    let @4: PtrMetadata<impl FnMut(u8, u8) -> u8>; // anonymous local
+    let @4: (); // anonymous local
 
     storage_live(@2)
     storage_live(@4)
-    @4 := ptr_metadata(copy (f@1))
+    @4 := ()
     @2 := &mut (*(f@1), move (@4))
     storage_live(@3)
     @3 := (const (10 : u8), const (20 : u8))

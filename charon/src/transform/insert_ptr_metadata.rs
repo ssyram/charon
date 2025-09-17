@@ -13,6 +13,7 @@ struct BodyVisitor<'a, 'b> {
     statements: Vec<Statement>,
     span: Span,
     ctx: &'b TransformCtx,
+    params: &'a GenericParams,
 }
 
 fn is_last_field_of_ty_decl_id(
@@ -75,22 +76,49 @@ fn outmost_deref_at_last_field<T: BodyTransformCtx>(
         ProjectionElem::Field(..) => None,
         // Indexing for array & slice will only result in sized types, hence no metadata
         ProjectionElem::Index { .. } => None,
-        // Subslice must have metadata length, but the key is which place to fetch it from?
-        // I.e., in places like `x[..]`, it returns `{[TypeOf<x>] as Index[Mut]}::Output`
+        // Subslice must have metadata length, compute the metadata here as `to` - `from`
         ProjectionElem::Subslice { from, to, from_end } => {
             let to_idx = compute_to_idx(ctx, subplace, *to.clone(), *from_end);
             let diff_place = ctx.fresh_var(None, Ty::mk_usize());
             ctx.insert_assn_stmt(
                 diff_place.clone(),
                 // `to` cannot be less than `from` as per Rust rules, so panic
-                Rvalue::BinaryOp(BinOp::Sub(OverflowMode::Panic), to_idx, *from.clone()),
+                Rvalue::BinaryOp(BinOp::Sub(OverflowMode::UB), to_idx, *from.clone()),
             );
             Some((Rvalue::Use(Operand::Copy(diff_place)), place.ty().clone()))
         }
     }
 }
 
-fn get_ptr_metadata_aux<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Option<Operand> {
+fn is_sized_type_var<T: BodyTransformCtxWithParams>(ctx: &mut T, ty: &Ty) -> bool {
+    match ty.kind() {
+        TyKind::TypeVar(..) => {
+            let params = ctx.get_params();
+            for clause in &params.trait_clauses {
+                let tref = clause.trait_.clone().erase();
+                // Check if it is `Sized<T>`
+                if tref.generics.types[0] == *ty
+                    && ctx
+                        .get_ctx()
+                        .translated
+                        .trait_decls
+                        .get(tref.id)
+                        .and_then(|decl| decl.item_meta.lang_item.clone())
+                        == Some("sized".into())
+                {
+                    return true;
+                }
+            }
+            false
+        }
+        _ => false,
+    }
+}
+
+fn get_ptr_metadata_aux<T: BodyTransformCtxWithParams>(
+    ctx: &mut T,
+    place: &Place,
+) -> Option<Operand> {
     trace!(
         "getting ptr metadata for place: {}",
         place.with_ctx(&ctx.get_ctx().into_fmt())
@@ -104,7 +132,14 @@ fn get_ptr_metadata_aux<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Opti
             Ty::new(TyKind::Adt(type_decl_ref)),
             RefKind::Shared,
         ))),
-        PtrMetadata::InheritFrom(ty) => Some(Ty::new(TyKind::PtrMetadata(ty))),
+        // If the type var is known to be `Sized`, then no metadata is needed
+        PtrMetadata::InheritFrom(ty) => {
+            if is_sized_type_var(ctx, &ty) {
+                None
+            } else {
+                Some(Ty::new(TyKind::PtrMetadata(ty)))
+            }
+        }
     }?;
     trace!(
         "computed metadata type: {}",
@@ -127,7 +162,10 @@ fn no_metadata<T: BodyTransformCtx>(ctx: &mut T) -> Operand {
 /// When a place is to be referred to as a reference or a raw pointer, we compute the metadata required
 /// for this operation and return it as an operand.
 /// New locals & statements are to be inserted before the target place to keep the metadata.
-pub fn place_ptr_metadata_operand<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Operand {
+pub fn place_ptr_metadata_operand<T: BodyTransformCtxWithParams>(
+    ctx: &mut T,
+    place: &Place,
+) -> Operand {
     // add a shortcut here -- if the type is originally not a type with ptr-metadata, ignore it
     match place.ty().get_ptr_metadata(&ctx.get_ctx().translated) {
         PtrMetadata::None => return no_metadata(ctx),
@@ -135,6 +173,16 @@ pub fn place_ptr_metadata_operand<T: BodyTransformCtx>(ctx: &mut T, place: &Plac
             Some(metadata) => metadata,
             None => no_metadata(ctx),
         },
+    }
+}
+
+pub trait BodyTransformCtxWithParams: BodyTransformCtx {
+    fn get_params(&self) -> &GenericParams;
+}
+
+impl BodyTransformCtxWithParams for BodyVisitor<'_, '_> {
+    fn get_params(&self) -> &GenericParams {
+        self.params
     }
 }
 
@@ -192,6 +240,29 @@ impl VisitBodyMut for BodyVisitor<'_, '_> {
 
 pub struct Transform;
 
+impl Transform {
+    fn transform_body_with_param(
+        &self,
+        ctx: &mut TransformCtx,
+        b: &mut ExprBody,
+        params: &GenericParams,
+    ) {
+        b.body.iter_mut().for_each(|data| {
+            data.transform(|st: &mut Statement| {
+                let mut visitor = BodyVisitor {
+                    locals: &mut b.locals,
+                    statements: Vec::new(),
+                    span: st.span,
+                    ctx: &ctx,
+                    params,
+                };
+                let _ = st.drive_body_mut(&mut visitor);
+                visitor.statements
+            });
+        });
+    }
+}
+
 /// This pass computes the metadata for Rvalue, which is used to create references and raw pointers.
 /// E.g., in cases like:
 /// ```ignore
@@ -204,18 +275,13 @@ pub struct Transform;
 /// ```
 /// There should be a new local variable introduced to store `PtrMetadata(some_v)`.
 impl UllbcPass for Transform {
-    fn transform_body(&self, ctx: &mut TransformCtx, b: &mut ExprBody) {
-        b.body.iter_mut().for_each(|data| {
-            data.transform(|st: &mut Statement| {
-                let mut visitor = BodyVisitor {
-                    locals: &mut b.locals,
-                    statements: Vec::new(),
-                    span: st.span,
-                    ctx: &ctx,
-                };
-                let _ = st.drive_body_mut(&mut visitor);
-                visitor.statements
-            });
-        });
+    fn transform_function(&self, ctx: &mut TransformCtx, decl: &mut FunDecl) {
+        if let Ok(body) = &mut decl.body {
+            self.transform_body_with_param(
+                ctx,
+                body.as_unstructured_mut().unwrap(),
+                &decl.signature.generics,
+            )
+        }
     }
 }

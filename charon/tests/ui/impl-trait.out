@@ -310,13 +310,13 @@ where
     let tupled_args@2: (&'_0 (U)); // arg #2
     let x@3: &'_ (U); // local
     let @4: &'_ (U); // anonymous local
-    let @5: PtrMetadata<U>; // anonymous local
+    let @5: (); // anonymous local
 
     storage_live(x@3)
     x@3 := move ((tupled_args@2).0)
     storage_live(@4)
     storage_live(@5)
-    @5 := ptr_metadata(copy (x@3))
+    @5 := ()
     @4 := &(*(x@3), move (@5))
     @0 := WrapClone { 0: move (@4) }
     storage_dead(@4)

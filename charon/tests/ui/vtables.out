@@ -354,13 +354,13 @@ where
     let @3: &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)); // anonymous local
     let @4: &'_ (T); // anonymous local
     let @5: &'static (test_crate::NoParam::{vtable}); // anonymous local
-    let @6: PtrMetadata<T>; // anonymous local
+    let @6: (); // anonymous local
 
     storage_live(@2)
     storage_live(@3)
     storage_live(@4)
     storage_live(@6)
-    @6 := ptr_metadata(copy (arg@1))
+    @6 := ()
     @4 := &(*(arg@1), move (@6))
     @3 := unsize_cast<&'_ (T), &'_ ((dyn exists<_dyn> [@TraitClause0]: NoParam<_dyn> + _dyn : '_)), @TraitClause1>(move (@4))
     storage_dead(@4)
@@ -405,14 +405,14 @@ where
     let arg@2: &'_ (T); // arg #2
     let @3: i32; // anonymous local
     let @4: &'_ (T); // anonymous local
-    let @5: PtrMetadata<T>; // anonymous local
+    let @5: (); // anonymous local
 
     storage_live(@3)
     @3 := copy (*(self@1)) panic.+ const (1 : i32)
     *(self@1) := move (@3)
     storage_live(@4)
     storage_live(@5)
-    @5 := ptr_metadata(copy (arg@2))
+    @5 := ()
     @4 := &(*(arg@2), move (@5))
     @0 := @TraitClause1::clone<'_>(move (@4))
     storage_dead(@4)
@@ -464,7 +464,7 @@ where
     let @5: i32; // anonymous local
     let @6: &'_ mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)); // anonymous local
     let @7: &'_ (T); // anonymous local
-    let @8: PtrMetadata<T>; // anonymous local
+    let @8: (); // anonymous local
     let @9: &'static (test_crate::Modifiable::{vtable}<T>); // anonymous local
     let @10: (); // anonymous local
     let @11: (); // anonymous local
@@ -489,7 +489,7 @@ where
     @6 := &two-phase-mut (*(x@2), move (@9))
     storage_live(@7)
     storage_live(@8)
-    @8 := ptr_metadata(copy (arg@1))
+    @8 := ()
     @7 := &(*(arg@1), move (@8))
     @0 := Modifiable<(dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_), T>::modify<'_, '_>(move (@6), move (@7))
     storage_dead(@7)
