@@ -2,9 +2,7 @@ use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
 };
 
-use charon_lib::formatter::IntoFormatter;
 use charon_lib::ids::Vector;
-use charon_lib::pretty::FmtWithCtx;
 use charon_lib::ullbc_ast::*;
 use itertools::Itertools;
 
@@ -551,11 +549,13 @@ impl ItemTransCtx<'_, '_> {
                 // The method is vtable safe so it has no generics, hence we can reuse the impl
                 // generics.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
-                let shim_ref = self.translate_fn_ptr(
-                    span,
-                    &item_ref,
-                    TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
-                )?.erase();
+                let shim_ref = self
+                    .translate_fn_ptr(
+                        span,
+                        &item_ref,
+                        TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
+                    )?
+                    .erase();
                 ConstantExprKind::FnPtr(shim_ref)
             }
             hax::ImplAssocItemValue::DefaultedFn { .. } => ConstantExprKind::Opaque(
@@ -695,7 +695,10 @@ impl ItemTransCtx<'_, '_> {
         // For each vtable field, assign the desired value to a new local.
         let mut field_ty_iter = field_tys.into_iter();
         let mut mk_field = |kind| {
-            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { value: kind, ty: field_ty_iter.next().unwrap() })));
+            aggregate_fields.push(Operand::Const(Box::new(ConstantExpr {
+                value: kind,
+                ty: field_ty_iter.next().unwrap(),
+            })));
         };
 
         // TODO(dyn): provide values
@@ -749,41 +752,6 @@ impl ItemTransCtx<'_, '_> {
         }))
     }
 
-    fn check_concretization_ty_match(
-        &self,
-        span: Span,
-        src_ty: &Ty,
-        tar_ty: &Ty,
-    ) -> Result<(), Error> {
-        match (src_ty.kind(), tar_ty.kind()) {
-            (TyKind::Ref(.., src_kind), TyKind::Ref(.., tar_kind)) => {
-                assert_eq!(src_kind, tar_kind);
-                Ok(())
-            }
-            (TyKind::RawPtr(.., src_kind), TyKind::RawPtr(.., tar_kind)) => {
-                assert_eq!(src_kind, tar_kind);
-                Ok(())
-            }
-            (
-                TyKind::Adt(TypeDeclRef { id: src_id, .. }),
-                TyKind::Adt(TypeDeclRef { id: tar_id, .. }),
-            ) => {
-                assert_eq!(src_id, tar_id);
-                Ok(())
-            }
-            _ => {
-                let fmt = &self.into_fmt();
-                raise_error!(
-                    self,
-                    span,
-                    "Invalid concretization targets: from \"{}\" to \"{}\"",
-                    src_ty.with_ctx(fmt),
-                    tar_ty.with_ctx(fmt)
-                )
-            }
-        }
-    }
-
     fn generate_concretization(
         &mut self,
         span: Span,
@@ -791,9 +759,6 @@ impl ItemTransCtx<'_, '_> {
         shim_self: &Place,
         target_self: &Place,
     ) -> Result<(), Error> {
-        // guarantees that both types are valid
-        self.check_concretization_ty_match(span, shim_self.ty(), target_self.ty())?;
-
         let rval = Rvalue::UnaryOp(
             UnOp::Cast(CastKind::Concretize(
                 shim_self.ty().clone(),
@@ -972,6 +937,7 @@ impl ItemTransCtx<'_, '_> {
         let span = item_meta.span;
         // compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
+
         let target_receiver = signature.inputs[0].clone();
         // dynify the receiver type, e.g., &T -> &dyn Trait when `impl ... for T`
         // Pin<Box<i32>> -> Pin<Box<dyn Trait>> when `impl ... for i32`
