@@ -331,6 +331,10 @@ and trait_instance_id_to_string (env : 'a fmt_env)
       let inst_id = trait_ref_to_string env tref in
       let clause_id = trait_clause_id_to_string env clause_id in
       "parent(" ^ inst_id ^ ")::" ^ clause_id
+  | ItemClause (tref, name, clause_id) ->
+      let inst_id = trait_ref_to_string env tref in
+      let clause_id = trait_clause_id_to_string env clause_id in
+      "item(" ^ inst_id ^ ")::" ^ name ^ "::" ^ clause_id
   | Dyn ->
       let trait =
         region_binder_to_string trait_decl_ref_to_string env
@@ -340,22 +344,7 @@ and trait_instance_id_to_string (env : 'a fmt_env)
   | UnknownTrait msg -> "UNKNOWN(" ^ msg ^ ")"
 
 and trait_ref_to_string (env : 'a fmt_env) (tr : trait_ref) : string =
-  match tr.trait_id with
-  | Self -> "Self"
-  | TraitImpl impl_ref -> trait_impl_ref_to_string env impl_ref
-  | BuiltinOrAuto _ ->
-      region_binder_to_string trait_decl_ref_to_string env tr.trait_decl_ref
-  | Clause id -> trait_db_var_to_string env id
-  | ParentClause (tref, clause_id) ->
-      let inst_id = trait_ref_to_string env tref in
-      let clause_id = trait_clause_id_to_string env clause_id in
-      "parent(" ^ inst_id ^ ")::" ^ clause_id
-  | Dyn ->
-      let trait =
-        region_binder_to_string trait_decl_ref_to_string env tr.trait_decl_ref
-      in
-      "dyn(" ^ trait ^ ")"
-  | UnknownTrait msg -> "UNKNOWN(" ^ msg ^ ")"
+  trait_instance_id_to_string env (Some tr.trait_decl_ref) tr.trait_id
 
 and trait_decl_ref_to_string (env : 'a fmt_env) (tr : trait_decl_ref) : string =
   let trait_id = trait_decl_id_to_string env tr.id in

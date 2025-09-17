@@ -99,7 +99,6 @@ pub enum TraitRefKind {
     ///                         clause 1 from item W (from local clause 0)
     /// }
     /// ```
-    #[charon::opaque]
     ItemClause(Box<TraitRef>, TraitItemName, TraitClauseId),
 
     /// The implicit `Self: Trait` clause. Present inside trait declarations, including trait
@@ -224,6 +223,8 @@ pub struct RegionBinder<T> {
 )]
 #[charon::variants_prefix("BK")]
 pub enum BinderKind {
+    /// The parameters of a generic associated type.
+    TraitType(TraitDeclId, TraitItemName),
     /// The parameters of a trait method. Used in the `methods` lists in trait decls and trait
     /// impls.
     TraitMethod(TraitDeclId, TraitItemName),
