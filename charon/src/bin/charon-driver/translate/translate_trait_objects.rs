@@ -317,11 +317,23 @@ impl ItemTransCtx<'_, '_> {
         Ok(fields)
     }
 
+    /// This is a temporary check until we support `dyn Trait` with `--monomorphize`.
+    pub(crate) fn check_no_monomorphize(&self, span: Span) -> Result<(), Error> {
+        if self.monomorphize() {
+            raise_error!(
+                self,
+                span,
+                "`dyn Trait` is not yet supported with `--monomorphize`; \
+                use `--monomorphize-conservative` instead"
+            )
+        }
+        Ok(())
+    }
+
     /// Construct the type of the vtable for this trait.
     ///
     /// It's a struct that has for generics the generics of the trait + one parameter for each
     /// associated type of the trait and its parents.
-    /// TODO(dyn): add the associated types.
     ///
     /// struct TraitVTable<TraitArgs.., AssocTys..> {
     ///   size: usize,
@@ -347,6 +359,7 @@ impl ItemTransCtx<'_, '_> {
                 for a non-dyn-compatible trait"
             );
         }
+        self.check_no_monomorphize(span)?;
 
         self.translate_def_generics(span, trait_def)?;
 
@@ -502,6 +515,7 @@ impl ItemTransCtx<'_, '_> {
     ) -> Result<GlobalDecl, Error> {
         let span = item_meta.span;
         self.translate_def_generics(span, impl_def)?;
+        self.check_no_monomorphize(span)?;
 
         let (impl_ref, _, vtable_struct_ref) =
             self.get_vtable_instance_info(span, impl_def, impl_kind)?;
@@ -781,6 +795,7 @@ impl ItemTransCtx<'_, '_> {
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
         self.translate_def_generics(span, impl_def)?;
+        self.check_no_monomorphize(span)?;
 
         let (impl_ref, _, vtable_struct_ref) =
             self.get_vtable_instance_info(span, impl_def, impl_kind)?;
@@ -935,6 +950,7 @@ impl ItemTransCtx<'_, '_> {
         impl_func_def: &hax::FullDef,
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
+        self.check_no_monomorphize(span)?;
         // compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
 
