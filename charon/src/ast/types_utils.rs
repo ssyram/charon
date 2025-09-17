@@ -576,6 +576,10 @@ impl Ty {
         Self::mk_tuple(vec![])
     }
 
+    pub fn mk_usize() -> Ty {
+        TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)).into()
+    }
+
     pub fn mk_tuple(tys: Vec<Ty>) -> Ty {
         TyKind::Adt(TypeDeclRef {
             id: TypeId::Tuple,

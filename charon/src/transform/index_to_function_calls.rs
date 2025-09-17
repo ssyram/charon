@@ -46,6 +46,43 @@ impl BodyTransformCtx for IndexVisitor<'_, '_> {
     fn get_ctx(&self) -> &TransformCtx {
         self.ctx
     }
+    
+    fn insert_storage_dead_stmt(&mut self, local: LocalId) {
+        let statement = StatementKind::StorageDead(local);
+        self.statements.push(Statement::new(self.span, statement));
+    }
+}
+
+/// When `from_end` is true, we need to compute `len(p) - last_arg` instead of just using `last_arg`.
+/// Otherwise, we simply return `last_arg`.
+/// New local variables are created as needed.
+///
+/// The `last_arg` is either the `offset` for `Index` or the `to` for `Subslice` for the projections.
+pub fn compute_to_idx<T: BodyTransformCtx>(ctx: &mut T, len_place: &Place, last_arg: Operand, from_end: bool) -> Operand {
+    if from_end {
+        // `storage_live(len_var)`
+        // `len_var = len(p)`
+        let len_var = ctx.fresh_var(None, Ty::mk_usize());
+        ctx.insert_assn_stmt(len_var.clone(), Rvalue::Len(
+            len_place.clone(),
+            len_place.ty().clone(),
+            len_place.ty().as_adt().unwrap().generics.const_generics.get(0.into()).cloned(),
+        ));
+
+        // `storage_live(index_var)`
+        // `index_var = len_var - last_arg`
+        // `storage_dead(len_var)`
+        let index_var = ctx.fresh_var(None, Ty::mk_usize());
+        ctx.insert_assn_stmt(index_var.clone(), Rvalue::BinaryOp(
+            BinOp::Sub(OverflowMode::UB),
+            Operand::Copy(len_var.clone()),
+            last_arg,
+        ));
+        ctx.insert_storage_dead_stmt(len_var.local_id().unwrap());
+        Operand::Copy(index_var)
+    } else {
+        last_arg
+    }
 }
 
 impl<'a, 'b> IndexVisitor<'a, 'b> {
@@ -138,40 +175,8 @@ impl<'a, 'b> IndexVisitor<'a, 'b> {
             } => (x.as_ref().clone(), *from_end),
             _ => unreachable!(),
         };
-        if from_end {
-            // `storage_live(len_var)`
-            // `len_var = len(p)`
-            let usize_ty = TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)).into_ty();
-            let len_var = self.fresh_var(None, usize_ty.clone());
-            let kind = StatementKind::Assign(
-                len_var.clone(),
-                Rvalue::Len(
-                    subplace.clone(),
-                    subplace.ty().clone(),
-                    tref.generics.const_generics.get(0.into()).cloned(),
-                ),
-            );
-            self.statements.push(Statement::new(self.span, kind));
-
-            // `storage_live(index_var)`
-            // `index_var = len_var - last_arg`
-            // `storage_dead(len_var)`
-            let index_var = self.fresh_var(None, usize_ty);
-            let kind = StatementKind::Assign(
-                index_var.clone(),
-                Rvalue::BinaryOp(
-                    BinOp::Sub(OverflowMode::UB),
-                    Operand::Copy(len_var.clone()),
-                    last_arg,
-                ),
-            );
-            self.statements.push(Statement::new(self.span, kind));
-            let dead_kind = StatementKind::StorageDead(len_var.local_id().unwrap());
-            self.statements.push(Statement::new(self.span, dead_kind));
-            args.push(Operand::Copy(index_var));
-        } else {
-            args.push(last_arg);
-        }
+        let to_idx = compute_to_idx(self, subplace, last_arg, from_end);
+        args.push(to_idx);
 
         // Call the indexing function:
         // `storage_live(tmp1)`

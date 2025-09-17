@@ -147,25 +147,23 @@ fn slice_pat3()
     let @12: (); // anonymous local
     let @13: (); // anonymous local
     let @14: usize; // anonymous local
-    let @15: (); // anonymous local
+    let @15: usize; // anonymous local
     let @16: usize; // anonymous local
-    let @17: &'_ (Slice<i32>); // anonymous local
-    let @18: usize; // anonymous local
+    let @17: usize; // anonymous local
+    let @18: (); // anonymous local
     let @19: usize; // anonymous local
-    let @20: &'_ (i32); // anonymous local
+    let @20: &'_ (Slice<i32>); // anonymous local
     let @21: usize; // anonymous local
-    let @22: &'_ (Slice<i32>); // anonymous local
-    let @23: usize; // anonymous local
+    let @22: usize; // anonymous local
+    let @23: &'_ (i32); // anonymous local
     let @24: usize; // anonymous local
     let @25: &'_ (Slice<i32>); // anonymous local
     let @26: usize; // anonymous local
-    let @27: &'_ (Slice<i32>); // anonymous local
-    let @28: usize; // anonymous local
+    let @27: usize; // anonymous local
+    let @28: &'_ (Slice<i32>); // anonymous local
     let @29: usize; // anonymous local
     let @30: &'_ (Slice<i32>); // anonymous local
-    let @31: usize; // anonymous local
-    let @32: &'_ (Slice<i32>); // anonymous local
-    let @33: &'_ (i32); // anonymous local
+    let @31: &'_ (i32); // anonymous local
 
     storage_live(@8)
     storage_live(@9)
@@ -198,54 +196,50 @@ fn slice_pat3()
         storage_dead(_a@5)
         panic(core::panicking::panic_explicit)
     }
-    storage_live(@15)
-    @15 := ()
-    storage_live(@31)
-    @31 := ptr_metadata(copy (slice@1))
-    storage_live(@32)
-    @32 := &(*(slice@1), move (@31))
-    storage_live(@33)
-    @33 := @SliceIndexShared<'_, i32>(move (@32), const (0 : usize))
-    _a@5 := &(*(@33), move (@15))
-    storage_live(@14)
-    storage_live(@26)
-    @26 := ptr_metadata(copy (slice@1))
-    storage_live(@27)
-    @27 := &(*(slice@1), move (@26))
-    storage_live(@28)
-    @28 := len(*(slice@1))
+    storage_live(@18)
+    @18 := ()
     storage_live(@29)
-    @29 := copy (@28) ub.- const (1 : usize)
-    storage_dead(@28)
+    @29 := ptr_metadata(copy (slice@1))
     storage_live(@30)
-    @30 := @SliceSubSliceShared<'_, i32>(move (@27), const (1 : usize), copy (@29))
-    @14 := ptr_metadata(copy (*(@30)))
-    storage_live(@21)
-    @21 := ptr_metadata(copy (slice@1))
-    storage_live(@22)
-    @22 := &(*(slice@1), move (@21))
-    storage_live(@23)
-    @23 := len(*(slice@1))
+    @30 := &(*(slice@1), move (@29))
+    storage_live(@31)
+    @31 := @SliceIndexShared<'_, i32>(move (@30), const (0 : usize))
+    _a@5 := &(*(@31), move (@18))
+    storage_live(@14)
+    @14 := len(*(slice@1))
+    storage_live(@15)
+    @15 := copy (@14) ub.- const (1 : usize)
+    storage_dead(@14)
+    storage_live(@16)
+    @16 := copy (@15) panic.- const (1 : usize)
+    storage_live(@17)
+    @17 := copy (@16)
     storage_live(@24)
-    @24 := copy (@23) ub.- const (1 : usize)
-    storage_dead(@23)
+    @24 := ptr_metadata(copy (slice@1))
     storage_live(@25)
-    @25 := @SliceSubSliceShared<'_, i32>(move (@22), const (1 : usize), copy (@24))
-    _b@6 := &(*(@25), move (@14))
+    @25 := &(*(slice@1), move (@24))
+    storage_live(@26)
+    @26 := len(*(slice@1))
+    storage_live(@27)
+    @27 := copy (@26) ub.- const (1 : usize)
+    storage_dead(@26)
+    storage_live(@28)
+    @28 := @SliceSubSliceShared<'_, i32>(move (@25), const (1 : usize), copy (@27))
+    _b@6 := &(*(@28), move (@17))
     storage_live(@13)
     @13 := ()
-    storage_live(@16)
-    @16 := ptr_metadata(copy (slice@1))
-    storage_live(@17)
-    @17 := &(*(slice@1), move (@16))
-    storage_live(@18)
-    @18 := len(*(slice@1))
     storage_live(@19)
-    @19 := copy (@18) ub.- const (1 : usize)
-    storage_dead(@18)
+    @19 := ptr_metadata(copy (slice@1))
     storage_live(@20)
-    @20 := @SliceIndexShared<'_, i32>(move (@17), copy (@19))
-    _c@7 := &(*(@20), move (@13))
+    @20 := &(*(slice@1), move (@19))
+    storage_live(@21)
+    @21 := len(*(slice@1))
+    storage_live(@22)
+    @22 := copy (@21) ub.- const (1 : usize)
+    storage_dead(@21)
+    storage_live(@23)
+    @23 := @SliceIndexShared<'_, i32>(move (@20), copy (@22))
+    _c@7 := &(*(@23), move (@13))
     @0 := ()
     storage_dead(_c@7)
     storage_dead(_b@6)

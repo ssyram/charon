@@ -1,5 +1,6 @@
 use crate::formatter::IntoFormatter;
 use crate::pretty::FmtWithCtx;
+use crate::transform::index_to_function_calls::compute_to_idx;
 use crate::transform::TransformCtx;
 use crate::transform::ctx::BodyTransformCtx;
 use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
@@ -52,14 +53,16 @@ fn is_last_field(ctx: &TransformCtx, proj_kind: &FieldProjKind, field: &FieldId)
 /// Get the outmost deref of a place, if it exists. Returns the place that the deref happens upon and the derefed type.
 /// Also check if the projection always performs on the last field, otherwise return None,
 /// as it should never have metadata if it is not the last field.
-fn outmost_deref_at_last_field(ctx: &TransformCtx, place: &Place) -> Option<(Place, Ty)> {
+fn outmost_deref_at_last_field<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Option<(Rvalue, Ty)> {
     let (subplace, proj) = place.as_projection()?;
     match proj {
         // *subplace
         // So that `subplace` is a pointer / reference type
         // We will need to keep the derefed type to get the metadata type
-        ProjectionElem::Deref => Some((subplace.clone(), place.ty().clone())),
-        ProjectionElem::Field(proj_kind, field) if is_last_field(ctx, proj_kind, field) => {
+        ProjectionElem::Deref => {
+            Some((Rvalue::UnaryOp(UnOp::PtrMetadata, Operand::Copy(subplace.clone())), place.ty().clone()))
+        },
+        ProjectionElem::Field(proj_kind, field) if is_last_field(ctx.get_ctx(), proj_kind, field) => {
             outmost_deref_at_last_field(ctx, subplace)
         }
         // This is not the last field, so it will never have metadata
@@ -68,8 +71,15 @@ fn outmost_deref_at_last_field(ctx: &TransformCtx, place: &Place) -> Option<(Pla
         ProjectionElem::Index { .. } => None,
         // Subslice must have metadata length, but the key is which place to fetch it from?
         // I.e., in places like `x[..]`, it returns `{[TypeOf<x>] as Index[Mut]}::Output`
-        ProjectionElem::Subslice { .. } => {
-            Some((place.clone(), place.ty().clone()))
+        ProjectionElem::Subslice { from, to, from_end } => {
+            let to_idx = compute_to_idx(ctx, subplace, *to.clone(), *from_end);
+            let diff_place = ctx.fresh_var(None, Ty::mk_usize());
+            ctx.insert_assn_stmt(
+                diff_place.clone(),
+                // `to` cannot be less than `from` as per Rust rules, so panic
+                Rvalue::BinaryOp(BinOp::Sub(OverflowMode::Panic), to_idx, *from.clone()),
+            );
+            Some((Rvalue::Use(Operand::Copy(diff_place)), place.ty().clone()))
         }
     }
 }
@@ -79,11 +89,7 @@ fn get_ptr_metadata_aux<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Opti
         "getting ptr metadata for place: {}",
         place.with_ctx(&ctx.get_ctx().into_fmt())
     );
-    let (place, deref_ty) = outmost_deref_at_last_field(ctx.get_ctx(), place)?;
-    trace!(
-        "outmost deref place: {}",
-        place.with_ctx(&ctx.get_ctx().into_fmt())
-    );
+    let (rvalue, deref_ty) = outmost_deref_at_last_field(ctx, place)?;
     let ty = match deref_ty.get_ptr_metadata(&ctx.get_ctx().translated) {
         PtrMetadata::None => None,
         PtrMetadata::Length => Some(Ty::new(TyKind::Literal(LiteralTy::UInt(UIntTy::Usize)))),
@@ -102,7 +108,7 @@ fn get_ptr_metadata_aux<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Opti
     // it is `Copy` because `place` is a deref, which means it is a pointer / ref
     ctx.insert_assn_stmt(
         new_place.clone(),
-        Rvalue::UnaryOp(UnOp::PtrMetadata, Operand::Copy(place.clone())),
+        rvalue,
     );
     Some(Operand::Move(new_place))
 }
@@ -148,6 +154,11 @@ impl BodyTransformCtx for BodyVisitor<'_, '_> {
 
     fn get_ctx(&self) -> &TransformCtx {
         self.ctx
+    }
+    
+    fn insert_storage_dead_stmt(&mut self, local: LocalId) {
+        self.statements
+            .push(Statement::new(self.span, StatementKind::StorageDead(local)));
     }
 }
 
