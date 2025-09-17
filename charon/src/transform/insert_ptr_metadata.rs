@@ -1,8 +1,8 @@
 use crate::formatter::IntoFormatter;
 use crate::pretty::FmtWithCtx;
-use crate::transform::index_to_function_calls::compute_to_idx;
 use crate::transform::TransformCtx;
 use crate::transform::ctx::BodyTransformCtx;
+use crate::transform::index_to_function_calls::compute_to_idx;
 use crate::{transform::ctx::UllbcPass, ullbc_ast::*};
 use derive_generic_visitor::*;
 
@@ -53,16 +53,22 @@ fn is_last_field(ctx: &TransformCtx, proj_kind: &FieldProjKind, field: &FieldId)
 /// Get the outmost deref of a place, if it exists. Returns the place that the deref happens upon and the derefed type.
 /// Also check if the projection always performs on the last field, otherwise return None,
 /// as it should never have metadata if it is not the last field.
-fn outmost_deref_at_last_field<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Option<(Rvalue, Ty)> {
+fn outmost_deref_at_last_field<T: BodyTransformCtx>(
+    ctx: &mut T,
+    place: &Place,
+) -> Option<(Rvalue, Ty)> {
     let (subplace, proj) = place.as_projection()?;
     match proj {
         // *subplace
         // So that `subplace` is a pointer / reference type
         // We will need to keep the derefed type to get the metadata type
-        ProjectionElem::Deref => {
-            Some((Rvalue::UnaryOp(UnOp::PtrMetadata, Operand::Copy(subplace.clone())), place.ty().clone()))
-        },
-        ProjectionElem::Field(proj_kind, field) if is_last_field(ctx.get_ctx(), proj_kind, field) => {
+        ProjectionElem::Deref => Some((
+            Rvalue::UnaryOp(UnOp::PtrMetadata, Operand::Copy(subplace.clone())),
+            place.ty().clone(),
+        )),
+        ProjectionElem::Field(proj_kind, field)
+            if is_last_field(ctx.get_ctx(), proj_kind, field) =>
+        {
             outmost_deref_at_last_field(ctx, subplace)
         }
         // This is not the last field, so it will never have metadata
@@ -106,10 +112,7 @@ fn get_ptr_metadata_aux<T: BodyTransformCtx>(ctx: &mut T, place: &Place) -> Opti
     );
     let new_place = ctx.fresh_var(None, ty);
     // it is `Copy` because `place` is a deref, which means it is a pointer / ref
-    ctx.insert_assn_stmt(
-        new_place.clone(),
-        rvalue,
-    );
+    ctx.insert_assn_stmt(new_place.clone(), rvalue);
     Some(Operand::Move(new_place))
 }
 
@@ -155,7 +158,7 @@ impl BodyTransformCtx for BodyVisitor<'_, '_> {
     fn get_ctx(&self) -> &TransformCtx {
         self.ctx
     }
-    
+
     fn insert_storage_dead_stmt(&mut self, local: LocalId) {
         self.statements
             .push(Statement::new(self.span, StatementKind::StorageDead(local)));

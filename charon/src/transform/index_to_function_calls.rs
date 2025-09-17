@@ -46,7 +46,7 @@ impl BodyTransformCtx for IndexVisitor<'_, '_> {
     fn get_ctx(&self) -> &TransformCtx {
         self.ctx
     }
-    
+
     fn insert_storage_dead_stmt(&mut self, local: LocalId) {
         let statement = StatementKind::StorageDead(local);
         self.statements.push(Statement::new(self.span, statement));
@@ -58,26 +58,44 @@ impl BodyTransformCtx for IndexVisitor<'_, '_> {
 /// New local variables are created as needed.
 ///
 /// The `last_arg` is either the `offset` for `Index` or the `to` for `Subslice` for the projections.
-pub fn compute_to_idx<T: BodyTransformCtx>(ctx: &mut T, len_place: &Place, last_arg: Operand, from_end: bool) -> Operand {
+pub fn compute_to_idx<T: BodyTransformCtx>(
+    ctx: &mut T,
+    len_place: &Place,
+    last_arg: Operand,
+    from_end: bool,
+) -> Operand {
     if from_end {
         // `storage_live(len_var)`
         // `len_var = len(p)`
         let len_var = ctx.fresh_var(None, Ty::mk_usize());
-        ctx.insert_assn_stmt(len_var.clone(), Rvalue::Len(
-            len_place.clone(),
-            len_place.ty().clone(),
-            len_place.ty().as_adt().unwrap().generics.const_generics.get(0.into()).cloned(),
-        ));
+        ctx.insert_assn_stmt(
+            len_var.clone(),
+            Rvalue::Len(
+                len_place.clone(),
+                len_place.ty().clone(),
+                len_place
+                    .ty()
+                    .as_adt()
+                    .unwrap()
+                    .generics
+                    .const_generics
+                    .get(0.into())
+                    .cloned(),
+            ),
+        );
 
         // `storage_live(index_var)`
         // `index_var = len_var - last_arg`
         // `storage_dead(len_var)`
         let index_var = ctx.fresh_var(None, Ty::mk_usize());
-        ctx.insert_assn_stmt(index_var.clone(), Rvalue::BinaryOp(
-            BinOp::Sub(OverflowMode::UB),
-            Operand::Copy(len_var.clone()),
-            last_arg,
-        ));
+        ctx.insert_assn_stmt(
+            index_var.clone(),
+            Rvalue::BinaryOp(
+                BinOp::Sub(OverflowMode::UB),
+                Operand::Copy(len_var.clone()),
+                last_arg,
+            ),
+        );
         ctx.insert_storage_dead_stmt(len_var.local_id().unwrap());
         Operand::Copy(index_var)
     } else {
