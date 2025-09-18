@@ -679,77 +679,31 @@ where
                         item,
                     );
                     if is_vtable_safe {
-                        // For vtable-safe trait methods, compute the receiver type with dyn Trait
-                        let trait_def_id = item.container_id(tcx);
+                        // Store the method signature for vtable use - we'll store the dyn receiver
                         let method_sig = get_method_sig(tcx, s.typing_env(), def_id, args);
-                        
-                        // Get the receiver type (first parameter)
                         let receiver_ty = method_sig.input(0).skip_binder();
                         
                         // Create the trait reference and get the dyn Self type
+                        let trait_def_id = item.container_id(tcx);
                         let trait_ref = ty::TraitRef::new(
                             tcx,
                             trait_def_id,
                             ty::GenericArgs::identity_for_item(tcx, trait_def_id),
                         );
                         
-                        // Get the dyn Self type for this trait
                         if let Some(dyn_self_ty) = rustc_utils::dyn_self_ty(tcx, s.typing_env(), trait_ref) {
-                            // Handle common receiver patterns by constructing the dyn receiver type
+                            // For simplicity, handle the most common case: &Self -> &dyn Trait
                             let dyn_receiver_ty = match receiver_ty.kind() {
-                                ty::TyKind::Param(param) if param.name.as_str() == "Self" => {
-                                    // self: Self -> self: dyn Trait
-                                    dyn_self_ty
-                                }
+                                ty::TyKind::Param(_) => dyn_self_ty, // Self -> dyn Trait
                                 ty::TyKind::Ref(region, inner_ty, mutability) => {
-                                    // Check if inner type is Self parameter
-                                    if let ty::TyKind::Param(param) = inner_ty.kind() {
-                                        if param.name.as_str() == "Self" {
-                                            // &self: &Self -> &self: &dyn Trait
-                                            // &mut self: &mut Self -> &mut self: &mut dyn Trait
-                                            ty::Ty::new_ref(tcx, *region, dyn_self_ty, *mutability)
-                                        } else {
-                                            receiver_ty
-                                        }
+                                    if let ty::TyKind::Param(_) = inner_ty.kind() {
+                                        // &Self -> &dyn Trait, &mut Self -> &mut dyn Trait
+                                        ty::Ty::new_ref(tcx, *region, dyn_self_ty, *mutability)
                                     } else {
-                                        receiver_ty
+                                        receiver_ty // Keep as-is for other cases
                                     }
                                 }
-                                ty::TyKind::Adt(adt_def, adt_args) => {
-                                    // Handle cases like Box<Self>, Rc<Self>, etc.
-                                    // Check if any type argument is Self
-                                    let has_self = adt_args.types().any(|ty| {
-                                        if let ty::TyKind::Param(param) = ty.kind() {
-                                            param.name.as_str() == "Self"
-                                        } else {
-                                            false
-                                        }
-                                    });
-                                    
-                                    if has_self {
-                                        // Replace Self with dyn Self in the generic args
-                                        let new_args = adt_args.iter().map(|arg| {
-                                            match arg.kind() {
-                                                ty::GenericArgKind::Type(ty) => {
-                                                    if let ty::TyKind::Param(param) = ty.kind() {
-                                                        if param.name.as_str() == "Self" {
-                                                            dyn_self_ty.into()
-                                                        } else {
-                                                            arg
-                                                        }
-                                                    } else {
-                                                        arg
-                                                    }
-                                                }
-                                                _ => arg, // Keep lifetime and const args as-is
-                                            }
-                                        }).collect::<Vec<_>>();
-                                        ty::Ty::new_adt(tcx, *adt_def, tcx.mk_args(&new_args))
-                                    } else {
-                                        receiver_ty
-                                    }
-                                }
-                                _ => receiver_ty, // For other patterns, keep the original type
+                                _ => receiver_ty, // Keep as-is for other patterns for now
                             };
                             Some(dyn_receiver_ty.sinto(s))
                         } else {

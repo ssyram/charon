@@ -542,8 +542,8 @@ impl ItemTransCtx<'_, '_> {
         &mut self,
         span: Span,
         impl_def: &hax::FullDef,
-        _self_ty: &Ty,
-        _dyn_self: &Ty,
+        self_ty: &Ty,
+        dyn_self: &Ty,
         item: &hax::ImplAssocItem,
         mut mk_field: impl FnMut(ConstantExprKind),
     ) -> Result<(), Error> {
@@ -938,7 +938,6 @@ impl ItemTransCtx<'_, '_> {
         }))
     }
 
-    /// Translate a vtable shim using the vtable receiver from the trait method definition.
     pub(crate) fn translate_vtable_shim(
         mut self,
         fun_id: FunDeclId,
@@ -962,10 +961,7 @@ impl ItemTransCtx<'_, '_> {
                 implemented_trait_item,
                 ..
             } => implemented_trait_item,
-            _ => unreachable!(
-                "VTableMethod should only be created for trait impl methods, found: {:?}",
-                associated_item.container
-            ),
+            _ => unreachable!("VTableMethod should only be created for trait impl methods"),
         };
 
         // Get the trait method definition and extract the vtable receiver
@@ -975,20 +971,17 @@ impl ItemTransCtx<'_, '_> {
             ..
         } = trait_method_def.kind()
         else {
-            unreachable!(
-                "Trait method should have vtable_receiver for vtable-safe methods: {:?}",
-                trait_method_ref.def_id
-            )
+            unreachable!("Trait method should have vtable_receiver for vtable-safe methods")
         };
 
         // Translate the vtable receiver type
         let dyn_receiver = self.translate_ty(span, vtable_receiver_hax)?;
 
-        // Start with the implementation signature
+        // Compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
         let target_receiver = signature.inputs[0].clone();
 
-        // Replace the receiver with the dyn receiver type (as per feedback)
+        // Simply set signature.inputs[0] = dyn_receiver (as per feedback)
         signature.inputs[0] = dyn_receiver;
 
         let body =

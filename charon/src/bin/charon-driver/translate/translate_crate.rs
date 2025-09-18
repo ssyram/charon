@@ -68,7 +68,7 @@ pub enum TransItemSourceKind {
     VTableInstanceInitializer(TraitImplSource),
     /// Shim function to store a method in a vtable; give a method with `self: Ptr<Self>` argument,
     /// this takes a `Ptr<dyn Trait>` and forwards to the method. The vtable receiver type is stored
-    /// in the method definition's `vtable_receiver` field.
+    /// in the method definition's `vtable_safe` field.
     VTableMethod,
 }
 
