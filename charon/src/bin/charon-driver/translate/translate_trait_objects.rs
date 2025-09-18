@@ -542,8 +542,8 @@ impl ItemTransCtx<'_, '_> {
         &mut self,
         span: Span,
         impl_def: &hax::FullDef,
-        self_ty: &Ty,
-        dyn_self: &Ty,
+        _self_ty: &Ty,
+        _dyn_self: &Ty,
         item: &hax::ImplAssocItem,
         mut mk_field: impl FnMut(ConstantExprKind),
     ) -> Result<(), Error> {
@@ -938,37 +938,6 @@ impl ItemTransCtx<'_, '_> {
         }))
     }
 
-    pub(crate) fn translate_vtable_shim(
-        mut self,
-        fun_id: FunDeclId,
-        item_meta: ItemMeta,
-        self_ty: &Ty,
-        dyn_self: &Ty,
-        impl_func_def: &hax::FullDef,
-    ) -> Result<FunDecl, Error> {
-        let span = item_meta.span;
-        self.check_no_monomorphize(span)?;
-        // compute the correct signature for the shim
-        let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
-
-        let target_receiver = signature.inputs[0].clone();
-        // dynify the receiver type, e.g., &T -> &dyn Trait when `impl ... for T`
-        // Pin<Box<i32>> -> Pin<Box<dyn Trait>> when `impl ... for i32`
-        signature.inputs[0].substitute_ty(self_ty, dyn_self);
-
-        let body =
-            self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
-
-        Ok(FunDecl {
-            def_id: fun_id,
-            item_meta,
-            signature,
-            kind: ItemKind::VTableMethodShim,
-            is_global_initializer: None,
-            body: Ok(body),
-        })
-    }
-
     /// Translate a vtable shim using the vtable signature from the method definition.
     pub(crate) fn translate_vtable_shim_from_sig(
         mut self,
@@ -987,18 +956,24 @@ impl ItemTransCtx<'_, '_> {
             unreachable!("VTableMethod should only be created for associated functions")
         };
 
-        // For now, try to extract vtable_sig from the impl method itself
-        // TODO: This is a temporary approach, we need to get the trait method definition
-        let hax::FullDefKind::AssocFn {
-            vtable_sig: Some(vtable_sig),
-            ..
-        } = impl_func_def.kind()
-        else {
-            // If the impl method doesn't have vtable_sig, this means we need to
-            // get it from the trait method definition. For now, fall back to the old approach.
+        // Extract the trait method definition from the impl method's container
+        let trait_method_ref = match &associated_item.container {
+            hax::AssocItemContainer::TraitImplContainer {
+                implemented_trait_item,
+                ..
+            } => implemented_trait_item,
+            _ => unreachable!(
+                "VTableMethod should only be created for trait impl methods, found: {:?}",
+                associated_item.container
+            ),
+        };
+
+        // Get the trait method definition for vtable safety check
+        let trait_method_def = self.hax_def(trait_method_ref)?;
+        let hax::FullDefKind::AssocFn { .. } = trait_method_def.kind() else {
             unreachable!(
-                "VTableMethod should only be created for vtable-safe methods with vtable_sig - method: {:?}",
-                associated_item.def_id
+                "Trait method should be an AssocFn: {:?}",
+                trait_method_ref.def_id
             )
         };
 
@@ -1006,11 +981,35 @@ impl ItemTransCtx<'_, '_> {
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
         let target_receiver = signature.inputs[0].clone();
 
-        // Replace the signature inputs and output with the vtable signature
-        let vtable_sig_translated = self.translate_fun_sig(span, vtable_sig)?;
-        let (vtable_inputs, vtable_output) = vtable_sig_translated.skip_binder;
-        signature.inputs = vtable_inputs;
-        signature.output = vtable_output;
+        // Extract self_ty and dyn_self to apply the dynification transformation
+        // This follows the same pattern as in gen_vtable_instance_init_body
+        let (self_ty, dyn_self) = match &associated_item.container {
+            hax::AssocItemContainer::TraitImplContainer {
+                impl_,
+                implemented_trait_ref,
+                ..
+            } => {
+                // Get the impl definition to extract dyn_self
+                let impl_def = self.hax_def(impl_)?;
+                let hax::FullDefKind::TraitImpl { dyn_self, .. } = impl_def.kind() else {
+                    unreachable!("impl_ should point to a TraitImpl")
+                };
+                let Some(dyn_self_hax) = dyn_self else {
+                    unreachable!("VTableMethod should only be created for dyn-compatible traits")
+                };
+
+                // Translate trait_ref to get self_ty and dyn_self
+                let trait_ref = self.translate_trait_ref(span, implemented_trait_ref)?;
+                let self_ty = trait_ref.generics.types[0].clone();
+                let dyn_self = self.translate_ty(span, dyn_self_hax)?;
+                (self_ty, dyn_self)
+            }
+            _ => unreachable!("Should be TraitImplContainer"),
+        };
+
+        // Apply the dynification transformation to the receiver type
+        // This is the same transformation that was done in the original translate_vtable_shim
+        signature.inputs[0].substitute_ty(&self_ty, &dyn_self);
 
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
