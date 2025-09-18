@@ -325,9 +325,9 @@ pub enum FullDefKind<Body> {
         associated_item: AssocItem,
         inline: InlineAttr,
         is_const: bool,
-        /// Whether this method will be included in the trait vtable. `false` if this is not a
-        /// trait method.
-        vtable_safe: bool,
+        /// The receiver type when this method is used in a vtable. `None` if this method is not
+        /// vtable safe. `Some(dyn_self)` if it is vtable safe.
+        vtable_receiver: Option<Ty>,
         sig: PolyFnSig,
         body: Option<Body>,
     },
@@ -671,22 +671,37 @@ where
         },
         RDefKind::AssocFn { .. } => {
             let item = tcx.associated_item(def_id);
-            let vtable_safe = match item.container {
+            let vtable_receiver = match item.container {
                 ty::AssocItemContainer::Trait => {
-                    rustc_trait_selection::traits::is_vtable_safe_method(
+                    // Check if the method is vtable safe
+                    let vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
                         tcx,
                         item.container_id(tcx),
                         item,
-                    )
+                    );
+                    
+                    if vtable_safe {
+                        // Get the trait reference and compute dyn_self
+                        let trait_def_id = item.container_id(tcx);
+                        
+                        // Use identity args for the trait (includes placeholders for all generics)
+                        let trait_args = ty::GenericArgs::identity_for_item(tcx, trait_def_id);
+                        let trait_ref = ty::TraitRef::new(tcx, trait_def_id, trait_args);
+                        
+                        // Compute dyn_self from the trait reference
+                        dyn_self_ty(tcx, s.typing_env(), trait_ref).map(|dyn_self| dyn_self.sinto(s))
+                    } else {
+                        None
+                    }
                 }
-                _ => false,
+                _ => None,
             };
             FullDefKind::AssocFn {
                 param_env: get_param_env(s, args),
                 associated_item: AssocItem::sfrom_instantiated(s, &item, args),
                 inline: tcx.codegen_fn_attrs(def_id).inline.sinto(s),
                 is_const: tcx.constness(def_id) == rustc_hir::Constness::Const,
-                vtable_safe,
+                vtable_receiver,
                 sig: get_method_sig(tcx, s.typing_env(), def_id, args).sinto(s),
                 body: get_body(s, args),
             }
