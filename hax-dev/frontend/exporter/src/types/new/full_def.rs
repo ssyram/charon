@@ -325,9 +325,9 @@ pub enum FullDefKind<Body> {
         associated_item: AssocItem,
         inline: InlineAttr,
         is_const: bool,
-        /// Whether this method will be included in the trait vtable. `false` if this is not a
-        /// trait method.
-        vtable_safe: bool,
+        /// The vtable shim signature of this function if it will be included in the trait vtable.
+        /// `None` if this is not a trait method or not vtable-safe.
+        vtable_sig: Option<Binder<TyFnSig>>,
         sig: PolyFnSig,
         body: Option<Body>,
     },
@@ -671,22 +671,28 @@ where
         },
         RDefKind::AssocFn { .. } => {
             let item = tcx.associated_item(def_id);
-            let vtable_safe = match item.container {
+            let vtable_sig = match item.container {
                 ty::AssocItemContainer::Trait => {
-                    rustc_trait_selection::traits::is_vtable_safe_method(
+                    let is_vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
                         tcx,
                         item.container_id(tcx),
                         item,
-                    )
+                    );
+                    if is_vtable_safe {
+                        // For vtable-safe methods, store the signature that will be used in the vtable
+                        Some(get_method_sig(tcx, s.typing_env(), def_id, args).sinto(s))
+                    } else {
+                        None
+                    }
                 }
-                _ => false,
+                _ => None,
             };
             FullDefKind::AssocFn {
                 param_env: get_param_env(s, args),
                 associated_item: AssocItem::sfrom_instantiated(s, &item, args),
                 inline: tcx.codegen_fn_attrs(def_id).inline.sinto(s),
                 is_const: tcx.constness(def_id) == rustc_hir::Constness::Const,
-                vtable_safe,
+                vtable_sig,
                 sig: get_method_sig(tcx, s.typing_env(), def_id, args).sinto(s),
                 body: get_body(s, args),
             }

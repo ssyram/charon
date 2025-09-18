@@ -67,12 +67,9 @@ pub enum TransItemSourceKind {
     /// The initializer function of the `VTableInstance`.
     VTableInstanceInitializer(TraitImplSource),
     /// Shim function to store a method in a vtable; give a method with `self: Ptr<Self>` argument,
-    /// this takes a `Ptr<dyn Trait>` and forwards to the method. The `DefId` refers to the method
-    /// implementation.
-    ///
-    /// For technical reasons, it takes the `self_type` and `dyn_self_type`:
-    /// the former is the type being implemented now while the latter is the `dyn Trait<...>` type.
-    VTableMethod(Ty, Ty),
+    /// this takes a `Ptr<dyn Trait>` and forwards to the method. The vtable signature is stored
+    /// in the method definition's `vtable_sig` field.
+    VTableMethod,
 }
 
 /// The kind of a [`TransItemSourceKind::TraitImpl`].
@@ -287,7 +284,7 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                     | ClosureAsFnCast
                     | DropGlueMethod
                     | VTableInstanceInitializer(..)
-                    | VTableMethod(..) => AnyTransId::Fun(self.translated.fun_decls.reserve_slot()),
+                    | VTableMethod => AnyTransId::Fun(self.translated.fun_decls.reserve_slot()),
                     InherentImpl | Module => return None,
                 };
                 // Add the id to the queue of declarations to translate

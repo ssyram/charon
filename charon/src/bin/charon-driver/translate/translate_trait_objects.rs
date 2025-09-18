@@ -225,7 +225,7 @@ impl ItemTransCtx<'_, '_> {
         )?;
         let hax::FullDefKind::AssocFn {
             sig,
-            vtable_safe: true,
+            vtable_sig: Some(_),
             ..
         } = item_def.kind()
         else {
@@ -550,7 +550,8 @@ impl ItemTransCtx<'_, '_> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
             hax::FullDefKind::AssocFn {
-                vtable_safe: true, ..
+                vtable_sig: Some(_),
+                ..
             } => {}
             _ => return Ok(()),
         }
@@ -564,11 +565,7 @@ impl ItemTransCtx<'_, '_> {
                 // generics.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
                 let shim_ref = self
-                    .translate_fn_ptr(
-                        span,
-                        &item_ref,
-                        TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
-                    )?
+                    .translate_fn_ptr(span, &item_ref, TransItemSourceKind::VTableMethod)?
                     .erase();
                 ConstantExprKind::FnPtr(shim_ref)
             }
@@ -958,6 +955,50 @@ impl ItemTransCtx<'_, '_> {
         // dynify the receiver type, e.g., &T -> &dyn Trait when `impl ... for T`
         // Pin<Box<i32>> -> Pin<Box<dyn Trait>> when `impl ... for i32`
         signature.inputs[0].substitute_ty(self_ty, dyn_self);
+
+        let body =
+            self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
+
+        Ok(FunDecl {
+            def_id: fun_id,
+            item_meta,
+            signature,
+            kind: ItemKind::VTableMethodShim,
+            is_global_initializer: None,
+            body: Ok(body),
+        })
+    }
+
+    /// Translate a vtable shim using the vtable signature from the method definition.
+    pub(crate) fn translate_vtable_shim_from_sig(
+        mut self,
+        fun_id: FunDeclId,
+        item_meta: ItemMeta,
+        impl_func_def: &hax::FullDef,
+    ) -> Result<FunDecl, Error> {
+        let span = item_meta.span;
+        self.check_no_monomorphize(span)?;
+
+        // Extract the vtable signature from the method definition
+        let hax::FullDefKind::AssocFn {
+            vtable_sig: Some(vtable_sig),
+            ..
+        } = impl_func_def.kind()
+        else {
+            unreachable!(
+                "VTableMethod should only be created for vtable-safe methods with vtable_sig"
+            )
+        };
+
+        // Start with the implementation signature
+        let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
+        let target_receiver = signature.inputs[0].clone();
+
+        // Replace the signature inputs and output with the vtable signature
+        let vtable_sig_translated = self.translate_fun_sig(span, vtable_sig)?;
+        let (vtable_inputs, vtable_output) = vtable_sig_translated.skip_binder;
+        signature.inputs = vtable_inputs;
+        signature.output = vtable_output;
 
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
