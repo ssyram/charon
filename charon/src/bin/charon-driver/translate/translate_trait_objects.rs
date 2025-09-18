@@ -225,7 +225,7 @@ impl ItemTransCtx<'_, '_> {
         )?;
         let hax::FullDefKind::AssocFn {
             sig,
-            vtable_sig: Some(_),
+            vtable_receiver: Some(_),
             ..
         } = item_def.kind()
         else {
@@ -550,7 +550,7 @@ impl ItemTransCtx<'_, '_> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
             hax::FullDefKind::AssocFn {
-                vtable_sig: Some(_),
+                vtable_receiver: Some(_),
                 ..
             } => {}
             _ => return Ok(()),
@@ -938,8 +938,8 @@ impl ItemTransCtx<'_, '_> {
         }))
     }
 
-    /// Translate a vtable shim using the vtable signature from the method definition.
-    pub(crate) fn translate_vtable_shim_from_sig(
+    /// Translate a vtable shim using the vtable receiver from the trait method definition.
+    pub(crate) fn translate_vtable_shim(
         mut self,
         fun_id: FunDeclId,
         item_meta: ItemMeta,
@@ -948,7 +948,7 @@ impl ItemTransCtx<'_, '_> {
         let span = item_meta.span;
         self.check_no_monomorphize(span)?;
 
-        // Get the trait method definition to extract the vtable signature
+        // Get the trait method definition to extract the vtable receiver
         let hax::FullDefKind::AssocFn {
             associated_item, ..
         } = impl_func_def.kind()
@@ -968,48 +968,28 @@ impl ItemTransCtx<'_, '_> {
             ),
         };
 
-        // Get the trait method definition for vtable safety check
+        // Get the trait method definition and extract the vtable receiver
         let trait_method_def = self.hax_def(trait_method_ref)?;
-        let hax::FullDefKind::AssocFn { .. } = trait_method_def.kind() else {
+        let hax::FullDefKind::AssocFn {
+            vtable_receiver: Some(vtable_receiver_hax),
+            ..
+        } = trait_method_def.kind()
+        else {
             unreachable!(
-                "Trait method should be an AssocFn: {:?}",
+                "Trait method should have vtable_receiver for vtable-safe methods: {:?}",
                 trait_method_ref.def_id
             )
         };
+
+        // Translate the vtable receiver type
+        let dyn_receiver = self.translate_ty(span, vtable_receiver_hax)?;
 
         // Start with the implementation signature
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
         let target_receiver = signature.inputs[0].clone();
 
-        // Extract self_ty and dyn_self to apply the dynification transformation
-        // This follows the same pattern as in gen_vtable_instance_init_body
-        let (self_ty, dyn_self) = match &associated_item.container {
-            hax::AssocItemContainer::TraitImplContainer {
-                impl_,
-                implemented_trait_ref,
-                ..
-            } => {
-                // Get the impl definition to extract dyn_self
-                let impl_def = self.hax_def(impl_)?;
-                let hax::FullDefKind::TraitImpl { dyn_self, .. } = impl_def.kind() else {
-                    unreachable!("impl_ should point to a TraitImpl")
-                };
-                let Some(dyn_self_hax) = dyn_self else {
-                    unreachable!("VTableMethod should only be created for dyn-compatible traits")
-                };
-
-                // Translate trait_ref to get self_ty and dyn_self
-                let trait_ref = self.translate_trait_ref(span, implemented_trait_ref)?;
-                let self_ty = trait_ref.generics.types[0].clone();
-                let dyn_self = self.translate_ty(span, dyn_self_hax)?;
-                (self_ty, dyn_self)
-            }
-            _ => unreachable!("Should be TraitImplContainer"),
-        };
-
-        // Apply the dynification transformation to the receiver type
-        // This is the same transformation that was done in the original translate_vtable_shim
-        signature.inputs[0].substitute_ty(&self_ty, &dyn_self);
+        // Replace the receiver with the dyn receiver type (as per feedback)
+        signature.inputs[0] = dyn_receiver;
 
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
