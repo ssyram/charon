@@ -979,14 +979,26 @@ impl ItemTransCtx<'_, '_> {
         let span = item_meta.span;
         self.check_no_monomorphize(span)?;
 
-        // Extract the vtable signature from the method definition
+        // Get the trait method definition to extract the vtable signature
+        let hax::FullDefKind::AssocFn {
+            associated_item, ..
+        } = impl_func_def.kind()
+        else {
+            unreachable!("VTableMethod should only be created for associated functions")
+        };
+
+        // For now, try to extract vtable_sig from the impl method itself
+        // TODO: This is a temporary approach, we need to get the trait method definition
         let hax::FullDefKind::AssocFn {
             vtable_sig: Some(vtable_sig),
             ..
         } = impl_func_def.kind()
         else {
+            // If the impl method doesn't have vtable_sig, this means we need to
+            // get it from the trait method definition. For now, fall back to the old approach.
             unreachable!(
-                "VTableMethod should only be created for vtable-safe methods with vtable_sig"
+                "VTableMethod should only be created for vtable-safe methods with vtable_sig - method: {:?}",
+                associated_item.def_id
             )
         };
 
