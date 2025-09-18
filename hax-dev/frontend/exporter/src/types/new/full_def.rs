@@ -325,9 +325,9 @@ pub enum FullDefKind<Body> {
         associated_item: AssocItem,
         inline: InlineAttr,
         is_const: bool,
-        /// The vtable receiver type (e.g., `&dyn Trait`) for this function if it will be included 
-        /// in the trait vtable. `None` if this is not a trait method or not vtable-safe.
-        vtable_receiver: Option<Ty>,
+        /// Whether this method will be included in the trait vtable. `false` if this is not a
+        /// trait method or not vtable-safe.
+        vtable_safe: bool,
         sig: PolyFnSig,
         body: Option<Body>,
     },
@@ -671,56 +671,22 @@ where
         },
         RDefKind::AssocFn { .. } => {
             let item = tcx.associated_item(def_id);
-            let vtable_receiver = match item.container {
+            let vtable_safe = match item.container {
                 ty::AssocItemContainer::Trait => {
-                    let is_vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
+                    rustc_trait_selection::traits::is_vtable_safe_method(
                         tcx,
                         item.container_id(tcx),
                         item,
-                    );
-                    if is_vtable_safe {
-                        // Store the method signature for vtable use - we'll store the dyn receiver
-                        let method_sig = get_method_sig(tcx, s.typing_env(), def_id, args);
-                        let receiver_ty = method_sig.input(0).skip_binder();
-                        
-                        // Create the trait reference and get the dyn Self type
-                        let trait_def_id = item.container_id(tcx);
-                        let trait_ref = ty::TraitRef::new(
-                            tcx,
-                            trait_def_id,
-                            ty::GenericArgs::identity_for_item(tcx, trait_def_id),
-                        );
-                        
-                        if let Some(dyn_self_ty) = rustc_utils::dyn_self_ty(tcx, s.typing_env(), trait_ref) {
-                            // For simplicity, handle the most common case: &Self -> &dyn Trait
-                            let dyn_receiver_ty = match receiver_ty.kind() {
-                                ty::TyKind::Param(_) => dyn_self_ty, // Self -> dyn Trait
-                                ty::TyKind::Ref(region, inner_ty, mutability) => {
-                                    if let ty::TyKind::Param(_) = inner_ty.kind() {
-                                        // &Self -> &dyn Trait, &mut Self -> &mut dyn Trait
-                                        ty::Ty::new_ref(tcx, *region, dyn_self_ty, *mutability)
-                                    } else {
-                                        receiver_ty // Keep as-is for other cases
-                                    }
-                                }
-                                _ => receiver_ty, // Keep as-is for other patterns for now
-                            };
-                            Some(dyn_receiver_ty.sinto(s))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
+                    )
                 }
-                _ => None,
+                _ => false,
             };
             FullDefKind::AssocFn {
                 param_env: get_param_env(s, args),
                 associated_item: AssocItem::sfrom_instantiated(s, &item, args),
                 inline: tcx.codegen_fn_attrs(def_id).inline.sinto(s),
                 is_const: tcx.constness(def_id) == rustc_hir::Constness::Const,
-                vtable_receiver,
+                vtable_safe,
                 sig: get_method_sig(tcx, s.typing_env(), def_id, args).sinto(s),
                 body: get_body(s, args),
             }

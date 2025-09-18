@@ -225,7 +225,7 @@ impl ItemTransCtx<'_, '_> {
         )?;
         let hax::FullDefKind::AssocFn {
             sig,
-            vtable_receiver: Some(_),
+            vtable_safe: true,
             ..
         } = item_def.kind()
         else {
@@ -550,8 +550,7 @@ impl ItemTransCtx<'_, '_> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
             hax::FullDefKind::AssocFn {
-                vtable_receiver: Some(_),
-                ..
+                vtable_safe: true, ..
             } => {}
             _ => return Ok(()),
         }
@@ -947,7 +946,7 @@ impl ItemTransCtx<'_, '_> {
         let span = item_meta.span;
         self.check_no_monomorphize(span)?;
 
-        // Get the trait method definition to extract the vtable receiver
+        // Get the implementation method details
         let hax::FullDefKind::AssocFn {
             associated_item, ..
         } = impl_func_def.kind()
@@ -955,34 +954,37 @@ impl ItemTransCtx<'_, '_> {
             unreachable!("VTableMethod should only be created for associated functions")
         };
 
-        // Extract the trait method definition from the impl method's container
-        let trait_method_ref = match &associated_item.container {
+        // Compute the dyn receiver by extracting the impl and trait information
+        let (self_ty, dyn_self) = match &associated_item.container {
             hax::AssocItemContainer::TraitImplContainer {
-                implemented_trait_item,
+                impl_,
+                implemented_trait_ref,
                 ..
-            } => implemented_trait_item,
+            } => {
+                // Get the impl definition to extract dyn_self
+                let impl_def = self.hax_def(impl_)?;
+                let hax::FullDefKind::TraitImpl { dyn_self, .. } = impl_def.kind() else {
+                    unreachable!("impl_ should point to a TraitImpl")
+                };
+                let Some(dyn_self_hax) = dyn_self else {
+                    unreachable!("VTableMethod should only be created for dyn-compatible traits")
+                };
+
+                // Translate trait_ref to get self_ty and dyn_self
+                let trait_ref = self.translate_trait_ref(span, implemented_trait_ref)?;
+                let self_ty = trait_ref.generics.types[0].clone();
+                let dyn_self = self.translate_ty(span, dyn_self_hax)?;
+                (self_ty, dyn_self)
+            }
             _ => unreachable!("VTableMethod should only be created for trait impl methods"),
         };
-
-        // Get the trait method definition and extract the vtable receiver
-        let trait_method_def = self.hax_def(trait_method_ref)?;
-        let hax::FullDefKind::AssocFn {
-            vtable_receiver: Some(vtable_receiver_hax),
-            ..
-        } = trait_method_def.kind()
-        else {
-            unreachable!("Trait method should have vtable_receiver for vtable-safe methods")
-        };
-
-        // Translate the vtable receiver type
-        let dyn_receiver = self.translate_ty(span, vtable_receiver_hax)?;
 
         // Compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
         let target_receiver = signature.inputs[0].clone();
 
-        // Simply set signature.inputs[0] = dyn_receiver (as per feedback)
-        signature.inputs[0] = dyn_receiver;
+        // Apply the dynification transformation to the receiver type
+        signature.inputs[0].substitute_ty(&self_ty, &dyn_self);
 
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
