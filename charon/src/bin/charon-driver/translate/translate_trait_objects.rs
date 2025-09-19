@@ -2,7 +2,9 @@ use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
 };
 
+use charon_lib::formatter::IntoFormatter;
 use charon_lib::ids::Vector;
+use charon_lib::pretty::FmtWithCtx;
 use charon_lib::ullbc_ast::*;
 use itertools::Itertools;
 
@@ -225,7 +227,7 @@ impl ItemTransCtx<'_, '_> {
         )?;
         let hax::FullDefKind::AssocFn {
             sig,
-            vtable_safe: true,
+            vtable_receiver: Some(_),
             ..
         } = item_def.kind()
         else {
@@ -542,15 +544,14 @@ impl ItemTransCtx<'_, '_> {
         &mut self,
         span: Span,
         impl_def: &hax::FullDef,
-        self_ty: &Ty,
-        dyn_self: &Ty,
         item: &hax::ImplAssocItem,
         mut mk_field: impl FnMut(ConstantExprKind),
     ) -> Result<(), Error> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
             hax::FullDefKind::AssocFn {
-                vtable_safe: true, ..
+                vtable_receiver: Some(_),
+                ..
             } => {}
             _ => return Ok(()),
         }
@@ -564,11 +565,7 @@ impl ItemTransCtx<'_, '_> {
                 // generics.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
                 let shim_ref = self
-                    .translate_fn_ptr(
-                        span,
-                        &item_ref,
-                        TransItemSourceKind::VTableMethod(self_ty.clone(), dyn_self.clone()),
-                    )?
+                    .translate_fn_ptr(span, &item_ref, TransItemSourceKind::VTableMethod)?
                     .erase();
                 ConstantExprKind::FnPtr(shim_ref)
             }
@@ -664,25 +661,12 @@ impl ItemTransCtx<'_, '_> {
         let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
 
         let hax::FullDefKind::TraitImpl {
-            trait_pred,
-            items,
-            dyn_self,
-            ..
+            trait_pred, items, ..
         } = impl_def.kind()
         else {
             unreachable!()
         };
         let trait_def = self.hax_def(&trait_pred.trait_ref)?;
-        let Some(dyn_self) = dyn_self else {
-            raise_error!(
-                self,
-                span,
-                "Trying to generate a vtable for a non-dyn-compatible trait"
-            );
-        };
-        let trait_ref = self.translate_trait_ref(span, &trait_pred.trait_ref)?;
-        let self_ty = trait_ref.generics.types[0].clone();
-        let dyn_self = self.translate_ty(span, dyn_self)?;
 
         // Retreive the expected field types from the struct definition. This avoids complicated
         // substitutions.
@@ -721,14 +705,7 @@ impl ItemTransCtx<'_, '_> {
         mk_field(ConstantExprKind::Opaque("unknown drop".to_string()));
 
         for item in items {
-            self.add_method_to_vtable_value(
-                span,
-                impl_def,
-                &self_ty,
-                &dyn_self,
-                item,
-                &mut mk_field,
-            )?;
+            self.add_method_to_vtable_value(span, impl_def, item, &mut mk_field)?;
         }
 
         self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut mk_field)?;
@@ -945,19 +922,37 @@ impl ItemTransCtx<'_, '_> {
         mut self,
         fun_id: FunDeclId,
         item_meta: ItemMeta,
-        self_ty: &Ty,
-        dyn_self: &Ty,
         impl_func_def: &hax::FullDef,
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
         self.check_no_monomorphize(span)?;
+
+        let hax::FullDefKind::AssocFn {
+            vtable_receiver: Some(vtable_receiver),
+            ..
+        } = impl_func_def.kind()
+        else {
+            raise_error!(
+                self,
+                span,
+                "Trying to generate a vtable shim for a non-vtable-safe method"
+            );
+        };
+
         // compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
 
         let target_receiver = signature.inputs[0].clone();
-        // dynify the receiver type, e.g., &T -> &dyn Trait when `impl ... for T`
-        // Pin<Box<i32>> -> Pin<Box<dyn Trait>> when `impl ... for i32`
-        signature.inputs[0].substitute_ty(self_ty, dyn_self);
+
+        // Use the vtable_receiver as the shim receiver type, but substitute generics
+        // with concrete types from the impl context
+        let dyn_receiver = self.translate_ty(span, vtable_receiver)?;
+        signature.inputs[0] = dyn_receiver;
+
+        trace!(
+            "[VtableShim] Obtained dyn receiver type: {}",
+            signature.inputs[0].with_ctx(&self.into_fmt())
+        );
 
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
