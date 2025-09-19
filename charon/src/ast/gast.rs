@@ -348,9 +348,7 @@ pub struct TraitImpl {
 }
 
 /// The value of a trait associated type.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Drive, DriveMut, PartialOrd, Ord,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Drive, DriveMut)]
 pub struct TraitAssocTyImpl {
     pub value: Ty,
     /// The `Vec` corresponds to the same `Vector` in `TraitAssocTy`. In the same way, this is
