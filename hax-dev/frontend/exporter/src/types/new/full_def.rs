@@ -470,8 +470,6 @@ fn gen_vtable_receiver<'tcx>(
         None => def_id,
     };
     let origin_trait_method_sig = tcx.fn_sig(origin_trait_method_id);
-    // The original code had .skip_binder().inputs().skip_binder()[0]
-    // This suggests inputs() returns another Binder
     let base_receiver_ty = origin_trait_method_sig.skip_binder().inputs().skip_binder()[0];
 
     use ty::TypeFoldable;
@@ -499,9 +497,7 @@ fn gen_vtable_receiver<'tcx>(
 
     let mut replacer = ReceiverReplacer(tcx, dyn_self);
 
-    let folded_receiver_ty = base_receiver_ty.fold_with(&mut replacer);
-
-    Some(folded_receiver_ty.sinto(s))
+    Some(base_receiver_ty.fold_with(&mut replacer).sinto(s))
 }
 
 #[cfg(feature = "rustc")]

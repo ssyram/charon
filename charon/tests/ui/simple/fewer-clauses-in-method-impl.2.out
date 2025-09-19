@@ -1,5 +1,5 @@
 
-thread 'rustc' panicked at /Users/ssyram/workspace/github/charon-dev/hax-dev/frontend/exporter/src/types/new/full_def.rs:473:28:
+thread 'rustc' panicked at /home/ssyram/workspace/my-charon/hax-dev/frontend/exporter/src/types/new/full_def.rs:473:28:
 index out of bounds: the len is 0 but the index is 0
 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
 error: Hax panicked when translating `test_crate::Trait::method`.
@@ -17,7 +17,7 @@ error: Item `test_crate::Trait` caused errors; ignoring.
   | ^^^^^^^^^^^
 
 
-thread 'rustc' panicked at /Users/ssyram/workspace/github/charon-dev/hax-dev/frontend/exporter/src/types/new/full_def.rs:473:28:
+thread 'rustc' panicked at /home/ssyram/workspace/my-charon/hax-dev/frontend/exporter/src/types/new/full_def.rs:473:28:
 index out of bounds: the len is 0 but the index is 0
 error: Hax panicked when translating `test_crate::Trait::method`.
  --> tests/ui/simple/fewer-clauses-in-method-impl.2.rs:4:5
@@ -34,7 +34,7 @@ error: Item `test_crate::{impl#0}` caused errors; ignoring.
   | ^^^^^^^^^^^^^^^^^
 
 
-thread 'rustc' panicked at /Users/ssyram/workspace/github/charon-dev/hax-dev/frontend/exporter/src/types/new/full_def.rs:473:28:
+thread 'rustc' panicked at /home/ssyram/workspace/my-charon/hax-dev/frontend/exporter/src/types/new/full_def.rs:473:28:
 index out of bounds: the len is 0 but the index is 0
 error: Hax panicked when translating `test_crate::Trait::method`.
  --> tests/ui/simple/fewer-clauses-in-method-impl.2.rs:4:5
