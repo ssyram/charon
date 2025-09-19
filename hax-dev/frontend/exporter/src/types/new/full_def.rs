@@ -673,7 +673,7 @@ where
             let item = tcx.associated_item(def_id);
             let vtable_receiver = match item.container {
                 ty::AssocItemContainer::Trait => {
-                    // Check if the method is vtable safe
+                    // For trait method declarations, check if the method is vtable safe
                     let vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
                         tcx,
                         item.container_id(tcx),
@@ -681,7 +681,7 @@ where
                     );
                     
                     if vtable_safe {
-                        // Get the trait reference and compute dyn_self
+                        // Get the trait reference and compute dyn_self with generic placeholders
                         let trait_def_id = item.container_id(tcx);
                         
                         // Use identity args for the trait (includes placeholders for all generics)
@@ -694,7 +694,58 @@ where
                         None
                     }
                 }
-                _ => None,
+                ty::AssocItemContainer::Impl => {
+                    // For impl methods, check if this implements a vtable-safe trait method
+                    if let Some(trait_item_def_id) = item.trait_item_def_id {
+                        // Check if the trait method is vtable safe
+                        let trait_item = tcx.associated_item(trait_item_def_id);
+                        let vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
+                            tcx,
+                            trait_item.container_id(tcx),
+                            trait_item,
+                        );
+                        
+                        if vtable_safe {
+                            // Get the impl's trait reference to compute concrete dyn_self
+                            let impl_def_id = item.container_id(tcx);
+                            if let Some(impl_trait_ref) = tcx.impl_trait_ref(impl_def_id) {
+                                // Get the concrete trait reference
+                                let concrete_trait_ref = inst_binder(tcx, s.typing_env(), args, impl_trait_ref);
+                                
+                                // Compute concrete dyn_self from the concrete trait reference
+                                if let Some(dyn_trait_ty) = dyn_self_ty(tcx, s.typing_env(), concrete_trait_ref) {
+                                    // Get the method signature to extract the receiver type
+                                    let method_sig = get_method_sig(tcx, s.typing_env(), def_id, args);
+                                    let receiver_ty = method_sig.skip_binder().inputs()[0];
+                                    
+                                    // For now, handle the simple case where receiver is &Self or &mut Self
+                                    let vtable_receiver_ty = match receiver_ty.kind() {
+                                        ty::TyKind::Ref(region, _ty, mutbl) => {
+                                            // Replace &Self with &dyn Trait or &mut Self with &mut dyn Trait  
+                                            ty::Ty::new_ref(tcx, *region, dyn_trait_ty, *mutbl)
+                                        }
+                                        _ => {
+                                            // For more complex receiver types (Box<Self>, etc.), 
+                                            // just use the dyn_trait_ty for now
+                                            dyn_trait_ty
+                                        }
+                                    };
+                                    
+                                    Some(vtable_receiver_ty.sinto(s))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        // This is an inherent impl method, not a trait impl method
+                        None
+                    }
+                }
             };
             FullDefKind::AssocFn {
                 param_env: get_param_env(s, args),
