@@ -542,15 +542,14 @@ impl ItemTransCtx<'_, '_> {
         &mut self,
         span: Span,
         impl_def: &hax::FullDef,
-        _self_ty: &Ty,
-        _dyn_self: &Ty,
         item: &hax::ImplAssocItem,
         mut mk_field: impl FnMut(ConstantExprKind),
     ) -> Result<(), Error> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
             hax::FullDefKind::AssocFn {
-                vtable_receiver: Some(_), ..
+                vtable_receiver: Some(_),
+                ..
             } => {}
             _ => return Ok(()),
         }
@@ -564,11 +563,7 @@ impl ItemTransCtx<'_, '_> {
                 // generics.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
                 let shim_ref = self
-                    .translate_fn_ptr(
-                        span,
-                        &item_ref,
-                        TransItemSourceKind::VTableMethod,
-                    )?
+                    .translate_fn_ptr(span, &item_ref, TransItemSourceKind::VTableMethod)?
                     .erase();
                 ConstantExprKind::FnPtr(shim_ref)
             }
@@ -664,25 +659,12 @@ impl ItemTransCtx<'_, '_> {
         let ret_place = locals.new_var(Some("ret".into()), ret_ty.clone());
 
         let hax::FullDefKind::TraitImpl {
-            trait_pred,
-            items,
-            dyn_self,
-            ..
+            trait_pred, items, ..
         } = impl_def.kind()
         else {
             unreachable!()
         };
         let trait_def = self.hax_def(&trait_pred.trait_ref)?;
-        let Some(dyn_self) = dyn_self else {
-            raise_error!(
-                self,
-                span,
-                "Trying to generate a vtable for a non-dyn-compatible trait"
-            );
-        };
-        let trait_ref = self.translate_trait_ref(span, &trait_pred.trait_ref)?;
-        let self_ty = trait_ref.generics.types[0].clone();
-        let dyn_self = self.translate_ty(span, dyn_self)?;
 
         // Retreive the expected field types from the struct definition. This avoids complicated
         // substitutions.
@@ -721,14 +703,7 @@ impl ItemTransCtx<'_, '_> {
         mk_field(ConstantExprKind::Opaque("unknown drop".to_string()));
 
         for item in items {
-            self.add_method_to_vtable_value(
-                span,
-                impl_def,
-                &self_ty,
-                &dyn_self,
-                item,
-                &mut mk_field,
-            )?;
+            self.add_method_to_vtable_value(span, impl_def, item, &mut mk_field)?;
         }
 
         self.add_supertraits_to_vtable_value(span, &trait_def, impl_def, &mut mk_field)?;
@@ -949,99 +924,29 @@ impl ItemTransCtx<'_, '_> {
     ) -> Result<FunDecl, Error> {
         let span = item_meta.span;
         self.check_no_monomorphize(span)?;
-        
-        // For impl methods, we need to get the trait method declaration to access vtable_receiver
+
         let hax::FullDefKind::AssocFn {
-            associated_item,
+            vtable_receiver: Some(vtable_receiver),
             ..
         } = impl_func_def.kind()
         else {
             raise_error!(
                 self,
                 span,
-                "translate_vtable_shim called on non-AssocFn"
+                "Trying to generate a vtable shim for a non-vtable-safe method"
             );
         };
-        
-        // Get the trait method declaration ID
-        let trait_method_ref = match &associated_item.container {
-            hax::AssocItemContainer::TraitImplContainer { implemented_trait_item, .. } => {
-                implemented_trait_item
-            }
-            _ => {
-                raise_error!(
-                    self,
-                    span,
-                    "translate_vtable_shim called on non-impl method"
-                );
-            }
-        };
-        
-        // Get the trait method declaration to access vtable_receiver
-        let trait_method_def = self.hax_def(trait_method_ref)?;
-        let hax::FullDefKind::AssocFn {
-            vtable_receiver: Some(vtable_receiver),
-            ..
-        } = trait_method_def.kind()
-        else {
-            raise_error!(
-                self,
-                span,
-                "translate_vtable_shim called on non-vtable-safe method"
-            );
-        };
-        
-        // Get the concrete trait reference from the impl method context
-        let concrete_trait_ref = match &associated_item.container {
-            hax::AssocItemContainer::TraitImplContainer { 
-                implemented_trait_ref,
-                ..
-            } => implemented_trait_ref,
-            _ => unreachable!(),
-        };
-        
-        // Get self_ty from the concrete trait reference (first generic argument)
-        let self_ty = match concrete_trait_ref.generic_args.get(0) {
-            Some(hax::GenericArg::Type(ty)) => self.translate_ty(span, ty)?,
-            _ => {
-                raise_error!(
-                    self,
-                    span,
-                    "Unable to extract self type from trait reference"
-                );
-            }
-        };
-        
-        // Translate the concrete trait reference 
-        let concrete_trait_ref_translated = self.translate_trait_ref(span, concrete_trait_ref)?;
-        
-        // Get dyn_self from the concrete trait reference - we need to extract this from the 
-        // trait definition using the concrete generics
-        let trait_def = self.hax_def(concrete_trait_ref)?;
-        let dyn_self = match trait_def.kind() {
-            hax::FullDefKind::Trait { dyn_self: Some(dyn_self), .. } => {
-                self.translate_ty(span, dyn_self)?
-            }
-            _ => {
-                raise_error!(
-                    self,
-                    span,
-                    "Unable to get dyn_self from trait definition"
-                );
-            }
-        };
-        
+
         // compute the correct signature for the shim
         let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
 
         let target_receiver = signature.inputs[0].clone();
-        
+
         // Use the vtable_receiver as the shim receiver type, but substitute generics
         // with concrete types from the impl context
-        let mut dyn_receiver = self.translate_ty(span, vtable_receiver)?;
-        dyn_receiver.substitute_ty(&dyn_self, &self_ty);
+        let dyn_receiver = self.translate_ty(span, vtable_receiver)?;
         signature.inputs[0] = dyn_receiver;
-        
+
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
 
