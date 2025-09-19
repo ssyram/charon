@@ -257,6 +257,21 @@ fn {impl Checkable<i32> for i32}::check<'_0>(@1: &'_0 (i32)) -> bool
     return
 }
 
+// Full name: test_crate::{impl Checkable<i32> for i32}::check::{vtable_method}
+fn {impl Checkable<i32> for i32}::check::{vtable_method}<'_0>(@1: &'_0 (type_error("Unexpected error: could not find the type variable Self"))) -> bool
+{
+    let @0: bool; // return
+    let @1: &'_0 (type_error("Unexpected error: could not find the type variable Self")); // arg #1
+    let @2: &'_0 (i32); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    @2 := concretize<&'_0 (type_error("Unexpected error: could not find the type variable Self")), &'_0 (i32)>(move (@1))
+    @0 := {impl Checkable<i32> for i32}::check<'_0>(move (@2))
+    return
+}
+
 // Full name: test_crate::{impl Checkable<i32> for i32}::{vtable}
 fn {impl Checkable<i32> for i32}::{vtable}() -> test_crate::Checkable::{vtable}<i32>
 {
@@ -401,6 +416,26 @@ where
     @4 := &*(arg@2)
     @0 := @TraitClause1::clone<'_>(move (@4))
     storage_dead(@4)
+    return
+}
+
+// Full name: test_crate::{impl Modifiable<T> for i32}::modify::{vtable_method}
+fn {impl Modifiable<T> for i32}::modify::{vtable_method}<'_0, '_1, T>(@1: &'_0 mut (T), @2: &'_1 (T)) -> T
+where
+    [@TraitClause0]: Sized<T>,
+    [@TraitClause1]: Clone<T>,
+{
+    let @0: T; // return
+    let @1: &'_0 mut (T); // arg #1
+    let @2: &'_1 (T); // arg #2
+    let @3: &'_0 mut (i32); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := concretize<&'_0 mut (T), &'_0 mut (i32)>(move (@1))
+    @0 := {impl Modifiable<T> for i32}::modify<'_0, '_1, T>[@TraitClause0, @TraitClause1](move (@3), move (@2))
     return
 }
 

@@ -425,6 +425,82 @@ pub enum FullDefKind<Body> {
 }
 
 #[cfg(feature = "rustc")]
+fn gen_vtable_receiver<'tcx>(
+    // The state that owns the method DefId
+    assoc_method_s: &StateWithOwner<'tcx>,
+    args: Option<ty::GenericArgsRef<'tcx>>,
+) -> Option<Ty>
+{
+    let def_id = assoc_method_s.owner_id();
+    let tcx = assoc_method_s.base().tcx;
+    let assoc_item = tcx.associated_item(def_id);
+    let s = &assoc_method_s.with_owner_id(assoc_item.container_id(tcx));
+    
+    // The args for the container
+    let container_args = {
+        let container_def_id = assoc_item.container_id(tcx);
+        let container_generics = tcx.generics_of(container_def_id);
+        args.map(|args| {
+            tcx.mk_args_from_iter(args.iter().take(container_generics.count()))
+        })
+    };
+
+    let dyn_self: ty::Ty = match assoc_item.container {
+        ty::AssocItemContainer::Trait => {
+            get_trait_decl_dyn_self_ty(s, container_args)
+        },
+        ty::AssocItemContainer::Impl => {
+            // For impl methods, compute concrete dyn_self from the impl's trait reference
+            let impl_def_id = assoc_item.container_id(tcx);
+            let Some(impl_trait_ref) = tcx.impl_trait_ref(impl_def_id) else {
+                // There might be inherent impl methods, which is surely not vtable safe.
+                return None;
+            };
+            // Get the concrete trait reference by rebasing the impl's trait ref args onto `container_args`
+            let concrete_trait_ref = inst_binder(tcx, s.typing_env(), container_args, impl_trait_ref);
+            dyn_self_ty(tcx, s.typing_env(), concrete_trait_ref)
+        },
+    }?;
+
+    // Next, try to find the receiver "template" from the trait method declaration.
+    // It would be convenient for us to simply substitute `Self` with `dyn_self` in the receiver.
+    let origin_trait_method_id = match assoc_item.trait_item_def_id {
+        Some(id) => id,
+        // It is itself a trait method declaration
+        None => def_id,
+    };
+    let origin_trait_method_sig = tcx.fn_sig(origin_trait_method_id);
+    let base_receiver_ty = origin_trait_method_sig.skip_binder().inputs().skip_binder()[0];
+
+    use ty::TypeFoldable;
+
+    struct ReceiverReplacer<'tcx>(ty::TyCtxt<'tcx>, ty::Ty<'tcx>);
+
+    impl<'tcx> ty::TypeFolder<ty::TyCtxt<'tcx>> for ReceiverReplacer<'tcx> {
+        fn cx(&self) -> ty::TyCtxt<'tcx> {
+            self.0
+        }
+        fn fold_ty(&mut self, t: ty::Ty<'tcx>) -> ty::Ty<'tcx> {
+            use rustc_middle::ty::TypeSuperFoldable;
+            match t.kind() {
+                ty::Param(param) => {
+                    if param.name == rustc_span::symbol::kw::SelfLower {
+                        assert!(param.index == 0);
+                        return self.1.clone();
+                    }
+                    return t.super_fold_with(self);
+                },
+                _ => t.super_fold_with(self)
+            }
+        }
+    }
+
+    let mut replacer = ReceiverReplacer(tcx, dyn_self);
+
+    Some(base_receiver_ty.fold_with(&mut replacer).sinto(s))
+}
+
+#[cfg(feature = "rustc")]
 /// Construct the `FullDefKind` for this item.
 ///
 /// If `args` is `Some`, instantiate the whole definition with these generics; otherwise keep the
@@ -506,7 +582,7 @@ where
             param_env: get_param_env(s, args),
             implied_predicates: get_implied_predicates(s, args),
             self_predicate: get_self_predicate(s, args),
-            dyn_self: get_dyn_self_ty(s, args),
+            dyn_self: get_trait_decl_dyn_self_ty(s, args).sinto(s),
             items: tcx
                 .associated_items(def_id)
                 .in_definition_order()
@@ -525,7 +601,7 @@ where
             param_env: get_param_env(s, args),
             implied_predicates: get_implied_predicates(s, args),
             self_predicate: get_self_predicate(s, args),
-            dyn_self: get_dyn_self_ty(s, args),
+            dyn_self: get_trait_decl_dyn_self_ty(s, args).sinto(s),
         },
         RDefKind::Impl { .. } => {
             use std::collections::HashMap;
@@ -671,88 +747,12 @@ where
         },
         RDefKind::AssocFn { .. } => {
             let item = tcx.associated_item(def_id);
-            let vtable_receiver = match item.container {
-                ty::AssocItemContainer::Trait => {
-                    // For trait method declarations, check if the method is vtable safe
-                    let vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
-                        tcx,
-                        item.container_id(tcx),
-                        item,
-                    );
-                    
-                    if vtable_safe {
-                        // Get the trait reference and compute dyn_self with generic placeholders
-                        let trait_def_id = item.container_id(tcx);
-                        
-                        // Use identity args for the trait (includes placeholders for all generics)
-                        let trait_args = ty::GenericArgs::identity_for_item(tcx, trait_def_id);
-                        let trait_ref = ty::TraitRef::new(tcx, trait_def_id, trait_args);
-                        
-                        // Compute dyn_self from the trait reference
-                        dyn_self_ty(tcx, s.typing_env(), trait_ref).map(|dyn_self| dyn_self.sinto(s))
-                    } else {
-                        None
-                    }
-                }
-                ty::AssocItemContainer::Impl => {
-                    // For impl methods, check if this implements a vtable-safe trait method
-                    if let Some(trait_item_def_id) = item.trait_item_def_id {
-                        // Check if the trait method is vtable safe
-                        let trait_item = tcx.associated_item(trait_item_def_id);
-                        let vtable_safe = rustc_trait_selection::traits::is_vtable_safe_method(
-                            tcx,
-                            trait_item.container_id(tcx),
-                            trait_item,
-                        );
-                        
-                        if vtable_safe {
-                            // Get the impl's trait reference to compute concrete dyn_self
-                            let impl_def_id = item.container_id(tcx);
-                            if let Some(impl_trait_ref) = tcx.impl_trait_ref(impl_def_id) {
-                                // Get the concrete trait reference
-                                let concrete_trait_ref = inst_binder(tcx, s.typing_env(), args, impl_trait_ref);
-                                
-                                // Compute concrete dyn_self from the concrete trait reference
-                                if let Some(dyn_trait_ty) = dyn_self_ty(tcx, s.typing_env(), concrete_trait_ref) {
-                                    // Get the method signature to extract the receiver type
-                                    let method_sig = get_method_sig(tcx, s.typing_env(), def_id, args);
-                                    let receiver_ty = method_sig.skip_binder().inputs()[0];
-                                    
-                                    // For now, handle the simple case where receiver is &Self or &mut Self
-                                    let vtable_receiver_ty = match receiver_ty.kind() {
-                                        ty::TyKind::Ref(region, _ty, mutbl) => {
-                                            // Replace &Self with &dyn Trait or &mut Self with &mut dyn Trait  
-                                            ty::Ty::new_ref(tcx, *region, dyn_trait_ty, *mutbl)
-                                        }
-                                        _ => {
-                                            // For more complex receiver types (Box<Self>, etc.), 
-                                            // just use the dyn_trait_ty for now
-                                            dyn_trait_ty
-                                        }
-                                    };
-                                    
-                                    Some(vtable_receiver_ty.sinto(s))
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        // This is an inherent impl method, not a trait impl method
-                        None
-                    }
-                }
-            };
             FullDefKind::AssocFn {
                 param_env: get_param_env(s, args),
                 associated_item: AssocItem::sfrom_instantiated(s, &item, args),
                 inline: tcx.codegen_fn_attrs(def_id).inline.sinto(s),
                 is_const: tcx.constness(def_id) == rustc_hir::Constness::Const,
-                vtable_receiver,
+                vtable_receiver: gen_vtable_receiver(s, args),
                 sig: get_method_sig(tcx, s.typing_env(), def_id, args).sinto(s),
                 body: get_body(s, args),
             }
@@ -1082,10 +1082,10 @@ fn get_self_predicate<'tcx, S: UnderOwnerState<'tcx>>(
 
 /// Generates a `dyn Trait<Args.., Ty = <Self as Trait>::Ty..>` type for this trait.
 #[cfg(feature = "rustc")]
-fn get_dyn_self_ty<'tcx, S: UnderOwnerState<'tcx>>(
+fn get_trait_decl_dyn_self_ty<'tcx, S: UnderOwnerState<'tcx>>(
     s: &S,
     args: Option<ty::GenericArgsRef<'tcx>>,
-) -> Option<Ty> {
+) -> Option<ty::Ty<'tcx>> {
     let tcx = s.base().tcx;
     let typing_env = s.typing_env();
     let def_id = s.owner_id();
@@ -1101,7 +1101,7 @@ fn get_dyn_self_ty<'tcx, S: UnderOwnerState<'tcx>>(
         } else {
             ty
         };
-        ty.sinto(s)
+        ty
     })
 }
 

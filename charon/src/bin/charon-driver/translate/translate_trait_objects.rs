@@ -2,7 +2,9 @@ use super::{
     translate_crate::TransItemSourceKind, translate_ctx::*, translate_generics::BindingLevel,
 };
 
+use charon_lib::formatter::IntoFormatter;
 use charon_lib::ids::Vector;
+use charon_lib::pretty::FmtWithCtx;
 use charon_lib::ullbc_ast::*;
 use itertools::Itertools;
 
@@ -946,6 +948,11 @@ impl ItemTransCtx<'_, '_> {
         // with concrete types from the impl context
         let dyn_receiver = self.translate_ty(span, vtable_receiver)?;
         signature.inputs[0] = dyn_receiver;
+
+        trace!(
+            "[VtableShim] Obtained dyn receiver type: {}",
+            signature.inputs[0].with_ctx(&self.into_fmt())
+        );
 
         let body =
             self.translate_vtable_shim_body(span, &target_receiver, &signature, impl_func_def)?;
