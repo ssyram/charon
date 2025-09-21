@@ -793,6 +793,35 @@ fn {impl LifetimeTrait for i32}::lifetime_method<'a, '_1>(@1: &'_1 (i32), @2: &'
     return
 }
 
+// Full name: test_crate::{impl LifetimeTrait for i32}::lifetime_method::{vtable_method}
+fn {impl LifetimeTrait for i32}::lifetime_method::{vtable_method}<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), @2: &'a (i32)) -> &'a (i32)
+{
+    let @0: &'a (i32); // return
+    let @1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // arg #1
+    let @2: &'a (i32); // arg #2
+    let @3: &'_1 (i32); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := concretize<&'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), &'_1 (i32)>(move (@1))
+    @0 := {impl LifetimeTrait for i32}::lifetime_method<'a, '_1>(move (@3), move (@2))
+    return
+}
+
+// Full name: test_crate::{impl LifetimeTrait for i32}::{vtable}
+fn {impl LifetimeTrait for i32}::{vtable}() -> test_crate::LifetimeTrait::{vtable}<i32>
+{
+    let ret@0: test_crate::LifetimeTrait::{vtable}<i32>; // return
+
+    ret@0 := test_crate::LifetimeTrait::{vtable} { size: const (Opaque(unknown size)), align: const (Opaque(unknown align)), drop: const (Opaque(unknown drop)), method_lifetime_method: const ({impl LifetimeTrait for i32}::lifetime_method::{vtable_method}<'_, '_>), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    return
+}
+
+// Full name: test_crate::{impl LifetimeTrait for i32}::{vtable}
+static {impl LifetimeTrait for i32}::{vtable}: test_crate::LifetimeTrait::{vtable}<i32> = {impl LifetimeTrait for i32}::{vtable}()
+
 // Full name: test_crate::{impl LifetimeTrait for i32}
 impl LifetimeTrait for i32 {
     parent_clause0 = MetaSized<i32>
@@ -934,6 +963,33 @@ fn main()
     let @60: &'_ (i64); // anonymous local
     let @61: &'_ (i64); // anonymous local
     let @62: i64; // anonymous local
+    let b@63: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // local
+    let @64: &'_ (i32); // anonymous local
+    let @65: &'_ (i32); // anonymous local
+    let @66: i32; // anonymous local
+    let @67: (); // anonymous local
+    let @68: (&'_ (i32), &'_ (i32)); // anonymous local
+    let @69: &'_ (i32); // anonymous local
+    let @70: &'_ (i32); // anonymous local
+    let @71: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // anonymous local
+    let @72: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // anonymous local
+    let @73: &'_ (i32); // anonymous local
+    let @74: &'_ (i32); // anonymous local
+    let @75: i32; // anonymous local
+    let @76: &'_ (i32); // anonymous local
+    let @77: i32; // anonymous local
+    let left_val@78: &'_ (i32); // local
+    let right_val@79: &'_ (i32); // local
+    let @80: bool; // anonymous local
+    let @81: i32; // anonymous local
+    let @82: i32; // anonymous local
+    let kind@83: AssertKind; // local
+    let @84: AssertKind; // anonymous local
+    let @85: &'_ (i32); // anonymous local
+    let @86: &'_ (i32); // anonymous local
+    let @87: &'_ (i32); // anonymous local
+    let @88: &'_ (i32); // anonymous local
+    let @89: Option<Arguments<'_>>[Sized<Arguments<'_>>]; // anonymous local
 
     storage_live(@21)
     storage_live(@22)
@@ -977,6 +1033,33 @@ fn main()
     storage_live(@60)
     storage_live(@61)
     storage_live(@62)
+    storage_live(b@63)
+    storage_live(@64)
+    storage_live(@65)
+    storage_live(@66)
+    storage_live(@67)
+    storage_live(@68)
+    storage_live(@69)
+    storage_live(@70)
+    storage_live(@71)
+    storage_live(@72)
+    storage_live(@73)
+    storage_live(@74)
+    storage_live(@75)
+    storage_live(@76)
+    storage_live(@77)
+    storage_live(left_val@78)
+    storage_live(right_val@79)
+    storage_live(@80)
+    storage_live(@81)
+    storage_live(@82)
+    storage_live(kind@83)
+    storage_live(@84)
+    storage_live(@85)
+    storage_live(@86)
+    storage_live(@87)
+    storage_live(@88)
+    storage_live(@89)
     storage_live(x@1)
     storage_live(@2)
     storage_live(@3)
@@ -1164,7 +1247,87 @@ fn main()
         storage_dead(@59)
         storage_dead(@58)
         storage_dead(@55)
+        storage_live(b@63)
+        storage_live(@64)
+        storage_live(@65)
+        storage_live(@66)
+        @66 := const (42 : i32)
+        @65 := &@66
+        @64 := &*(@65)
+        b@63 := unsize_cast<&'_ (i32), &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), {impl LifetimeTrait for i32}>(move (@64))
+        storage_dead(@64)
+        storage_dead(@65)
+        storage_live(@67)
+        storage_live(@68)
+        storage_live(@69)
+        storage_live(@70)
+        storage_live(@71)
+        storage_live(@72)
+        @72 := &*(b@63)
+        @71 := unsize_cast<&'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), LifetimeTrait<(dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)>>(move (@72))
+        storage_dead(@72)
+        storage_live(@73)
+        storage_live(@74)
+        storage_live(@75)
+        @75 := const (10 : i32)
+        @74 := &@75
+        @73 := &*(@74)
+        @70 := use_lifetime_trait<'_, '_>(move (@71), move (@73))
+        storage_dead(@73)
+        storage_dead(@71)
+        @69 := &*(@70)
+        storage_live(@76)
+        storage_live(@77)
+        @77 := const (10 : i32)
+        @76 := &@77
+        @68 := (move (@69), move (@76))
+        storage_dead(@76)
+        storage_dead(@69)
+        storage_live(left_val@78)
+        left_val@78 := copy ((@68).0)
+        storage_live(right_val@79)
+        right_val@79 := copy ((@68).1)
+        storage_live(@80)
+        storage_live(@81)
+        @81 := copy (*(left_val@78))
+        storage_live(@82)
+        @82 := copy (*(right_val@79))
+        @80 := move (@81) == move (@82)
+        if move (@80) {
+        }
+        else {
+            storage_dead(@82)
+            storage_dead(@81)
+            storage_live(kind@83)
+            kind@83 := AssertKind::Eq {  }
+            storage_live(@84)
+            @84 := move (kind@83)
+            storage_live(@85)
+            storage_live(@86)
+            @86 := &*(left_val@78)
+            @85 := &*(@86)
+            storage_live(@87)
+            storage_live(@88)
+            @88 := &*(right_val@79)
+            @87 := &*(@88)
+            storage_live(@89)
+            @89 := Option::None {  }
+            panic(core::panicking::assert_failed)
+        }
+        storage_dead(@82)
+        storage_dead(@81)
+        storage_dead(@80)
+        storage_dead(right_val@79)
+        storage_dead(left_val@78)
+        storage_dead(@77)
+        storage_dead(@75)
+        storage_dead(@74)
+        storage_dead(@70)
+        storage_dead(@68)
+        storage_dead(@67)
         @0 := ()
+        storage_dead(@66)
+        storage_dead(b@63)
         storage_dead(@54)
         storage_dead(a@51)
         storage_dead(z@43)

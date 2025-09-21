@@ -93,4 +93,6 @@ fn main() {
     z.dummy();
     let a: &dyn Both32And64 = &42;
     a.both_operate(&100, &200);
+    let b: &dyn LifetimeTrait<Ty = i32> = &42;
+    assert_eq!(*use_lifetime_trait(b, &10), 10);
 }
