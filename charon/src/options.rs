@@ -253,6 +253,7 @@ pub struct CliOpts {
     /// Control how name matcher handles monomorphized vs generic names
     #[clap(
         long = "name-match-mode",
+        default_value = "both",
         help = "Control how name matcher handles monomorphized vs generic names. \
         'both' (default) matches both generic and monomorphized names, \
         'generic-only' matches only generic names, \

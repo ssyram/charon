@@ -329,3 +329,43 @@ fn test_compare() {
         assert_eq!(x.compare(&y), o);
     }
 }
+
+#[test]
+fn test_name_match_modes() {
+    use crate::options::NameMatchMode;
+    use crate::ast::{Name, PathElem, Disambiguator, TranslatedCrate};
+    
+    // Create a simple pattern and name for testing
+    let pattern = Pattern::parse("test::foo").unwrap();
+    
+    // Create a test crate (minimal)
+    let crate_data = TranslatedCrate::default();
+    
+    // Test normal name (should match in all modes)
+    let normal_name = Name {
+        name: vec![
+            PathElem::Ident("test".to_string(), Disambiguator::new(0)),
+            PathElem::Ident("foo".to_string(), Disambiguator::new(0)),
+        ]
+    };
+    
+    assert!(pattern.matches_with_mode(&crate_data, &normal_name, NameMatchMode::Both));
+    assert!(pattern.matches_with_mode(&crate_data, &normal_name, NameMatchMode::GenericOnly));
+    assert!(!pattern.matches_with_mode(&crate_data, &normal_name, NameMatchMode::MonoOnly));
+    
+    // Test name with monomorphized element
+    let mono_name = Name {
+        name: vec![
+            PathElem::Ident("test".to_string(), Disambiguator::new(0)),
+            PathElem::Ident("foo".to_string(), Disambiguator::new(0)),
+            PathElem::Monomorphized(Box::new(crate::ast::GenericArgs::empty())),
+        ]
+    };
+    
+    // For monomorphized names, we need a pattern that can match the prefix
+    let pattern_with_glob = Pattern::parse("test::foo::_").unwrap();
+    
+    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, NameMatchMode::Both));
+    assert!(!pattern_with_glob.matches_with_mode(&crate_data, &mono_name, NameMatchMode::GenericOnly));
+    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, NameMatchMode::MonoOnly));
+}
