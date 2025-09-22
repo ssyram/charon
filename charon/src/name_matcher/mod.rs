@@ -4,6 +4,7 @@ use itertools::{EitherOrBoth, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::*;
+use crate::options::NameMatchMode;
 
 mod parser;
 
@@ -52,10 +53,20 @@ impl Pattern {
         self.matches_with_generics(ctx, name, None)
     }
 
+    pub fn matches_with_mode(&self, ctx: &TranslatedCrate, name: &Name, mode: NameMatchMode) -> bool {
+        self.matches_with_generics_and_mode(ctx, name, None, mode)
+    }
+
     pub fn matches_item(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>) -> bool {
         let generics = item.identity_args();
         let name = &item.item_meta().name;
         self.matches_with_generics(ctx, name, Some(&generics))
+    }
+
+    pub fn matches_item_with_mode(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>, mode: NameMatchMode) -> bool {
+        let generics = item.identity_args();
+        let name = &item.item_meta().name;
+        self.matches_with_generics_and_mode(ctx, name, Some(&generics), mode)
     }
 
     pub fn matches_with_generics(
@@ -64,7 +75,38 @@ impl Pattern {
         name: &Name,
         args: Option<&GenericArgs>,
     ) -> bool {
+        self.matches_with_generics_and_mode(ctx, name, args, NameMatchMode::Both)
+    }
+
+    pub fn matches_with_generics_and_mode(
+        &self,
+        ctx: &TranslatedCrate,
+        name: &Name,
+        args: Option<&GenericArgs>,
+        mode: NameMatchMode,
+    ) -> bool {
         let mut scrutinee_elems = name.name.as_slice();
+        
+        // Handle monomorphized names based on the match mode
+        if let Some(monomorphized_pos) = scrutinee_elems.iter().position(|elem| elem.is_monomorphized()) {
+            match mode {
+                NameMatchMode::GenericOnly => {
+                    // For generic-only mode, truncate at monomorphized element
+                    scrutinee_elems = &scrutinee_elems[..monomorphized_pos];
+                }
+                NameMatchMode::MonoOnly => {
+                    // For mono-only mode, only match if the name contains monomorphized elements
+                    // Keep all elements including monomorphized ones  
+                }
+                NameMatchMode::Both => {
+                    // Default behavior: keep all elements
+                }
+            }
+        } else if mode == NameMatchMode::MonoOnly {
+            // If mode is mono-only but no monomorphized elements, no match
+            return false;
+        }
+
         // Patterns that start with an impl block match that impl block anywhere. In such a case we
         // truncate the scrutinee name to start with the rightmost impl in its name. This isn't
         // fully precise in case of impls within impls, but we'll ignore that.
@@ -85,7 +127,7 @@ impl Pattern {
             match x {
                 EitherOrBoth::Both(pat, elem) => {
                     let args = if is_last { args } else { None };
-                    if !pat.matches_with_generics(ctx, elem, args) {
+                    if !pat.matches_with_generics_and_mode(ctx, elem, args, mode) {
                         return false;
                     }
                 }
@@ -176,11 +218,12 @@ impl PartialOrd for Pattern {
 }
 
 impl PatElem {
-    fn matches_with_generics(
+    fn matches_with_generics_and_mode(
         &self,
         ctx: &TranslatedCrate,
         elem: &PathElem,
         args: Option<&GenericArgs>,
+        mode: NameMatchMode,
     ) -> bool {
         match (self, elem) {
             (PatElem::Glob, _) => true,
@@ -208,7 +251,14 @@ impl PatElem {
                 let Some(trait_name) = ctx.item_name(timpl.impl_trait.id) else {
                     return false;
                 };
-                pat.matches_with_generics(ctx, trait_name, Some(&timpl.impl_trait.generics))
+                pat.matches_with_generics_and_mode(ctx, trait_name, Some(&timpl.impl_trait.generics), mode)
+            }
+            (_, PathElem::Monomorphized(_)) => {
+                // Handle monomorphized elements based on mode
+                match mode {
+                    NameMatchMode::GenericOnly => false, // Don't match monomorphized in generic-only mode
+                    NameMatchMode::MonoOnly | NameMatchMode::Both => true, // Match in mono-only or both modes
+                }
             }
             _ => false,
         }

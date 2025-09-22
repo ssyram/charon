@@ -250,6 +250,18 @@ pub struct CliOpts {
     #[serde(default)]
     pub raw_boxes: bool,
 
+    /// Control how name matcher handles monomorphized vs generic names
+    #[clap(
+        long = "name-match-mode",
+        help = "Control how name matcher handles monomorphized vs generic names. \
+        'both' (default) matches both generic and monomorphized names, \
+        'generic-only' matches only generic names, \
+        'mono-only' matches only monomorphized names."
+    )]
+    #[arg(value_enum)]
+    #[serde(default)]
+    pub name_match_mode: NameMatchMode,
+
     /// Named builtin sets of options. Currently used only for dependent projects, eveentually
     /// should be replaced with semantically-meaningful presets.
     #[clap(long = "preset")]
@@ -274,6 +286,18 @@ pub enum MirLevel {
     /// The MIR after optimizations. Charon disables all the optimizations it can, so this is
     /// sensibly the same MIR as the elaborated MIR.
     Optimized,
+}
+
+/// Mode for matching function names: controls how the name matcher handles monomorphized names.
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Serialize, Deserialize)]
+pub enum NameMatchMode {
+    /// Match both generic and monomorphized names (default behavior)
+    #[default]
+    Both,
+    /// Match only generic names, ignore monomorphized names
+    GenericOnly,
+    /// Match only monomorphized names, ignore generic names  
+    MonoOnly,
 }
 
 /// Presets to make it easier to tweak options without breaking dependent projects. Eventually we
@@ -428,6 +452,8 @@ pub struct TranslateOptions {
     pub item_opacities: Vec<(NamePattern, ItemOpacity)>,
     /// List of traits for which we transform associated types to type parameters.
     pub remove_associated_types: Vec<NamePattern>,
+    /// Control how name matcher handles monomorphized vs generic names
+    pub name_match_mode: NameMatchMode,
 }
 
 impl TranslateOptions {
@@ -510,6 +536,7 @@ impl TranslateOptions {
             raw_boxes: options.raw_boxes,
             remove_associated_types,
             translate_all_methods: options.translate_all_methods,
+            name_match_mode: options.name_match_mode,
         }
     }
 
