@@ -16,6 +16,11 @@ use crate::{
 /// when calling charon-driver from cargo-charon.
 pub const CHARON_ARGS: &str = "CHARON_ARGS";
 
+/// Helper function for serde default values
+fn default_true() -> bool {
+    true
+}
+
 // This structure is used to store the command-line instructions.
 // We automatically derive a command-line parser based on this structure.
 // Note that the doc comments are used to generate the help message when using
@@ -250,18 +255,21 @@ pub struct CliOpts {
     #[serde(default)]
     pub raw_boxes: bool,
 
-    /// Control how name matcher handles monomorphized vs generic names
+    /// Enable matching of generic names (without monomorphization parameters)
     #[clap(
-        long = "name-match-mode",
-        default_value = "both",
-        help = "Control how name matcher handles monomorphized vs generic names. \
-        'both' (default) matches both generic and monomorphized names, \
-        'generic-only' matches only generic names, \
-        'mono-only' matches only monomorphized names."
+        long = "match-generics",
+        help = "Enable matching of generic function names (default: true)"
     )]
-    #[arg(value_enum)]
-    #[serde(default)]
-    pub name_match_mode: NameMatchMode,
+    #[serde(default = "default_true")]
+    pub match_generics: bool,
+
+    /// Enable matching of monomorphized names (with monomorphization parameters)  
+    #[clap(
+        long = "match-monomorphized",
+        help = "Enable matching of monomorphized function names (default: true)"
+    )]
+    #[serde(default = "default_true")]
+    pub match_monomorphized: bool,
 
     /// Named builtin sets of options. Currently used only for dependent projects, eveentually
     /// should be replaced with semantically-meaningful presets.
@@ -289,17 +297,7 @@ pub enum MirLevel {
     Optimized,
 }
 
-/// Mode for matching function names: controls how the name matcher handles monomorphized names.
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Serialize, Deserialize)]
-pub enum NameMatchMode {
-    /// Match both generic and monomorphized names (default behavior)
-    #[default]
-    Both,
-    /// Match only generic names, ignore monomorphized names
-    GenericOnly,
-    /// Match only monomorphized names, ignore generic names  
-    MonoOnly,
-}
+
 
 /// Presets to make it easier to tweak options without breaking dependent projects. Eventually we
 /// should define semantically-meaningful presets instead of project-specific ones.
@@ -453,8 +451,10 @@ pub struct TranslateOptions {
     pub item_opacities: Vec<(NamePattern, ItemOpacity)>,
     /// List of traits for which we transform associated types to type parameters.
     pub remove_associated_types: Vec<NamePattern>,
-    /// Control how name matcher handles monomorphized vs generic names
-    pub name_match_mode: NameMatchMode,
+    /// Enable matching of generic names (without monomorphization parameters)
+    pub match_generics: bool,
+    /// Enable matching of monomorphized names (with monomorphization parameters)
+    pub match_monomorphized: bool,
 }
 
 impl TranslateOptions {
@@ -537,7 +537,8 @@ impl TranslateOptions {
             raw_boxes: options.raw_boxes,
             remove_associated_types,
             translate_all_methods: options.translate_all_methods,
-            name_match_mode: options.name_match_mode,
+            match_generics: options.match_generics,
+            match_monomorphized: options.match_monomorphized,
         }
     }
 

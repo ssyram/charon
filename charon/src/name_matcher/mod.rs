@@ -4,7 +4,6 @@ use itertools::{EitherOrBoth, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::ast::*;
-use crate::options::NameMatchMode;
 
 mod parser;
 
@@ -53,8 +52,8 @@ impl Pattern {
         self.matches_with_generics(ctx, name, None)
     }
 
-    pub fn matches_with_mode(&self, ctx: &TranslatedCrate, name: &Name, mode: NameMatchMode) -> bool {
-        self.matches_with_generics_and_mode(ctx, name, None, mode)
+    pub fn matches_with_mode(&self, ctx: &TranslatedCrate, name: &Name, match_generics: bool, match_monomorphized: bool) -> bool {
+        self.matches_with_generics_and_mode(ctx, name, None, match_generics, match_monomorphized)
     }
 
     pub fn matches_item(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>) -> bool {
@@ -63,10 +62,10 @@ impl Pattern {
         self.matches_with_generics(ctx, name, Some(&generics))
     }
 
-    pub fn matches_item_with_mode(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>, mode: NameMatchMode) -> bool {
+    pub fn matches_item_with_mode(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>, match_generics: bool, match_monomorphized: bool) -> bool {
         let generics = item.identity_args();
         let name = &item.item_meta().name;
-        self.matches_with_generics_and_mode(ctx, name, Some(&generics), mode)
+        self.matches_with_generics_and_mode(ctx, name, Some(&generics), match_generics, match_monomorphized)
     }
 
     pub fn matches_with_generics(
@@ -75,7 +74,7 @@ impl Pattern {
         name: &Name,
         args: Option<&GenericArgs>,
     ) -> bool {
-        self.matches_with_generics_and_mode(ctx, name, args, NameMatchMode::Both)
+        self.matches_with_generics_and_mode(ctx, name, args, true, true)
     }
 
     pub fn matches_with_generics_and_mode(
@@ -83,27 +82,23 @@ impl Pattern {
         ctx: &TranslatedCrate,
         name: &Name,
         args: Option<&GenericArgs>,
-        mode: NameMatchMode,
+        match_generics: bool,
+        match_monomorphized: bool,
     ) -> bool {
         let mut scrutinee_elems = name.name.as_slice();
         
-        // Handle monomorphized names based on the match mode
+        // Handle monomorphized names based on the match flags
         if let Some(monomorphized_pos) = scrutinee_elems.iter().position(|elem| elem.is_monomorphized()) {
-            match mode {
-                NameMatchMode::GenericOnly => {
-                    // For generic-only mode, truncate at monomorphized element
-                    scrutinee_elems = &scrutinee_elems[..monomorphized_pos];
-                }
-                NameMatchMode::MonoOnly => {
-                    // For mono-only mode, only match if the name contains monomorphized elements
-                    // Keep all elements including monomorphized ones  
-                }
-                NameMatchMode::Both => {
-                    // Default behavior: keep all elements
-                }
+            if !match_monomorphized {
+                // For generic-only mode, truncate at monomorphized element
+                scrutinee_elems = &scrutinee_elems[..monomorphized_pos];
+            } else if !match_generics {
+                // For mono-only mode, we still need to process the name but will check later
+                // Keep all elements including monomorphized ones  
             }
-        } else if mode == NameMatchMode::MonoOnly {
-            // If mode is mono-only but no monomorphized elements, no match
+            // For both modes, keep all elements
+        } else if !match_generics {
+            // If mono-only mode but no monomorphized elements, no match
             return false;
         }
 
@@ -127,7 +122,7 @@ impl Pattern {
             match x {
                 EitherOrBoth::Both(pat, elem) => {
                     let args = if is_last { args } else { None };
-                    if !pat.matches_with_generics_and_mode(ctx, elem, args, mode) {
+                    if !pat.matches_with_generics_and_mode(ctx, elem, args, match_generics, match_monomorphized) {
                         return false;
                     }
                 }
@@ -223,7 +218,8 @@ impl PatElem {
         ctx: &TranslatedCrate,
         elem: &PathElem,
         args: Option<&GenericArgs>,
-        mode: NameMatchMode,
+        match_generics: bool,
+        match_monomorphized: bool,
     ) -> bool {
         match (self, elem) {
             (PatElem::Glob, _) => true,
@@ -251,14 +247,11 @@ impl PatElem {
                 let Some(trait_name) = ctx.item_name(timpl.impl_trait.id) else {
                     return false;
                 };
-                pat.matches_with_generics_and_mode(ctx, trait_name, Some(&timpl.impl_trait.generics), mode)
+                pat.matches_with_generics_and_mode(ctx, trait_name, Some(&timpl.impl_trait.generics), match_generics, match_monomorphized)
             }
             (_, PathElem::Monomorphized(_)) => {
-                // Handle monomorphized elements based on mode
-                match mode {
-                    NameMatchMode::GenericOnly => false, // Don't match monomorphized in generic-only mode
-                    NameMatchMode::MonoOnly | NameMatchMode::Both => true, // Match in mono-only or both modes
-                }
+                // Handle monomorphized elements based on flags
+                match_monomorphized
             }
             _ => false,
         }
@@ -332,7 +325,6 @@ fn test_compare() {
 
 #[test]
 fn test_name_match_modes() {
-    use crate::options::NameMatchMode;
     use crate::ast::{Name, PathElem, Disambiguator, TranslatedCrate};
     
     // Create a simple pattern and name for testing
@@ -341,7 +333,7 @@ fn test_name_match_modes() {
     // Create a test crate (minimal)
     let crate_data = TranslatedCrate::default();
     
-    // Test normal name (should match in all modes)
+    // Test normal name (should match when match_generics=true)
     let normal_name = Name {
         name: vec![
             PathElem::Ident("test".to_string(), Disambiguator::new(0)),
@@ -349,9 +341,9 @@ fn test_name_match_modes() {
         ]
     };
     
-    assert!(pattern.matches_with_mode(&crate_data, &normal_name, NameMatchMode::Both));
-    assert!(pattern.matches_with_mode(&crate_data, &normal_name, NameMatchMode::GenericOnly));
-    assert!(!pattern.matches_with_mode(&crate_data, &normal_name, NameMatchMode::MonoOnly));
+    assert!(pattern.matches_with_mode(&crate_data, &normal_name, true, true)); // both
+    assert!(pattern.matches_with_mode(&crate_data, &normal_name, true, false)); // generics only
+    assert!(!pattern.matches_with_mode(&crate_data, &normal_name, false, true)); // mono only
     
     // Test name with monomorphized element
     let mono_name = Name {
@@ -365,7 +357,7 @@ fn test_name_match_modes() {
     // For monomorphized names, we need a pattern that can match the prefix
     let pattern_with_glob = Pattern::parse("test::foo::_").unwrap();
     
-    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, NameMatchMode::Both));
-    assert!(!pattern_with_glob.matches_with_mode(&crate_data, &mono_name, NameMatchMode::GenericOnly));
-    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, NameMatchMode::MonoOnly));
+    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, true, true)); // both
+    assert!(!pattern_with_glob.matches_with_mode(&crate_data, &mono_name, true, false)); // generics only
+    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, false, true)); // mono only
 }

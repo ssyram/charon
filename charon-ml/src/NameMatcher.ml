@@ -233,12 +233,6 @@ type 'fun_body ctx = { crate : 'fun_body GAst.gcrate }
 let ctx_from_crate crate = { crate }
 let ctx_to_fmt_env { crate } = PrintUtils.of_crate crate
 
-(** Mode for matching function names: controls how the name matcher handles monomorphized names. *)
-type name_match_mode =
-  | Both  (** Match both generic and monomorphized names (default behavior) *)
-  | GenericOnly  (** Match only generic names, ignore monomorphized names *)
-  | MonoOnly  (** Match only monomorphized names, ignore generic names *)
-
 (** Match configuration *)
 type match_config = {
   map_vars_to_vars : bool;
@@ -259,8 +253,10 @@ type match_config = {
           ["std::ops::Index<Vec<@T>, usize>::index"]. Otherwise, you will have
           to refer to the [index] function in the proper [impl] block for [Vec].
       *)
-  name_match_mode : name_match_mode;
-      (** Control how name matcher handles monomorphized vs generic names *)
+  match_generics : bool;
+      (** Enable matching of generic names (without monomorphization parameters) *)
+  match_monomorphized : bool;
+      (** Enable matching of monomorphized names (with monomorphization parameters) *)
 }
 
 (** Mapped expressions.
@@ -451,10 +447,8 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
            "match_name_with_generics: attempt to match empty names and patterns")
       (* We shouldn't get there: the names/patterns should be non empty *)
   | [], [ PeMonomorphized _ ] ->
-      (* Handle monomorphized elements based on match mode *)
-      (match c.name_match_mode with
-      | GenericOnly -> false (* Don't match monomorphized in generic-only mode *)
-      | MonoOnly | Both -> true (* Match in mono-only or both modes *))
+      (* Handle monomorphized elements based on match flags *)
+      c.match_monomorphized
   | [ PIdent (pid, pd, pg) ], [ PeIdent (id, d) ] ->
       log#ldebug
         (lazy
@@ -1090,7 +1084,8 @@ let name_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config) (n : T.name) :
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           name_match_mode = Both;
+           match_generics = true;
+           match_monomorphized = true;
          }
          pat n);
   (* Return *)
@@ -1113,7 +1108,8 @@ let name_with_generics_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           name_match_mode = Both;
+           match_generics = true;
+           match_monomorphized = true;
          }
          pat n args);
   (* Return *)
@@ -1169,7 +1165,8 @@ let fn_ptr_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           name_match_mode = Both;
+           match_generics = true;
+           match_monomorphized = true;
          }
          pat func);
   (* Return *)
@@ -1458,11 +1455,10 @@ module NameMatcherMap = struct
     | [] -> 
         if g = TypesUtils.empty_generic_args then node_v else None
     | [ PeMonomorphized _ ] ->
-        (* Handle monomorphized elements based on match mode *)
-        (match c.name_match_mode with
-        | GenericOnly -> None (* Don't match monomorphized in generic-only mode *)
-        | MonoOnly | Both -> 
-            if g = TypesUtils.empty_generic_args then node_v else None)
+        (* Handle monomorphized elements based on match flags *)
+        if c.match_monomorphized then
+            if g = TypesUtils.empty_generic_args then node_v else None
+        else None
     | _ ->
         (* Explore the children *)
         find_with_generics_in_children_opt ctx c name g children
