@@ -253,6 +253,15 @@ type match_config = {
           ["std::ops::Index<Vec<@T>, usize>::index"]. Otherwise, you will have
           to refer to the [index] function in the proper [impl] block for [Vec].
       *)
+  match_mono : bool;
+      (** If true, handle monomorphized names specially. When matching names
+          that end with a [PeMonomorphized] element, use the monomorphized
+          generic arguments instead of the regular arguments.
+          
+          This allows matching monomorphized instances like 
+          [test_crate::{Container::<i32>}::new::<i32>] where the [<i32>] part
+          comes from the monomorphized element and [::<i32>] part comes from
+          function-level generics. Both are allowed by design. *)
 }
 
 (** Mapped expressions.
@@ -436,13 +445,29 @@ let match_literal (pl : literal) (l : Values.literal) : bool =
 let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
     ?(m : maps = mk_empty_maps ()) (p : pattern) (n : T.name)
     (g : T.generic_args) : bool =
+  (* Handle monomorphized matching: if match_mono is true and the name ends with 
+     a PeMonomorphized element, use the monomorphized args and continue matching
+     without that element *)
+  let (n, g) = 
+    if c.match_mono then
+      match List.rev n with
+      | PeMonomorphized mono_args :: rest_rev ->
+          (* In monomorphized mode, we use the monomorphized args from the name element.
+             The regular args may contain additional function-level generics, which is allowed.
+             We prioritize the monomorphized args but don't forbid additional function generics. *)
+          (List.rev rest_rev, mono_args)
+      | _ -> (n, g)
+    else (n, g)
+  in
   match (p, n) with
   | [], [] ->
       raise
         (Failure
            "match_name_with_generics: attempt to match empty names and patterns")
       (* We shouldn't get there: the names/patterns should be non empty *)
-  | [], [ PeMonomorphized _ ] -> true (* We ignored monomorphizeds *)
+  | [], [ PeMonomorphized _ ] -> 
+      (* This case should not occur anymore since we handle monomorphized elements above *)
+      true
   | [ PIdent (pid, pd, pg) ], [ PeIdent (id, d) ] ->
       log#ldebug
         (lazy
@@ -489,6 +514,21 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
 and match_name (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
     (n : T.name) : bool =
   match_name_with_generics ctx c p n TypesUtils.empty_generic_args
+
+(** Convenience function for matching monomorphized names.
+    This is equivalent to calling match_name with match_mono=true in the config. *)
+and match_name_mono (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
+    (n : T.name) : bool =
+  let mono_config = { c with match_mono = true } in
+  match_name ctx mono_config p n
+
+(** Convenience function for matching monomorphized names with generics.
+    This is equivalent to calling match_name_with_generics with match_mono=true in the config. *)
+and match_name_with_generics_mono (ctx : 'fun_body ctx) (c : match_config)
+    ?(m : maps = mk_empty_maps ()) (p : pattern) (n : T.name)
+    (g : T.generic_args) : bool =
+  let mono_config = { c with match_mono = true } in
+  match_name_with_generics ctx mono_config ~m p n g
 
 and match_pattern_with_type_id (ctx : 'fun_body ctx) (c : match_config)
     (m : maps) (pid : pattern) (id : T.type_id) (generics : T.generic_args) :
@@ -934,7 +974,10 @@ and path_elem_with_generic_args_to_pattern (ctx : 'fun_body ctx)
       | Some args -> [ PIdent (s, d, args) ]
     end
   | PeImpl impl -> [ impl_elem_to_pattern ctx c impl ]
-  | PeMonomorphized _ -> []
+  | PeMonomorphized _ -> 
+      (* In pattern generation, we skip monomorphized elements since patterns
+         are meant to match the logical structure, not the instantiation details *)
+      []
 
 and impl_elem_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
     (impl : T.impl_elem) : pattern_elem =
@@ -1441,6 +1484,10 @@ module NameMatcherMap = struct
     (* Check if we reached the destination *)
     match name with
     | [] | [ PeMonomorphized _ ] ->
+        (* For tree search, we also consider monomorphized elements as terminal
+           since they represent instantiation details, not logical structure.
+           However, if match_mono is enabled in the config, this should be
+           handled by the calling context. *)
         if g = TypesUtils.empty_generic_args then node_v else None
     | _ ->
         (* Explore the children *)

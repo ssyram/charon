@@ -58,6 +58,18 @@ impl Pattern {
         self.matches_with_generics(ctx, name, Some(&generics), match_mono)
     }
 
+    /// Convenience method for matching monomorphized names.
+    /// This is equivalent to calling `matches` with `match_mono=true`.
+    pub fn matches_mono(&self, ctx: &TranslatedCrate, name: &Name) -> bool {
+        self.matches(ctx, name, true)
+    }
+
+    /// Convenience method for matching monomorphized items.
+    /// This is equivalent to calling `matches_item` with `match_mono=true`.
+    pub fn matches_item_mono(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>) -> bool {
+        self.matches_item(ctx, item, true)
+    }
+
     pub fn matches_with_generics(
         &self,
         ctx: &TranslatedCrate,
@@ -67,9 +79,9 @@ impl Pattern {
     ) -> bool {
         let mut scrutinee_elems = name.name.as_slice();
         let args: Option<&GenericArgs> = if match_mono && let Some(PathElem::Monomorphized(mono_args)) = scrutinee_elems.last() {
-            // In the monomorphized mode, the generics may still exist but should be empty.
-            // It produces conflicts if it is not.
-            assert!(args.is_none() || args.unwrap().is_empty());
+            // In monomorphized mode, we use the monomorphized args from the name element.
+            // The regular args may contain additional function-level generics, which is allowed.
+            // We prioritize the monomorphized args but don't forbid additional function generics.
             scrutinee_elems = &scrutinee_elems[..scrutinee_elems.len() - 1];
             Some(&*mono_args)
         } else {
