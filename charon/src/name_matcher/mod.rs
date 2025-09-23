@@ -48,14 +48,14 @@ impl Pattern {
         self.elems.len()
     }
 
-    pub fn matches(&self, ctx: &TranslatedCrate, name: &Name) -> bool {
-        self.matches_with_generics(ctx, name, None)
+    pub fn matches(&self, ctx: &TranslatedCrate, name: &Name, match_mono: bool) -> bool {
+        self.matches_with_generics(ctx, name, None, match_mono)
     }
 
-    pub fn matches_item(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>) -> bool {
+    pub fn matches_item(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>, match_mono: bool) -> bool {
         let generics = item.identity_args();
         let name = &item.item_meta().name;
-        self.matches_with_generics(ctx, name, Some(&generics))
+        self.matches_with_generics(ctx, name, Some(&generics), match_mono)
     }
 
     pub fn matches_with_generics(
@@ -63,8 +63,18 @@ impl Pattern {
         ctx: &TranslatedCrate,
         name: &Name,
         args: Option<&GenericArgs>,
+        match_mono: bool,
     ) -> bool {
         let mut scrutinee_elems = name.name.as_slice();
+        let args: Option<&GenericArgs> = if match_mono && let Some(PathElem::Monomorphized(mono_args)) = scrutinee_elems.last() {
+            // In the monomorphized mode, the generics may still exist but should be empty.
+            // It produces conflicts if it is not.
+            assert!(args.is_none() || args.unwrap().is_empty());
+            scrutinee_elems = &scrutinee_elems[..scrutinee_elems.len() - 1];
+            Some(&*mono_args)
+        } else {
+            args
+        };
         // Patterns that start with an impl block match that impl block anywhere. In such a case we
         // truncate the scrutinee name to start with the rightmost impl in its name. This isn't
         // fully precise in case of impls within impls, but we'll ignore that.
@@ -85,7 +95,7 @@ impl Pattern {
             match x {
                 EitherOrBoth::Both(pat, elem) => {
                     let args = if is_last { args } else { None };
-                    if !pat.matches_with_generics(ctx, elem, args) {
+                    if !pat.matches_with_generics(ctx, elem, args, match_mono) {
                         return false;
                     }
                 }
@@ -100,7 +110,7 @@ impl Pattern {
         true
     }
 
-    pub fn matches_ty(&self, ctx: &TranslatedCrate, ty: &Ty) -> bool {
+    pub fn matches_ty(&self, ctx: &TranslatedCrate, ty: &Ty, match_mono: bool) -> bool {
         if let [PatElem::Glob] = self.elems.as_slice() {
             return true;
         }
@@ -112,11 +122,11 @@ impl Pattern {
                         let Some(type_name) = ctx.item_name(type_id) else {
                             return false;
                         };
-                        self.matches_with_generics(ctx, type_name, Some(args))
+                        self.matches_with_generics(ctx, type_name, Some(args), match_mono)
                     }
                     TypeId::Builtin(builtin_ty) => {
                         let name = builtin_ty.get_name();
-                        self.matches_with_generics(ctx, &name, Some(args))
+                        self.matches_with_generics(ctx, &name, Some(args), match_mono)
                     }
                     TypeId::Tuple => false,
                 }
@@ -181,6 +191,7 @@ impl PatElem {
         ctx: &TranslatedCrate,
         elem: &PathElem,
         args: Option<&GenericArgs>,
+        match_mono: bool,
     ) -> bool {
         match (self, elem) {
             (PatElem::Glob, _) => true,
@@ -195,7 +206,7 @@ impl PatElem {
                 // `crate` is a special keyword that referes to the current crate.
                 let same_ident =
                     pat_ident == ident || (pat_ident == "crate" && ident == &ctx.crate_name);
-                same_ident && PatTy::matches_generics(ctx, generics, args)
+                same_ident && PatTy::matches_generics(ctx, generics, args, match_mono)
             }
             (PatElem::Impl(_pat), PathElem::Impl(ImplElem::Ty(..))) => {
                 // TODO
@@ -208,7 +219,7 @@ impl PatElem {
                 let Some(trait_name) = ctx.item_name(timpl.impl_trait.id) else {
                     return false;
                 };
-                pat.matches_with_generics(ctx, trait_name, Some(&timpl.impl_trait.generics))
+                pat.matches_with_generics(ctx, trait_name, Some(&timpl.impl_trait.generics), match_mono)
             }
             _ => false,
         }
@@ -220,6 +231,7 @@ impl PatTy {
         ctx: &TranslatedCrate,
         pats: &[Self],
         generics: Option<&GenericArgs>,
+        match_mono: bool,
     ) -> bool {
         let Some(generics) = generics else {
             // If we'r ematching on a plain name without generics info, we ignore pattern generics.
@@ -238,7 +250,7 @@ impl PatTy {
             .types
             .iter()
             .zip(type_pats)
-            .all(|(ty, pat)| pat.matches_ty(ctx, ty));
+            .all(|(ty, pat)| pat.matches_ty(ctx, ty, match_mono));
         let consts_match = generics
             .const_generics
             .iter()
@@ -247,11 +259,11 @@ impl PatTy {
         types_match && consts_match
     }
 
-    pub fn matches_ty(&self, ctx: &TranslatedCrate, ty: &Ty) -> bool {
+    pub fn matches_ty(&self, ctx: &TranslatedCrate, ty: &Ty, match_mono: bool) -> bool {
         match (self, ty.kind()) {
-            (PatTy::Pat(p), _) => p.matches_ty(ctx, ty),
+            (PatTy::Pat(p), _) => p.matches_ty(ctx, ty, match_mono),
             (PatTy::Ref(pat_mtbl, p_ty), TyKind::Ref(_, ty, ty_mtbl)) => {
-                pat_mtbl == ty_mtbl && p_ty.matches_ty(ctx, ty)
+                pat_mtbl == ty_mtbl && p_ty.matches_ty(ctx, ty, match_mono)
             }
             _ => false,
         }
