@@ -728,13 +728,11 @@ impl<'a> ComputeItemModifications<'a> {
                     tr.item_meta.lang_item.as_deref(),
                     Some("discriminant_kind" | "pointee_trait")
                 );
-                let remove_assoc_type = !has_builtin_assoc_ty
-                    && self
-                        .ctx
-                        .options
-                        .remove_associated_types
-                        .iter()
-                        .any(|pat| pat.matches(&self.ctx.translated, &tr.item_meta.name, false));
+                let remove_assoc_type =
+                    !has_builtin_assoc_ty
+                        && self.ctx.options.remove_associated_types.iter().any(|pat| {
+                            pat.matches(&self.ctx.translated, &tr.item_meta.name, false)
+                        });
                 let remove_assoc_types = !is_self_referential && remove_assoc_type;
                 let type_constraints = self.compute_constraint_set(&tr.generics);
                 let mut modifications =

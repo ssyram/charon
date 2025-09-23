@@ -7,7 +7,7 @@ use charon_lib::name_matcher::Pattern;
 
 mod util;
 
-static TEST_FILE: &str = "tests/ui/rust-name-matcher-tests.rs";
+static TEST_FILE: &str = "tests/ui/mono-name-matcher-tests.rs";
 
 fn parse_pattern_attr(a: &Attribute) -> Option<(bool, bool, Pattern)> {
     let Attribute::Unknown(a) = a else {
@@ -35,7 +35,7 @@ fn parse_pattern_attr(a: &Attribute) -> Option<(bool, bool, Pattern)> {
 }
 
 #[test]
-fn test_name_matcher() -> anyhow::Result<()> {
+fn test_mono_name_matcher() -> anyhow::Result<()> {
     let crate_data = util::translate_rust_text(&std::fs::read_to_string(TEST_FILE)?, &[])?;
     let fmt_ctx = &crate_data.into_fmt();
 
