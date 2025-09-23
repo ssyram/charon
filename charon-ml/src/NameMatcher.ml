@@ -452,10 +452,33 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
     if c.match_mono then
       match List.rev n with
       | PeMonomorphized mono_args :: rest_rev ->
-          (* In monomorphized mode, we use the monomorphized args from the name element.
-             The regular args may contain additional function-level generics, which is allowed.
-             We prioritize the monomorphized args but don't forbid additional function generics. *)
-          (List.rev rest_rev, mono_args)
+          (* In this case, we may still have some late-bound generics in `g`, this could ONLY happen for regions *)
+          let (regions_count, types_count, const_generics_count, trait_refs_count) = TypesUtils.generic_args_lengths g in
+          let total_count = regions_count + types_count + const_generics_count + trait_refs_count in
+          if total_count > 0 && total_count <> regions_count then
+            let pattern_str = match List.map (function
+              | PIdent (s, _, _) -> s
+              | PImpl _ -> "{impl}"
+              | _ -> "_") p |> String.concat "::" with
+              | "" -> "<empty_pattern>"
+              | s -> s in
+            let name_str = match List.map (function
+              | PeIdent (s, _) -> s
+              | PeImpl _ -> "{impl}"
+              | PeMonomorphized _ -> "{mono}") (List.rev (PeMonomorphized mono_args :: rest_rev)) |> String.concat "::" with
+              | "" -> "<empty_name>"
+              | s -> s in
+            failwith (Printf.sprintf "In pattern \"%s\" matching against name \"%s\": we have both monomorphized generics and regular generics with non-region types (regions: %d, types: %d, const_generics: %d, trait_refs: %d)" 
+              pattern_str name_str regions_count types_count const_generics_count trait_refs_count);
+          (* We additionally append the regions from `g` to the monomorphized args, so that we can match against them. *)
+          let merged_args = 
+            if total_count > 0 then
+              (* Late-bound regions are appended after the monomorphized ones. *)
+              { mono_args with regions = mono_args.regions @ g.regions }
+            else
+              mono_args
+          in
+          (List.rev rest_rev, merged_args)
       | _ -> (n, g)
     else (n, g)
   in
