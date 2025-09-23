@@ -1,4 +1,6 @@
-use charon_lib::formatter::IntoFormatter;
+use std::borrow::Cow;
+
+use charon_lib::formatter::{AstFormatter, IntoFormatter};
 use charon_lib::pretty::FmtWithCtx;
 
 use charon_lib::ast::*;
@@ -13,43 +15,113 @@ mod util;
 fn test_assertion_validation() -> anyhow::Result<()> {
     // Test case specifically designed to create late-bound lifetimes
     let test_code = r#"
-        use std::marker::PhantomData;
-        
-        struct Wrapper<T> {
-            value: T,
-        }
-        
-        impl<T> Wrapper<T> {
-            // Function with higher-rank trait bound - creates late-bound lifetime
-            fn apply_closure<F>(&self, f: F) -> T
+    // === Basic Structs with Early-bound Regions ===
+
+    struct Wrapper<'w, T> {
+        value: &'w T,
+    }
+
+    struct RefPair<'a, 'b, T, U> {
+        first: &'a T,
+        second: &'b U,
+    }
+
+    // === Implementations with Early-bound Regions ===
+
+    impl<'w, T> Wrapper<'w, T> {
+        // Function with late-bound regions (for<'a>)
+        fn apply_closure<F>(&self, f: F) -> T
             where
                 F: for<'a> Fn(&'a T) -> T,
                 T: Clone,
-            {
-                f(&self.value)
-            }
-            
-            // Function that takes a closure with late-bound lifetime
-            fn with_ref<F, R>(&self, f: F) -> R
+        {
+            f(self.value)
+        }
+        
+        fn with_ref<F, R>(&self, f: F) -> R
             where
                 F: for<'a> FnOnce(&'a T) -> R,
-            {
-                f(&self.value)
-            }
+        {
+            f(self.value)
         }
         
-        // Function pointer type with late-bound lifetime
-        type RefProcessor<T> = for<'a> fn(&'a T) -> T;
-        
-        fn process_wrapper() {
-            let wrapper = Wrapper { value: 42i32 };
-            
-            // These should create instances with late-bound regions
-            let result1 = wrapper.apply_closure(|x| *x + 1);
-            let result2 = wrapper.with_ref(|x| x.to_string());
-            
-            println!("{}, {}", result1, result2);
+        // Functions with early-bound regions
+        fn borrow_value<'b>(&self) -> &'b T 
+            where 
+                'w: 'b
+        {
+            self.value
         }
+        
+        fn compare_with<'other>(&self, other: &'other T) -> bool
+            where
+                T: PartialEq,
+                'w: 'other,
+        {
+            self.value == other
+        }
+    }
+
+    impl<'a, 'b, T, U> RefPair<'a, 'b, T, U> {
+        // Mix of early-bound and late-bound regions
+        fn process_both<F, R>(&self, f: F) -> R
+            where
+                F: for<'x> Fn(&'x T, &'x U) -> R,
+        {
+            f(self.first, self.second)
+        }
+        
+        fn get_first(&self) -> &'a T {
+            self.first
+        }
+        
+        fn get_second(&self) -> &'b U {
+            self.second
+        }
+
+        fn get_dummy<'c, X>(&self, dummy: &'c X) -> &'c X
+            where
+                'a: 'c,
+        {
+            dummy
+        }
+    }
+
+    // === Standalone Functions with Early-bound Regions ===
+
+    fn process_refs<'x, 'y, T>(first: &'x T, _second: &'y T) -> &'x T
+    where
+        'y: 'x,
+        T: Clone,
+    {
+        first
+    }
+
+    // Function pointer type with late-bound lifetime
+    type RefProcessor<T> = for<'a> fn(&'a T) -> T;
+
+    fn process_wrapper() {
+        let wrapper = Wrapper { value: &42i32 };
+        
+        // These should create instances with late-bound regions
+        let result1 = wrapper.apply_closure(|x| *x + 1);
+        let result2 = wrapper.with_ref(|x| x.to_string());
+        
+        println!("{}, {}", result1, result2);
+    }
+
+    fn use_more() {
+        let pair = RefPair { first: &"Hello", second: &"World" };
+        
+        let combined = pair.process_both(|a, b| format!("{}, {}", a, b));
+        println!("{}", combined);
+        
+        let first = pair.get_first();
+        let second = pair.get_second();
+        println!("First: {}, Second: {}", first, second);
+        
+        assert!(pair.get_dummy(&10) == &10);
+    }
     "#;
     
     // Translate with monomorphization
@@ -84,6 +156,7 @@ fn test_assertion_validation() -> anyhow::Result<()> {
         "test_crate::_::with_ref", 
         "test_crate::Wrapper::apply_closure",
         "_::_::apply_closure",
+        "_::_::get_dummy::_",
     ];
     
     for mono_item in &monomorphized_items {
@@ -93,13 +166,18 @@ fn test_assertion_validation() -> anyhow::Result<()> {
         if !name_str.starts_with("test_crate::") {
             continue;
         }
-        
-        println!("\nTesting monomorphized item: {}", name_str);
+
+        {
+            let mut name = name.clone();
+            name.name.push(PathElem::Monomorphized(Box::new(mono_item.identity_args().clone())));
+            let fmt_ctx = &fmt_ctx.push_binder(Cow::Borrowed(&mono_item.generic_params()));
+            println!("\nTesting item: for<{}> {}", mono_item.identity_args().with_ctx(fmt_ctx), name.with_ctx(fmt_ctx));
+        }
         
         for pattern_str in &test_patterns {
             let pattern = match Pattern::parse(pattern_str) {
                 Ok(p) => p,
-                Err(_) => continue,
+                Err(e) => panic!("Failed to parse pattern: {}, with error: {}", pattern_str, e),
             };
             
             // Test both regular and mono matching - the assertion should work in both cases
@@ -117,26 +195,6 @@ fn test_assertion_validation() -> anyhow::Result<()> {
     
     println!("\n✅ All pattern matching completed successfully!");
     println!("✅ The assertion logic is working correctly!");
-    
-    Ok(())
-}
-
-/// Test to validate that the assertion catches incorrect usage
-#[test] 
-fn test_assertion_correctness_understanding() -> anyhow::Result<()> {
-    println!("=== Understanding Assertion Correctness ===");
-    
-    // The assertion checks: args.len() == args.regions.elem_count()
-    // This means: when we have both monomorphized args AND regular args,
-    // the regular args should ONLY contain regions (late-bound regions)
-    
-    println!("✅ Assertion purpose:");
-    println!("  - Monomorphized functions have all type/const generics baked in"); 
-    println!("  - Only late-bound regions can appear in 'args' alongside monomorphized args");
-    println!("  - Late-bound regions are resolved at call site, not definition site");
-    println!("  - If args has types/consts when mono args exist, that's a bug");
-    
-    println!("\n✅ The assertion is correct and should NOT be removed!");
     
     Ok(())
 }

@@ -1,7 +1,6 @@
 use charon_lib::formatter::IntoFormatter;
 use charon_lib::pretty::FmtWithCtx;
 
-use charon_lib::ast::*;
 use charon_lib::name_matcher::Pattern;
 
 mod util;
