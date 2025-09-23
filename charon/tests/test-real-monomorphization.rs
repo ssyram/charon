@@ -33,40 +33,46 @@ fn test_real_monomorphization() -> anyhow::Result<()> {
             let _ = str_container.get();
         }
     "#;
-    
+
     // Translate with monomorphization enabled
     let crate_data = util::translate_rust_text(test_code, &["--monomorphize"])?;
     let fmt_ctx = &crate_data.into_fmt();
-    
+
     println!("=== All items with monomorphization ===");
     for item in crate_data.all_items() {
         let name = &item.item_meta().name;
         let name_str = format!("{}", name.with_ctx(fmt_ctx));
         println!("Item: {}", name_str);
-        
+
         // Check if this name contains a monomorphized element
-        if name.name.iter().any(|elem| matches!(elem, PathElem::Monomorphized(_))) {
+        if name
+            .name
+            .iter()
+            .any(|elem| matches!(elem, PathElem::Monomorphized(_)))
+        {
             println!("  ^ Contains monomorphized element!");
-            
+
             // Test pattern matching with mono=true vs mono=false
             let patterns_to_test = vec![
                 "test_crate::_::new",
-                "test_crate::_::get", 
+                "test_crate::_::get",
                 "test_crate::Container::new",
                 "_::Container::new",
             ];
-            
+
             for pattern_str in &patterns_to_test {
                 if let Ok(pattern) = Pattern::parse(pattern_str) {
                     let matches_regular = pattern.matches_item(&crate_data, item, false);
                     let matches_mono = pattern.matches_item(&crate_data, item, true);
-                    
-                    println!("    Pattern '{}': regular={}, mono={}", 
-                             pattern_str, matches_regular, matches_mono);
+
+                    println!(
+                        "    Pattern '{}': regular={}, mono={}",
+                        pattern_str, matches_regular, matches_mono
+                    );
                 }
             }
         }
     }
-    
+
     Ok(())
 }

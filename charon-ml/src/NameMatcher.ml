@@ -453,86 +453,81 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
       match List.rev n with
       | PeMonomorphized mono_args :: rest_rev ->
           (* In this case, we may still have some late-bound generics in `g`, this could ONLY happen for regions *)
-          let (regions_count, types_count, const_generics_count, trait_refs_count) = TypesUtils.generic_args_lengths g in
-          let total_count = regions_count + types_count + const_generics_count + trait_refs_count in
-          if total_count > 0 && total_count <> regions_count then
-            let pattern_str = match List.map (function
-              | PIdent (s, _, _) -> s
-              | PImpl _ -> "{impl}"
-              | _ -> "_") p |> String.concat "::" with
-              | "" -> "<empty_pattern>"
-              | s -> s in
-            let name_str = match List.map (function
-              | PeIdent (s, _) -> s
-              | PeImpl _ -> "{impl}"
-              | PeMonomorphized _ -> "{mono}") (List.rev (PeMonomorphized mono_args :: rest_rev)) |> String.concat "::" with
-              | "" -> "<empty_name>"
-              | s -> s in
-            failwith (Printf.sprintf "In pattern \"%s\" matching against name \"%s\": we have both monomorphized generics and regular generics with non-region types (regions: %d, types: %d, const_generics: %d, trait_refs: %d)" 
-              pattern_str name_str regions_count types_count const_generics_count trait_refs_count);
+          let regions_count, types_count, const_generics_count, trait_refs_count
+              =
+            TypesUtils.generic_args_lengths g
+          in
+          assert (
+            types_count = 0 && const_generics_count = 0 && trait_refs_count = 0);
           (* We additionally append the regions from `g` to the monomorphized args, so that we can match against them. *)
-          let merged_args = 
-            if total_count > 0 then
+          let merged_args =
+            if regions_count > 0 then begin
               (* Late-bound regions are appended after the monomorphized ones. *)
               { mono_args with regions = mono_args.regions @ g.regions }
-            else
-              mono_args
+            end
+            else mono_args
           in
           (List.rev rest_rev, merged_args)
       | _ -> (n, g)
     else (n, g)
   in
-  match (p, n) with
-  | [], [] ->
-      raise
-        (Failure
-           "match_name_with_generics: attempt to match empty names and patterns")
-      (* We shouldn't get there: the names/patterns should be non empty *)
-  | [], [ PeMonomorphized _ ] ->
-      (* This case should not occur anymore since we handle monomorphized elements above *)
-      true
-  | [ PIdent (pid, pd, pg) ], [ PeIdent (id, d) ] ->
-      log#ldebug
-        (lazy
-          ("match_name_with_generics: last ident:" ^ "\n- pid: " ^ pid
-         ^ "\n- id: " ^ id));
-      (* We reached the end: match the generics.
+  let ret =
+    match (p, n) with
+    | [], [] ->
+        raise
+          (Failure
+             "match_name_with_generics: attempt to match empty names and \
+              patterns")
+        (* We shouldn't get there: the names/patterns should be non empty *)
+    | [], [ PeMonomorphized _ ] ->
+        (* This case should not occur anymore since we handle monomorphized elements above *)
+        true
+    | [ PIdent (pid, pd, pg) ], [ PeIdent (id, d) ] ->
+        log#ldebug
+          (lazy
+            ("match_name_with_generics: last ident:" ^ "\n- pid: " ^ pid
+           ^ "\n- id: " ^ id));
+        (* We reached the end: match the generics.
          We have to generate an empty map. *)
-      pid = id
-      && T.Disambiguator.of_int pd = d
-      && match_generic_args ctx c m pg g
-  | [ PImpl pty ], [ PeImpl impl ] -> (
-      (* We can get there when matching a prefix of the name with a pattern *)
-      (* We have to distinguish two cases:
+        pid = id
+        && T.Disambiguator.of_int pd = d
+        && match_generic_args ctx c m pg g
+    | [ PImpl pty ], [ PeImpl impl ] -> (
+        (* We can get there when matching a prefix of the name with a pattern *)
+        (* We have to distinguish two cases:
          - the impl is an inherent impl (linked to a type)
          - the impl is a trait impl
       *)
-      match impl with
-      | ImplElemTy bound_ty ->
-          match_expr_with_ty ctx c (mk_empty_maps ()) pty bound_ty.binder_value
-          && g = TypesUtils.empty_generic_args
-      | ImplElemTrait impl_id ->
-          match_expr_with_trait_impl_id ctx c pty impl_id
-          && g = TypesUtils.empty_generic_args)
-  | PIdent (pid, pd, pg) :: p, PeIdent (id, d) :: n ->
-      (* This is not the end: check that the generics are empty *)
-      pid = id
-      && T.Disambiguator.of_int pd = d
-      && pg = []
-      && match_name_with_generics ctx c p n g
-  | PImpl pty :: p, PeImpl impl :: n -> (
-      (* We have to distinguish two cases:
+        match impl with
+        | ImplElemTy bound_ty ->
+            match_expr_with_ty ctx c (mk_empty_maps ()) pty
+              bound_ty.binder_value
+            && g = TypesUtils.empty_generic_args
+        | ImplElemTrait impl_id ->
+            match_expr_with_trait_impl_id ctx c pty impl_id
+            && g = TypesUtils.empty_generic_args)
+    | PIdent (pid, pd, pg) :: p, PeIdent (id, d) :: n ->
+        (* This is not the end: check that the generics are empty *)
+        pid = id
+        && T.Disambiguator.of_int pd = d
+        && pg = []
+        && match_name_with_generics ctx c p n g
+    | PImpl pty :: p, PeImpl impl :: n -> (
+        (* We have to distinguish two cases:
          - the impl is an inherent impl (linked to a type)
          - the impl is a trait impl
       *)
-      match impl with
-      | ImplElemTy bound_ty ->
-          match_expr_with_ty ctx c (mk_empty_maps ()) pty bound_ty.binder_value
-          && match_name_with_generics ctx c p n g
-      | ImplElemTrait impl_id ->
-          match_expr_with_trait_impl_id ctx c pty impl_id
-          && match_name_with_generics ctx c p n g)
-  | _ -> false
+        match impl with
+        | ImplElemTy bound_ty ->
+            match_expr_with_ty ctx c (mk_empty_maps ()) pty
+              bound_ty.binder_value
+            && match_name_with_generics ctx c p n g
+        | ImplElemTrait impl_id ->
+            match_expr_with_trait_impl_id ctx c pty impl_id
+            && match_name_with_generics ctx c p n g)
+    | _ -> false
+  in
+  ret
 
 and match_name (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
     (n : T.name) : bool =
@@ -783,10 +778,14 @@ let match_fn_ptr (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
           let name = builtin_fun_id_to_string fid in
           match_name_with_generics ctx c p (to_name [ name ]) func.generics)
   | FunId (FRegular fid) ->
+      (* Lookup the function decl *)
       let d = Types.FunDeclId.Map.find fid ctx.crate.fun_decls in
       (* Match the pattern on the name of the function. *)
       let match_function_name =
-        match_name_with_generics ctx c p d.item_meta.name func.generics
+        let ret =
+          match_name_with_generics ctx c p d.item_meta.name func.generics
+        in
+        ret
       in
       (* Match the pattern on the trait implementation and method name, if applicable. *)
       let match_trait_ref =

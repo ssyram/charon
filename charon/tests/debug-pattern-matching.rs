@@ -19,28 +19,28 @@ fn test_pattern_matching_debug() -> anyhow::Result<()> {
             }
         }
     "#;
-    
+
     let crate_data = util::translate_rust_text(test_code, &[])?;
     let fmt_ctx = &crate_data.into_fmt();
-    
+
     println!("=== All items ===");
     for item in crate_data.all_items() {
         let name = &item.item_meta().name;
         println!("Item: {}", name.with_ctx(fmt_ctx));
     }
-    
+
     // Test various patterns
     let patterns_to_test = vec![
         "test_crate::{TestStruct<_>}::new",
-        "test_crate::{impl TestStruct<_>}::new", 
+        "test_crate::{impl TestStruct<_>}::new",
         "_::{TestStruct<_>}::new",
         "*::{TestStruct<_>}::new",
         "test_crate::_::new",
     ];
-    
+
     for pattern_str in patterns_to_test {
         let pattern = Pattern::parse(pattern_str).expect("Valid pattern");
-        
+
         for item in crate_data.all_items() {
             let name = &item.item_meta().name;
             let name_str = format!("{}", name.with_ctx(fmt_ctx));
@@ -55,6 +55,6 @@ fn test_pattern_matching_debug() -> anyhow::Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }

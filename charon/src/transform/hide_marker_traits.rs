@@ -95,7 +95,11 @@ impl TransformPass for Transform {
             .translated
             .item_names
             .iter()
-            .filter(|(_, name)| exclude.iter().any(|p| p.matches(&ctx.translated, name, false)))
+            .filter(|(_, name)| {
+                exclude
+                    .iter()
+                    .any(|p| p.matches(&ctx.translated, name, false))
+            })
             .filter_map(|(id, _)| id.as_trait_decl())
             .copied()
             .collect();
