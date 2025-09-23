@@ -1,0 +1,87 @@
+# Final LLBC before serialization:
+
+// Full name: core::marker::MetaSized
+#[lang_item("meta_sized")]
+pub trait MetaSized<Self>
+
+// Full name: core::marker::Sized
+#[lang_item("sized")]
+pub trait Sized<Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    non-dyn-compatible
+}
+
+// Full name: core::ops::drop::Drop
+#[lang_item("drop")]
+pub trait Drop<Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    fn drop<'_0> = drop<'_0_0, Self>[Self]
+    vtable: core::ops::drop::Drop::{vtable}
+}
+
+// Full name: core::ops::drop::Drop::drop
+pub fn drop<'_0, Self>(@1: &'_0 mut (Self))
+where
+    [@TraitClause0]: Drop<Self>,
+
+// Full name: test_crate::foo::generic_fn
+fn generic_fn<T>()
+where
+    [@TraitClause0]: Sized<T>,
+{
+    let @0: (); // return
+
+    @0 := ()
+    @0 := ()
+    return
+}
+
+// Full name: test_crate::SimpleStruct
+struct SimpleStruct<T>
+where
+    [@TraitClause0]: Sized<T>,
+{
+  value: T,
+}
+
+// Full name: test_crate::{SimpleStruct<T>[@TraitClause0]}::new
+fn new<T>(@1: T) -> SimpleStruct<T>[@TraitClause0]
+where
+    [@TraitClause0]: Sized<T>,
+{
+    let @0: SimpleStruct<T>[@TraitClause0]; // return
+    let value@1: T; // arg #1
+    let @2: T; // anonymous local
+
+    storage_live(@2)
+    @2 := move (value@1)
+    @0 := SimpleStruct { value: move (@2) }
+    drop[Drop<T>] @2
+    storage_dead(@2)
+    drop[Drop<T>] value@1
+    return
+}
+
+// Full name: test_crate::test_usage
+fn test_usage()
+{
+    let @0: (); // return
+    let _int_struct@1: SimpleStruct<i32>[Sized<i32>]; // local
+    let _str_struct@2: SimpleStruct<&'_ (Str)>[Sized<&'_ (Str)>]; // local
+
+    storage_live(_int_struct@1)
+    // These should create monomorphized instances when compiled
+    _int_struct@1 := new<i32>[Sized<i32>](const (42 : i32))
+    storage_live(_str_struct@2)
+    _str_struct@2 := new<&'_ (Str)>[Sized<&'_ (Str)>](const ("hello"))
+    @0 := ()
+    storage_dead(_str_struct@2)
+    storage_dead(_int_struct@1)
+    @0 := ()
+    return
+}
+
+
+
