@@ -253,8 +253,6 @@ type match_config = {
           ["std::ops::Index<Vec<@T>, usize>::index"]. Otherwise, you will have
           to refer to the [index] function in the proper [impl] block for [Vec].
       *)
-  match_generics : bool;
-      (** Enable matching of generic names (without monomorphization parameters) *)
   match_monomorphized : bool;
       (** Enable matching of monomorphized names (with monomorphization parameters) *)
 }
@@ -1084,8 +1082,7 @@ let name_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config) (n : T.name) :
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           match_generics = true;
-           match_monomorphized = true;
+           match_monomorphized = false;
          }
          pat n);
   (* Return *)
@@ -1108,8 +1105,7 @@ let name_with_generics_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           match_generics = true;
-           match_monomorphized = true;
+           match_monomorphized = false;
          }
          pat n args);
   (* Return *)
@@ -1165,8 +1161,7 @@ let fn_ptr_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           match_generics = true;
-           match_monomorphized = true;
+           match_monomorphized = false;
          }
          pat func);
   (* Return *)

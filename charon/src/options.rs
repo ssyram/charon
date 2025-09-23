@@ -16,11 +16,6 @@ use crate::{
 /// when calling charon-driver from cargo-charon.
 pub const CHARON_ARGS: &str = "CHARON_ARGS";
 
-/// Helper function for serde default values
-fn default_true() -> bool {
-    true
-}
-
 // This structure is used to store the command-line instructions.
 // We automatically derive a command-line parser based on this structure.
 // Note that the doc comments are used to generate the help message when using
@@ -255,20 +250,12 @@ pub struct CliOpts {
     #[serde(default)]
     pub raw_boxes: bool,
 
-    /// Enable matching of generic names (without monomorphization parameters)
-    #[clap(
-        long = "match-generics",
-        help = "Enable matching of generic function names (default: true)"
-    )]
-    #[serde(default = "default_true")]
-    pub match_generics: bool,
-
-    /// Enable matching of monomorphized names (with monomorphization parameters)  
+    /// Enable matching of monomorphized names (with monomorphization parameters)
     #[clap(
         long = "match-monomorphized",
-        help = "Enable matching of monomorphized function names (default: true)"
+        help = "Enable matching of monomorphized function names (default: false)"
     )]
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub match_monomorphized: bool,
 
     /// Named builtin sets of options. Currently used only for dependent projects, eveentually
@@ -296,8 +283,6 @@ pub enum MirLevel {
     /// sensibly the same MIR as the elaborated MIR.
     Optimized,
 }
-
-
 
 /// Presets to make it easier to tweak options without breaking dependent projects. Eventually we
 /// should define semantically-meaningful presets instead of project-specific ones.
@@ -451,8 +436,6 @@ pub struct TranslateOptions {
     pub item_opacities: Vec<(NamePattern, ItemOpacity)>,
     /// List of traits for which we transform associated types to type parameters.
     pub remove_associated_types: Vec<NamePattern>,
-    /// Enable matching of generic names (without monomorphization parameters)
-    pub match_generics: bool,
     /// Enable matching of monomorphized names (with monomorphization parameters)
     pub match_monomorphized: bool,
 }
@@ -537,7 +520,6 @@ impl TranslateOptions {
             raw_boxes: options.raw_boxes,
             remove_associated_types,
             translate_all_methods: options.translate_all_methods,
-            match_generics: options.match_generics,
             match_monomorphized: options.match_monomorphized,
         }
     }

@@ -52,8 +52,13 @@ impl Pattern {
         self.matches_with_generics(ctx, name, None)
     }
 
-    pub fn matches_with_mode(&self, ctx: &TranslatedCrate, name: &Name, match_generics: bool, match_monomorphized: bool) -> bool {
-        self.matches_with_generics_and_mode(ctx, name, None, match_generics, match_monomorphized)
+    pub fn matches_with_mode(
+        &self,
+        ctx: &TranslatedCrate,
+        name: &Name,
+        match_monomorphized: bool,
+    ) -> bool {
+        self.matches_with_generics_and_mode(ctx, name, None, match_monomorphized)
     }
 
     pub fn matches_item(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>) -> bool {
@@ -62,10 +67,15 @@ impl Pattern {
         self.matches_with_generics(ctx, name, Some(&generics))
     }
 
-    pub fn matches_item_with_mode(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>, match_generics: bool, match_monomorphized: bool) -> bool {
+    pub fn matches_item_with_mode(
+        &self,
+        ctx: &TranslatedCrate,
+        item: AnyTransItem<'_>,
+        match_monomorphized: bool,
+    ) -> bool {
         let generics = item.identity_args();
         let name = &item.item_meta().name;
-        self.matches_with_generics_and_mode(ctx, name, Some(&generics), match_generics, match_monomorphized)
+        self.matches_with_generics_and_mode(ctx, name, Some(&generics), match_monomorphized)
     }
 
     pub fn matches_with_generics(
@@ -74,7 +84,7 @@ impl Pattern {
         name: &Name,
         args: Option<&GenericArgs>,
     ) -> bool {
-        self.matches_with_generics_and_mode(ctx, name, args, true, true)
+        self.matches_with_generics_and_mode(ctx, name, args, false)
     }
 
     pub fn matches_with_generics_and_mode(
@@ -82,25 +92,10 @@ impl Pattern {
         ctx: &TranslatedCrate,
         name: &Name,
         args: Option<&GenericArgs>,
-        match_generics: bool,
         match_monomorphized: bool,
     ) -> bool {
+        // Simplify: generics are always matched, monomorphized names are matched only if flag is set
         let mut scrutinee_elems = name.name.as_slice();
-        
-        // Handle monomorphized names based on the match flags
-        if let Some(monomorphized_pos) = scrutinee_elems.iter().position(|elem| elem.is_monomorphized()) {
-            if !match_monomorphized {
-                // For generic-only mode, truncate at monomorphized element
-                scrutinee_elems = &scrutinee_elems[..monomorphized_pos];
-            } else if !match_generics {
-                // For mono-only mode, we still need to process the name but will check later
-                // Keep all elements including monomorphized ones  
-            }
-            // For both modes, keep all elements
-        } else if !match_generics {
-            // If mono-only mode but no monomorphized elements, no match
-            return false;
-        }
 
         // Patterns that start with an impl block match that impl block anywhere. In such a case we
         // truncate the scrutinee name to start with the rightmost impl in its name. This isn't
@@ -122,7 +117,7 @@ impl Pattern {
             match x {
                 EitherOrBoth::Both(pat, elem) => {
                     let args = if is_last { args } else { None };
-                    if !pat.matches_with_generics_and_mode(ctx, elem, args, match_generics, match_monomorphized) {
+                    if !pat.matches_with_generics_and_mode(ctx, elem, args, match_monomorphized) {
                         return false;
                     }
                 }
@@ -218,7 +213,6 @@ impl PatElem {
         ctx: &TranslatedCrate,
         elem: &PathElem,
         args: Option<&GenericArgs>,
-        match_generics: bool,
         match_monomorphized: bool,
     ) -> bool {
         match (self, elem) {
@@ -247,10 +241,15 @@ impl PatElem {
                 let Some(trait_name) = ctx.item_name(timpl.impl_trait.id) else {
                     return false;
                 };
-                pat.matches_with_generics_and_mode(ctx, trait_name, Some(&timpl.impl_trait.generics), match_generics, match_monomorphized)
+                pat.matches_with_generics_and_mode(
+                    ctx,
+                    trait_name,
+                    Some(&timpl.impl_trait.generics),
+                    match_monomorphized,
+                )
             }
-            (_, PathElem::Monomorphized(_)) => {
-                // Handle monomorphized elements based on flags
+            (_, PathElem::Monomorphized(_args)) => {
+                // For monomorphized elements, only match if the flag is enabled
                 match_monomorphized
             }
             _ => false,
@@ -325,39 +324,37 @@ fn test_compare() {
 
 #[test]
 fn test_name_match_modes() {
-    use crate::ast::{Name, PathElem, Disambiguator, TranslatedCrate};
-    
+    use crate::ast::{Disambiguator, Name, PathElem, TranslatedCrate};
+
     // Create a simple pattern and name for testing
     let pattern = Pattern::parse("test::foo").unwrap();
-    
+
     // Create a test crate (minimal)
     let crate_data = TranslatedCrate::default();
-    
-    // Test normal name (should match when match_generics=true)
+
+    // Test normal name (should match when match_monomorphized=false since it's generic)
     let normal_name = Name {
         name: vec![
             PathElem::Ident("test".to_string(), Disambiguator::new(0)),
             PathElem::Ident("foo".to_string(), Disambiguator::new(0)),
-        ]
+        ],
     };
-    
-    assert!(pattern.matches_with_mode(&crate_data, &normal_name, true, true)); // both
-    assert!(pattern.matches_with_mode(&crate_data, &normal_name, true, false)); // generics only
-    assert!(!pattern.matches_with_mode(&crate_data, &normal_name, false, true)); // mono only
-    
+
+    assert!(pattern.matches_with_mode(&crate_data, &normal_name, false)); // generics only (default)
+    assert!(pattern.matches_with_mode(&crate_data, &normal_name, true)); // with monomorphized enabled
+
     // Test name with monomorphized element
     let mono_name = Name {
         name: vec![
             PathElem::Ident("test".to_string(), Disambiguator::new(0)),
             PathElem::Ident("foo".to_string(), Disambiguator::new(0)),
             PathElem::Monomorphized(Box::new(crate::ast::GenericArgs::empty())),
-        ]
+        ],
     };
-    
+
     // For monomorphized names, we need a pattern that can match the prefix
     let pattern_with_glob = Pattern::parse("test::foo::_").unwrap();
-    
-    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, true, true)); // both
-    assert!(!pattern_with_glob.matches_with_mode(&crate_data, &mono_name, true, false)); // generics only
-    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, false, true)); // mono only
+
+    assert!(!pattern_with_glob.matches_with_mode(&crate_data, &mono_name, false)); // generics only
+    assert!(pattern_with_glob.matches_with_mode(&crate_data, &mono_name, true)); // with monomorphized enabled
 }
