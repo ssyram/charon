@@ -1,4 +1,6 @@
-use charon_lib::formatter::IntoFormatter;
+use std::borrow::Cow;
+
+use charon_lib::formatter::{AstFormatter, IntoFormatter};
 use charon_lib::pretty::FmtWithCtx;
 
 use charon_lib::ast::*;
@@ -88,7 +90,12 @@ fn test_name_matcher_mono_initialization() -> anyhow::Result<()> {
             continue;
         }
         
-        println!("\nTesting item: {}", name_str);
+        {
+            let mut name = name.clone();
+            name.name.push(PathElem::Monomorphized(Box::new(mono_item.identity_args().clone())));
+            let fmt_ctx = &fmt_ctx.push_binder(Cow::Borrowed(&mono_item.generic_params()));
+            println!("\nTesting item: for<{}> {}", mono_item.identity_args().with_ctx(fmt_ctx), name.with_ctx(fmt_ctx));
+        }
         
         // Verify the item actually has a monomorphized element
         assert!(name.name.iter().any(|elem| matches!(elem, PathElem::Monomorphized(_))), 
@@ -105,7 +112,7 @@ fn test_name_matcher_mono_initialization() -> anyhow::Result<()> {
             let matches_mono = pattern.matches_item(&crate_data, *mono_item, true);
             
             // Also test the convenience methods
-            let matches_mono_convenience = pattern.matches_item_mono(&crate_data, *mono_item);
+            let matches_mono_convenience = pattern.matches_item(&crate_data, *mono_item, true);
             assert_eq!(matches_mono, matches_mono_convenience, 
                        "Convenience method should match direct call");
             

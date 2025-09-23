@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use itertools::{EitherOrBoth, Itertools};
 use serde::{Deserialize, Serialize};
 
-use crate::ast::*;
+use crate::{ast::*, formatter::IntoFormatter, pretty::FmtWithCtx};
 
 mod parser;
 
@@ -58,18 +58,6 @@ impl Pattern {
         self.matches_with_generics(ctx, name, Some(&generics), match_mono)
     }
 
-    /// Convenience method for matching monomorphized names.
-    /// This is equivalent to calling `matches` with `match_mono=true`.
-    pub fn matches_mono(&self, ctx: &TranslatedCrate, name: &Name) -> bool {
-        self.matches(ctx, name, true)
-    }
-
-    /// Convenience method for matching monomorphized items.
-    /// This is equivalent to calling `matches_item` with `match_mono=true`.
-    pub fn matches_item_mono(&self, ctx: &TranslatedCrate, item: AnyTransItem<'_>) -> bool {
-        self.matches_item(ctx, item, true)
-    }
-
     pub fn matches_with_generics(
         &self,
         ctx: &TranslatedCrate,
@@ -78,15 +66,20 @@ impl Pattern {
         match_mono: bool,
     ) -> bool {
         let mut scrutinee_elems = name.name.as_slice();
-        let args: Option<&GenericArgs> = if match_mono && let Some(PathElem::Monomorphized(mono_args)) = scrutinee_elems.last() {
-            // In monomorphized mode, we use the monomorphized args from the name element.
-            // The regular args may contain additional function-level generics, which is allowed.
-            // We prioritize the monomorphized args but don't forbid additional function generics.
+        let mut args = args.cloned();
+        if match_mono && let Some(PathElem::Monomorphized(mono_args)) = scrutinee_elems.last() {
+            // In this case, we may still have some late-bound generics in `args`, this could ONLY happen for regions
+            assert!(args.is_none() || args.as_ref().unwrap().len() == args.as_ref().unwrap().regions.elem_count(), "In pattern \"{}\" matching against name \"{}\": we have both monomorphized generics {} and regular generics {}", self, name.with_ctx(&ctx.into_fmt()), mono_args.with_ctx(&ctx.into_fmt()), args.unwrap().with_ctx(&ctx.into_fmt()));
+            // We additionally append the regions from `args` to the monomorphized args, so that we can match against them.
+            let mut mono_args = (**mono_args).clone();
+            if let Some(args) = args {
+                // Late-bound regions are appended after the monomorphized ones.
+                mono_args.regions.extend(args.regions.into_iter());
+            }
             scrutinee_elems = &scrutinee_elems[..scrutinee_elems.len() - 1];
-            Some(&*mono_args)
-        } else {
-            args
+            args = Some(mono_args);
         };
+        let args = args.as_ref();
         // Patterns that start with an impl block match that impl block anywhere. In such a case we
         // truncate the scrutinee name to start with the rightmost impl in its name. This isn't
         // fully precise in case of impls within impls, but we'll ignore that.

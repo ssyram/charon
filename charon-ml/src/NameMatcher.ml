@@ -257,8 +257,8 @@ type match_config = {
       (** If true, handle monomorphized names specially. When matching names
           that end with a [PeMonomorphized] element, use the monomorphized
           generic arguments instead of the regular arguments.
-          
-          This allows matching monomorphized instances like 
+
+          This allows matching monomorphized instances like
           [test_crate::{Container::<i32>}::new::<i32>] where the [<i32>] part
           comes from the monomorphized element and [::<i32>] part comes from
           function-level generics. Both are allowed by design. *)
@@ -448,7 +448,7 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
   (* Handle monomorphized matching: if match_mono is true and the name ends with 
      a PeMonomorphized element, use the monomorphized args and continue matching
      without that element *)
-  let (n, g) = 
+  let n, g =
     if c.match_mono then
       match List.rev n with
       | PeMonomorphized mono_args :: rest_rev ->
@@ -465,7 +465,7 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
         (Failure
            "match_name_with_generics: attempt to match empty names and patterns")
       (* We shouldn't get there: the names/patterns should be non empty *)
-  | [], [ PeMonomorphized _ ] -> 
+  | [], [ PeMonomorphized _ ] ->
       (* This case should not occur anymore since we handle monomorphized elements above *)
       true
   | [ PIdent (pid, pd, pg) ], [ PeIdent (id, d) ] ->
@@ -515,15 +515,16 @@ and match_name (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
     (n : T.name) : bool =
   match_name_with_generics ctx c p n TypesUtils.empty_generic_args
 
-(** Convenience function for matching monomorphized names.
-    This is equivalent to calling match_name with match_mono=true in the config. *)
+(** Convenience function for matching monomorphized names. This is equivalent to
+    calling match_name with match_mono=true in the config. *)
 and match_name_mono (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
     (n : T.name) : bool =
   let mono_config = { c with match_mono = true } in
   match_name ctx mono_config p n
 
-(** Convenience function for matching monomorphized names with generics.
-    This is equivalent to calling match_name_with_generics with match_mono=true in the config. *)
+(** Convenience function for matching monomorphized names with generics. This is
+    equivalent to calling match_name_with_generics with match_mono=true in the
+    config. *)
 and match_name_with_generics_mono (ctx : 'fun_body ctx) (c : match_config)
     ?(m : maps = mk_empty_maps ()) (p : pattern) (n : T.name)
     (g : T.generic_args) : bool =
@@ -974,7 +975,7 @@ and path_elem_with_generic_args_to_pattern (ctx : 'fun_body ctx)
       | Some args -> [ PIdent (s, d, args) ]
     end
   | PeImpl impl -> [ impl_elem_to_pattern ctx c impl ]
-  | PeMonomorphized _ -> 
+  | PeMonomorphized _ ->
       (* In pattern generation, we skip monomorphized elements since patterns
          are meant to match the logical structure, not the instantiation details *)
       []
@@ -1121,6 +1122,7 @@ let name_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config) (n : T.name) :
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
+           match_mono = false;
          }
          pat n);
   (* Return *)
@@ -1143,6 +1145,7 @@ let name_with_generics_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
+           match_mono = false;
          }
          pat n args);
   (* Return *)
@@ -1198,6 +1201,7 @@ let fn_ptr_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
+           match_mono = false;
          }
          pat func);
   (* Return *)
