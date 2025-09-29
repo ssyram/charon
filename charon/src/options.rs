@@ -523,7 +523,7 @@ impl TranslateOptions {
         let (_, opacity) = self
             .item_opacities
             .iter()
-            .filter(|(pat, _)| pat.matches(krate, name, false))
+            .filter(|(pat, _)| pat.matches(krate, name))
             .max()
             .unwrap();
         *opacity

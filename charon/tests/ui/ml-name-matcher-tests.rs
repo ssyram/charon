@@ -79,3 +79,23 @@ fn funs_with_disambiguator(b : bool) ->u32 {
         f()
     }
 }
+
+// Simple tests for monomorphized patterns - these will be handled when the name matcher
+// processes monomorphized items
+struct MonoContainer<T> {
+    item: T,
+}
+
+impl<T> MonoContainer<T> {
+    #[pattern::pass("test_crate::{test_crate::MonoContainer<@T>}::create")]
+    #[pattern::pass("test_crate::_::create")]
+    fn create(item: T) -> Self {
+        Self { item }
+    }
+}
+
+#[pattern::pass("test_crate::mono_usage")]
+fn mono_usage() {
+    let _container1 = MonoContainer::create(42i32);
+    let _container2 = MonoContainer::create("test");
+}

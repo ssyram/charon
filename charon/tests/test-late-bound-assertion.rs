@@ -129,13 +129,12 @@ fn test_late_bound_generics_assertion() -> anyhow::Result<()> {
                 Err(_) => continue,
             };
 
-            // Test both regular and mono matching
-            let matches_regular = pattern.matches_item(&crate_data, *mono_item, false);
-            let matches_mono = pattern.matches_item(&crate_data, *mono_item, true);
+            // Test pattern matching with monomorphized names
+            let matches = pattern.matches_item(&crate_data, *mono_item);
 
             println!(
-                "    Pattern '{}': regular={}, mono={} ({})",
-                pattern_str, matches_regular, matches_mono, description
+                "    Pattern '{}': matches={} ({})",
+                pattern_str, matches, description
             );
 
             // The assertion should work correctly for both cases
@@ -191,10 +190,10 @@ fn test_pattern_with_generics(crate_data: &TranslatedCrate) -> anyhow::Result<()
                     let name_str = format!("{}", mono_item.item_meta().name.with_ctx(fmt_ctx));
 
                     // Test matching - this should work or fail gracefully, not panic
-                    let matches_mono = pattern.matches_item(crate_data, *mono_item, true);
+                    let matches = pattern.matches_item(crate_data, *mono_item);
                     println!(
                         "  '{}' matches '{}': {}",
-                        pattern_str, name_str, matches_mono
+                        pattern_str, name_str, matches
                     );
                 }
             }

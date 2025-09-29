@@ -45,12 +45,10 @@ fn test_pattern_matching_debug() -> anyhow::Result<()> {
             let name = &item.item_meta().name;
             let name_str = format!("{}", name.with_ctx(fmt_ctx));
             if name_str.contains("::new") {
-                let matches_regular = pattern.matches_item(&crate_data, item, false);
-                let matches_mono = pattern.matches_item(&crate_data, item, true);
+                let matches_result = pattern.matches_item(&crate_data, item);
                 println!("Pattern: {}", pattern_str);
                 println!("  Item: {}", name_str);
-                println!("  Matches (regular): {}", matches_regular);
-                println!("  Matches (mono): {}", matches_mono);
+                println!("  Matches: {}", matches_result);
                 println!();
             }
         }

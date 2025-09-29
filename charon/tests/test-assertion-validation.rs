@@ -193,13 +193,12 @@ fn test_assertion_validation() -> anyhow::Result<()> {
                 ),
             };
 
-            // Test both regular and mono matching - the assertion should work in both cases
+            // Test pattern matching - the assertion should work with monomorphized names
             println!("  Testing pattern: {}", pattern_str);
 
-            let matches_regular = pattern.matches_item(&crate_data, **mono_item, false);
-            let matches_mono = pattern.matches_item(&crate_data, **mono_item, true);
+            let matches = pattern.matches_item(&crate_data, **mono_item);
 
-            println!("    Regular: {}, Mono: {}", matches_regular, matches_mono);
+            println!("    Matches: {}", matches);
 
             // If the assertion is correct, both should succeed without panicking
             // If it's wrong, we'd get an assertion failure with helpful error message

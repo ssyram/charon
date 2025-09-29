@@ -64,3 +64,29 @@ impl<T> Trait<T> for [T] {
 impl<T> Trait<T> for &[T] {
     fn method<U>() {}
 }
+
+// Simple tests for monomorphized patterns
+struct Generic<T> {
+    value: T,
+}
+
+impl<T> Generic<T> {
+    #[pattern::pass("test_crate::_::new")]
+    #[pattern::pass("_::_::new")]
+    fn new(value: T) -> Self {
+        Self { value }
+    }
+
+    #[pattern::pass("test_crate::_::get")]
+    fn get(&self) -> &T {
+        &self.value
+    }
+}
+
+// Function that creates monomorphized instances when used
+#[pattern::pass("test_crate::use_generic")]
+fn use_generic() {
+    let _int_generic = Generic::new(42i32);
+    let _str_generic = Generic::new("hello");
+    let _ = _int_generic.get();
+}

@@ -183,7 +183,7 @@ impl LlbcPass for Transform {
             .translated
             .item_names
             .iter()
-            .find(|(_, name)| pat.matches(&ctx.translated, name, false))
+            .find(|(_, name)| pat.matches(&ctx.translated, name))
             .and_then(|(id, _)| id.as_fun())
             .copied();
 

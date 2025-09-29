@@ -44,7 +44,7 @@ impl TransformPass for Transform {
             .filter(|(_, name)| {
                 types
                     .iter()
-                    .any(|p| p.matches(&ctx.translated, name, false))
+                    .any(|p| p.matches(&ctx.translated, name))
             })
             .filter_map(|(id, _)| id.as_type())
             .copied()

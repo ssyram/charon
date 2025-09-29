@@ -9,25 +9,25 @@ mod util;
 
 static TEST_FILE: &str = "tests/ui/rust-name-matcher-tests.rs";
 
-fn parse_pattern_attr(a: &Attribute) -> Option<(bool, bool, Pattern)> {
+fn parse_pattern_attr(a: &Attribute) -> Option<(bool, Pattern)> {
     let Attribute::Unknown(a) = a else {
         return None;
     };
-    let (pass, mono, a) = if a.path == "pattern::pass" {
-        (true, false, a)
+    let (pass, a) = if a.path == "pattern::pass" {
+        (true, a)
     } else if a.path == "pattern::fail" {
-        (false, false, a)
+        (false, a)
     } else if a.path == "pattern::mono_pass" {
-        (true, true, a)
+        (true, a)
     } else if a.path == "pattern::mono_fail" {
-        (false, true, a)
+        (false, a)
     } else {
         return None;
     };
     let a = a.args.as_ref()?;
     let a = a.strip_prefix("\"")?.strip_suffix("\"")?;
     match Pattern::parse(a) {
-        Ok(pat) => Some((pass, mono, pat)),
+        Ok(pat) => Some((pass, pat)),
         Err(e) => {
             panic!("Failed to parse pattern `{a}` ({e})")
         }
@@ -48,17 +48,17 @@ fn test_name_matcher() -> anyhow::Result<()> {
             .iter()
             .filter_map(|a| parse_pattern_attr(a))
             .collect_vec();
-        for (pass, mono, pat) in patterns {
-            let passes = pat.matches_item(&crate_data, item, mono);
+        for (pass, pat) in patterns {
+            let passes = pat.matches_item(&crate_data, item);
             if passes != pass {
                 if passes {
                     panic!(
-                        "Pattern `{pat}` passes on `{}` (mono={mono}) but shouldn't",
+                        "Pattern `{pat}` passes on `{}` but shouldn't",
                         name.with_ctx(fmt_ctx)
                     );
                 } else {
                     panic!(
-                        "Pattern `{pat}` doesn't pass on `{}` (mono={mono}) but should",
+                        "Pattern `{pat}` doesn't pass on `{}` but should",
                         name.with_ctx(fmt_ctx)
                     );
                 }

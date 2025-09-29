@@ -62,12 +62,11 @@ fn test_real_monomorphization() -> anyhow::Result<()> {
 
             for pattern_str in &patterns_to_test {
                 if let Ok(pattern) = Pattern::parse(pattern_str) {
-                    let matches_regular = pattern.matches_item(&crate_data, item, false);
-                    let matches_mono = pattern.matches_item(&crate_data, item, true);
+                    let matches = pattern.matches_item(&crate_data, item);
 
                     println!(
-                        "    Pattern '{}': regular={}, mono={}",
-                        pattern_str, matches_regular, matches_mono
+                        "    Pattern '{}': matches={}",
+                        pattern_str, matches
                     );
                 }
             }
