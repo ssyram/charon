@@ -466,74 +466,7 @@ pub struct FunDeclRef {
 - 仅用 `FunDeclId`：无法区分 `Vec<u32>` vs `Vec<String>`
 - 使用 `FunDeclRef`：完整记录实例化信息
 
-<!-- ### 5.2 泛型处理机制
-
-**Early Bound vs Late Bound**：
-- **Early Bound**：项级泛型参数 `<T>`，编译时已知，可单态化
-- **Late Bound**：局部量化 `for<'a>`，运行时绑定，保留 binder
-
-**单态化框架处理策略**：
-- Early Bound 类型参数：替换为具体类型
-- Late Bound 生命周期：保留在 `RegionBinder<T>` 中
-- 常量泛型：视情况实例化
-
-这一段整个都是错的！要点如下：
-- Charon 不区分 Early Bound 和 Late Bound 只是 Late Bound 一定在 Early Bound **之后**
-- Charon 的单态化框架只对 Early Bound 进行单态化，Late Bound 很可能会保留在定义中，而 Late Bound 只可能是生命周期参数，所以换句话说：即使单态化翻译，依然可能遇到要处理 Late Bound 生命周期参数的情况
-- 这个标题为“泛型处理机制”，上面两个要点只是其中很小一部分，你要重点陈述的泛型机制要包括：
-    + GenericParams 和 GenericArgs 的定义详解，里面到底包含什么东西
-    + Binder 和 RegionBinder 的定义详解，里面到底包含什么，在 Rust 中对应什么。要提到：RegionBinder 是 Binder 的特例，而且是 Charon 原创，Rustc 中全都是 Binder 。
-    + DeBruijnIndex 和几种 DeBruijn 变量的管理和使用，其与 binding_levels 的具体关系，列举一个详细的嵌套的例子
-    + 具体 binding_levels 的管理，其中的内容分别有什么用
-    + 特别提到特殊的 DynPred 机制，为什么它的类型是 Binder<Ty> ，其代表什么意思
-    + 对于 Clause ，详解其数据结构和类型，特别是提到 TraitClause 和 TraitRef / TraitDeclRef 的区别和联系，同时，要特别提到 `Trait<...> for Type` 会被表示为 `Trait<Type, ...>` ，即对 Trait 的引用的**第一个参数**是实现类型。
--->
-
-### 5.3 translate_def_generics 详解
-
-处理定义项的泛型参数的核心函数是 `translate_def_generics` 。
-
-**四重职责** (`translate_generics.rs` 约 406 行)：
-
-1. **收集参数**：
-   ```rust
-   // 从 hax::FullDef 提取泛型声明
-   for param in def.generics.params {
-       match param.kind {
-           ParamKind::Type => binding_level.push_type_var(...),
-           ParamKind::Lifetime => binding_level.push_early_region(...),
-           ParamKind::Const => binding_level.push_const_generic_var(...),
-       }
-   }
-   ```
-
-2. **环境设置**：
-   ```rust
-   // 创建新的 BindingLevel 并压栈
-   let binding_level = BindingLevel::new(is_item_binder);
-   self.binding_levels.push(binding_level);
-   ```
-
-3. **Early 替换**：
-   ```rust
-   // 更新类型变量映射
-   for (rust_id, our_id) in type_vars_map {
-       // 后续类型翻译时查找此映射进行替换
-   }
-   ```
-
-4. **Late 生命周期 binder**：
-   ```rust
-   // 为 Late Bound 生命周期创建 RegionBinder
-   if has_late_bound_regions {
-       RegionBinder {
-           regions: late_bound_regions,
-           skip_binder: inner_value,
-       }
-   }
-   ```
-
-### 5.3.1 GenericParams 与 GenericArgs 深度剖析
+### 5.3 GenericParams 与 GenericArgs 深度剖析
 
 **核心概念**：`GenericParams` 是声明侧的形式参数集合，`GenericArgs` 是使用侧的实际参数集合。两者结构对应，ID 一一映射。
 
@@ -803,18 +736,9 @@ GenericArgs {
 
 #### 设计理念
 
-**分离约束与参数**：
-- `regions/types/const_generics` + `trait_clauses` 需要调用者提供实参
-- `regions_outlive/types_outlive/trait_type_constraints` 是编译器检查的约束，不需实例化
+类似于 Dependent Type 系统，明确需要提供“实现证明”，即 `TraitRef` 来满足 `TraitClause` 的约束。
 
-**Vector vs Vec 区别**：
-- `Vector<Id, T>`：索引化集合，ID 作为索引直接访问，用于参数
-- `Vec<T>`：顺序集合，用于约束列表
-
-**为何 trait_clauses 单独字段**：
-trait bound 需要在实例化时提供具体实现（witness），而其他约束仅需验证满足
-
-这套设计使 Charon 能精确表达 Rust 复杂的泛型系统，同时为下游验证工具提供清晰的语义
+**Vector 数据结构**：`Vector<Id, T>` 是 Charon 内部的数据结构索引化集合，ID 作为索引直接访问，用于参数，同时 Id 可以只有一个 Placeholder 没有实际内容，对应注册了但是没有填入实际内容的情况，内部使用 `IndexVec<I, Option<T>>` 。
 
 ### 5.4 DeBruijnIndex 系统
 
