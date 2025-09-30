@@ -1405,6 +1405,283 @@ cargo test          # 仅 Rust 单元测试
 **错误处理**：所有错误通过 `register_error!` 宏收集到 `ErrorCtx`
 
 
+## 11. 待开发工作：完整单态化支持
+
+### 概述
+
+Charon 当前对单态化有框架性支持（通过 `--monomorphize` 标志），但存在两个关键限制阻碍完整功能：
+
+1. **Trait 定义错误单态化**：当前机制会生成不符合 Rust 语义的单态化 trait 定义
+2. **Trait Object 无法单态化**：`dyn Trait` 类型因无法指定关联类型而不支持单态化
+
+这两个问题根源于当前采用的 `ItemRef` **整体单态化**策略，需要重新设计单态化机制以正确处理 trait 相关场景。
+
+### 问题一：Trait 定义的错误单态化
+
+#### 当前问题表现
+
+**当前实现**（`translate/translate_crate.rs` 第 406 行）：
+```rust
+let item = if self.monomorphize() && item.has_param {
+    item.erase(&self.hax_state_with_id())  // 整体单态化
+} else {
+    item.clone()
+};
+```
+
+这种方式对 `ItemRef` 直接单态化，**包括 trait 定义本身**，导致：
+
+**错误场景示例**：
+```rust
+// Rust 源码
+trait MyTrait<T> {
+    fn process(&self, x: T) -> T;
+}
+
+impl MyTrait<i32> for String { ... }
+impl MyTrait<bool> for String { ... }
+```
+
+**当前 Charon 输出（错误）**：
+```
+trait MyTrait for i32 {  // ❌ 错误：trait 被单态化为具体类型
+    fn process(&self, x: i32) -> i32;
+}
+
+trait MyTrait for bool {  // ❌ 错误：又一份单态化的 trait 定义
+    fn process(&self, x: bool) -> bool;
+}
+```
+
+**问题分析**：
+- Rust 语义中，trait **定义**只有一份，泛型参数保留
+- trait **实现**（impl）才会针对具体类型单态化
+- 当前机制混淆了定义与实现，对定义也进行单态化
+
+#### 正确语义应该是
+
+**期望 Charon 输出**：
+```rust
+// 单一 trait 定义，保留 Self 泛型参数，其他参数单态化
+trait MyTrait {  // ✓ 正确：trait 定义不单态化 Self
+    fn process<T>(&self, x: T) -> T;  // 保留方法泛型
+}
+
+// 但如果 trait 有其他泛型参数（非 Self），应单态化
+trait Container<T> { ... }  
+// 应生成多份：
+trait Container_i32 { type Item = ...; }   // 针对 T=i32
+trait Container_bool { type Item = ...; }  // 针对 T=bool
+```
+
+**关键原则**：
+- `Self` 参数：**永远保留**，因为 trait 可被多种类型实现
+- 其他泛型参数：**应该单态化**，每组参数值生成一份定义
+- 方法泛型：**看情况保留或单态化**
+
+#### 具体问题根源
+
+**ItemRef 结构限制**：
+```rust
+pub struct ItemRef {
+    pub def_id: DefId,
+    pub generics: Vec<GenericArg>,  // 包含所有泛型实参
+    // ...
+}
+```
+
+`erase()` 调用时：
+- 对所有泛型参数统一处理
+- 无法区分 `Self` 与其他参数
+- 无法特殊处理 trait 定义
+
+**需要的改进**：
+1. 识别项类型（trait vs 其他）
+2. 对 trait 定义：保留 `Self`，单态化其他参数
+3. 对 trait 方法：继承 trait 单态化策略
+
+### 问题二：Trait Object 无法单态化
+
+#### 当前问题表现
+
+**trait object 语法**：
+```rust
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+
+// trait object 必须明确所有关联类型
+let iter: Box<dyn Iterator<Item = i32>> = ...;
+```
+
+**关键要求**：`dyn Trait` 必须**明确指定所有关联类型**
+
+**当前 ItemRef 的限制**：
+```rust
+pub struct ItemRef {
+    pub def_id: DefId,
+    pub generics: Vec<GenericArg>,  // 仅包含类型/生命周期/常量参数
+    // ❌ 缺失：无法表达关联类型绑定
+}
+```
+
+#### 无法单态化的具体场景
+
+**场景 1：基本 trait object**
+```rust
+trait Display {
+    type Output;
+    fn fmt(&self) -> Self::Output;
+}
+
+// 使用 trait object
+fn print(x: &dyn Display<Output = String>) {
+    //            ^^^ 关联类型约束
+    ...
+}
+```
+
+**当前单态化失败**：
+- `ItemRef` 只能表达 `dyn Display`
+- 无法表达 `Output = String` 约束
+- 导致虚表（vtable）无法生成
+
+**场景 2：多关联类型 trait**
+```rust
+trait Converter {
+    type Input;
+    type Output;
+    fn convert(&self, x: Self::Input) -> Self::Output;
+}
+
+let conv: Box<dyn Converter<Input = i32, Output = String>> = ...;
+//                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ 两个关联类型
+```
+
+**问题**：
+- 必须同时指定 `Input` 和 `Output`
+- `ItemRef` 无对应字段
+- 虚表翻译时缺少类型信息
+
+#### Vtable 生成依赖关联类型
+
+**Vtable 结构**（`translate_trait_objects.rs` 第 329 行）：
+```rust
+struct VTable_Trait {
+    drop: fn(*mut dyn Trait<...>),       // 需要知道关联类型
+    method: fn(&dyn Trait<...>, ...) -> Output,  // Output 是关联类型
+    //                               ^^^^^^ 必须已知具体类型
+}
+```
+
+**生成 vtable 时**：
+- 需要完整的 trait 签名，包括关联类型
+- 当前 `ItemRef` 无法提供关联类型信息
+- 导致虚表方法签名不完整
+
+#### 为何问题一是前提
+
+**依赖关系**：
+```
+问题一：Trait 定义正确单态化
+    ↓ 确保每组参数有唯一 trait 定义
+问题二：ItemRef 支持关联类型
+    ↓ dyn Trait 能指向正确的 trait 定义
+成功生成 vtable
+```
+
+**如果问题一未解决**：
+- 会有 `trait Trait for i32` 等错误定义
+- `dyn Trait` 无法指向正确的"单一 trait 定义"
+- 即使 `ItemRef` 支持关联类型也无济于事
+
+### 解决方案设计
+
+#### 核心思路
+
+1. **重新设计 trait 单态化策略**
+   - 识别 trait 定义，特殊处理
+   - 保留 `Self` 参数
+   - 单态化其他泛型参数
+
+2. **扩展 ItemRef 结构**
+   ```rust
+   pub struct ItemRef {
+       pub def_id: DefId,
+       pub generics: Vec<GenericArg>,
+       // 新增：关联类型绑定
+       pub assoc_types: HashMap<Symbol, Ty>,  // 关联类型名 -> 具体类型
+   }
+   ```
+
+3. **更新单态化流程**
+   - `erase()` 时携带关联类型信息
+   - trait 定义生成时检查并保留 `Self`
+   - trait object 翻译时传递关联类型到 vtable
+
+#### 实现步骤
+
+**步骤 1：修改 ItemRef（Hax 侧）**
+- 添加 `assoc_types` 字段
+- 更新序列化/反序列化
+
+**步骤 2：调整 trait 单态化逻辑**
+- 在 `translate_trait_decl` 中检测单态化模式
+- 对 `Self` 以外参数调用 `erase()`
+- 生成正确的单态化 trait 定义
+
+**步骤 3：支持 trait object 单态化**
+- `translate_type` 中处理 `dyn Trait<AssocTy=T>` 语法
+- 从 `ItemRef.assoc_types` 提取关联类型
+- 传递给 vtable 生成逻辑
+
+**步骤 4：更新 vtable 生成**
+- 使用关联类型信息完整化方法签名
+- 正确生成虚表结构体定义
+
+### 技术挑战
+
+**挑战 1：Hax 集成**
+- 需要修改 Hax 的 `ItemRef` 定义
+- 确保关联类型信息在 Rustc → Hax 转换中保留
+
+**挑战 2：关联类型解析**
+- 复杂 where 子句中的关联类型约束
+- 多层嵌套的关联类型（`T::Item::Output`）
+
+**挑战 3：向后兼容**
+- 保持非单态化模式不受影响
+- 已有测试用例需要更新
+
+### 预期效果
+
+**完成后**：
+- 正确生成单态化的 trait 定义（保留 `Self`）
+- 支持 `dyn Trait<AssocTy=T>` 单态化
+- 完整 vtable 支持，方法签名正确
+- 单态化模式下无语义错误
+
+**示例结果**：
+```rust
+// 输入
+trait Container<T> {
+    type Item;
+    fn get(&self) -> Self::Item;
+}
+
+// 输出（单态化 T=i32）
+trait Container_i32 {
+    type Item;  // 关联类型保留
+    fn get(&self) -> Self::Item;
+}
+
+// trait object 支持
+dyn Container_i32<Item = String>  // ✓ 可正确翻译和生成 vtable
+```
+
+这项工作将使 Charon 的单态化功能完整、正确，符合 Rust 语义，为下游工具提供准确的单态化 LLBC。
+
 ## 附录
 
 | 英文术语 | 中文解释 | 上下文示例 |
