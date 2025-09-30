@@ -295,24 +295,155 @@ pub enum RustcItem {
 
 `ItemTransCtx` 是项级翻译上下文，管理**单个项**的翻译状态和数据。其由 `translate_item()` 通过给定的 `TransItemSource` 创建并按照 `TransItemSourceKind` 传递给具体对应翻译函数。其中包含 `TranslateCtx` 的引用以便访问全局状态。
 
-**项级翻译上下文** (`translate_ctx.rs` 约 74 行)：
+**项级翻译上下文** (`translate_ctx.rs` 约 61 行)：
 ```rust
 pub(crate) struct ItemTransCtx<'tcx, 'ctx> {
-    pub t_ctx: &'ctx mut TranslateCtx<'tcx>,     // 全局上下文引用
-    pub item_src: TransItemSource,                // 当前翻译项
-    pub item_id: Option<AnyTransId>,              // 当前项 ID
-    
-    // ⭐ 泛型绑定核心
-    pub binding_levels: BindingStack<BindingLevel>,  // 泛型定义绑定层级栈
-    pub parent_trait_clauses: Vector<TraitClauseId, TraitClause>,
-    pub item_trait_clauses: HashMap<TraitItemName, Vector<TraitClauseId, TraitClause>>,
+    pub item_src: TransItemSource,              // 当前翻译项源
+    pub item_id: Option<AnyTransId>,            // 当前项 ID
+    pub t_ctx: &'ctx mut TranslateCtx<'tcx>,   // 全局上下文引用
+    pub error_on_impl_expr_error: bool,         // 错误处理标志
+    pub binding_levels: BindingStack<BindingLevel>, // 泛型绑定层级栈
 }
 ```
 
-**binding_levels 作用**：
-- 管理嵌套泛型作用域
-- 栈结构：栈顶是最内层绑定器，即最**贴近**当前位置的泛型参数绑定
-- 支持 `DeBruijnIndex` 变量查找，其中从最内层开始编号为 0 即栈顶为 0
+#### 字段详细说明
+
+**1. item_src: TransItemSource**
+- **作用**：标识当前正在翻译的项的来源
+- **内容**：包含 `RustcItem`（Poly 或 Mono）和 `TransItemSourceKind`（Fun/Type/TraitDecl 等）
+- **用途**：用于错误报告、调试追踪、确定翻译策略
+
+**2. item_id: Option<AnyTransId>**
+- **作用**：当前项已分配的 Charon ID
+- **为何 Option**：某些项（如 InherentImpl/Module）不生成独立 ID
+- **用途**：
+  - 在翻译体内引用自身（递归类型）
+  - 检测循环依赖（通过 `translate_stack` 检查）
+  - 注册子项时作为父项引用
+
+**3. t_ctx: &'ctx mut TranslateCtx<'tcx>**
+- **作用**：访问全局翻译上下文的可变引用
+- **可访问数据**：
+  - `translated`：已翻译实体存储
+  - `id_map`：源到 ID 映射
+  - `items_to_translate`：待翻译队列
+  - `errors`：错误收集器
+- **常用操作**：
+  - `register_and_enqueue`：注册依赖项
+  - `span_err`：报告错误
+  - `catch_sinto`：调用 Hax 转换
+
+**4. error_on_impl_expr_error: bool**
+- **作用**：控制是否将 trait 实现错误视为致命错误
+- **为何需要**：Rust 对 type alias 不强制 trait bound 检查
+- **取值**：
+  - `true`：正常函数/类型，严格检查
+  - `false`：type alias 内部，允许不完整 trait 实现
+- **典型场景**：
+  ```rust
+  type MyType<T> = Vec<T>;  // 即使 T 没有 Clone，也允许
+  ```
+
+**5. binding_levels: BindingStack<BindingLevel>**
+- **作用**：管理嵌套泛型参数绑定作用域
+- **结构**：栈，栈顶（index 0）是最内层绑定器
+- **每层内容** (`BindingLevel`)：
+  - `params: GenericParams` - 该层绑定的参数
+  - `early_region_vars` - Early Bound 生命周期映射
+  - `bound_region_vars` - Late Bound 生命周期映射  
+  - `type_vars_map` - 类型变量映射
+  - `const_generic_vars_map` - 常量泛型映射
+- **操作**：
+  - `push`：进入新绑定器（如函数签名、trait 声明）
+  - `pop`：退出绑定器作用域
+  - `lookup_param`：从栈顶向下查找变量，返回 `DeBruijnVar`
+- **用途**：
+  - 翻译类型时解析泛型参数引用
+  - 构建 `DeBruijnVar` 索引
+  - 处理 Early/Late Bound 参数差异
+
+#### 上下文创建流程
+
+```rust
+// translate_items.rs
+pub(crate) fn translate_item(&mut self, item_src: &TransItemSource) {
+    // 1. 创建 ItemTransCtx
+    let mut item_ctx = ItemTransCtx {
+        item_src: item_src.clone(),
+        item_id: self.id_map.get(item_src).copied(),
+        t_ctx: self,
+        error_on_impl_expr_error: true,  // 默认严格
+        binding_levels: BindingStack::new(),
+    };
+    
+    // 2. 根据类型分派
+    match item_src.kind {
+        TransItemSourceKind::Fun => {
+            item_ctx.translate_function(...);
+        }
+        TransItemSourceKind::Type => {
+            item_ctx.translate_type(...);
+        }
+        // ...
+    }
+}
+```
+
+#### binding_levels 使用示例
+
+```rust
+// 翻译函数签名
+fn translate_function_signature(&mut self, def: &hax::FullDef) {
+    // 1. 创建顶层绑定
+    let mut level = BindingLevel::new(is_item_binder: true);
+    
+    // 2. 添加泛型参数
+    for param in def.generics.params {
+        match param.kind {
+            ParamKind::Lifetime => level.push_early_region(...),
+            ParamKind::Type => level.push_type_var(...),
+            // ...
+        }
+    }
+    
+    // 3. 压入栈
+    self.binding_levels.push(level);
+    
+    // 4. 翻译函数体（可访问参数）
+    self.translate_body(...);
+    
+    // 5. 退出作用域
+    self.binding_levels.pop();
+}
+```
+
+#### 多层 binding_levels 场景
+
+```rust
+// Rust 代码
+fn outer<'a, T>(x: T) {
+    fn inner<'b, U: 'b>(y: U) { ... }
+    //      ^^^^^^^^^ 内层绑定器
+}
+//      ^^^^^^ 外层绑定器
+
+// binding_levels 栈状态（翻译 inner 函数体时）
+[
+    BindingLevel { // index 0 - 最内层
+        params: ['b, U],
+        is_item_binder: true,
+    },
+    BindingLevel { // index 1 - 外层
+        params: ['a, T],
+        is_item_binder: true,
+    },
+]
+
+// 查找变量 'b -> DeBruijnVar::Bound(DeBruijnId(0), 'b)
+// 查找变量 T  -> DeBruijnVar::Bound(DeBruijnId(1), T)
+```
+
+**关键设计**：`ItemTransCtx` 通过 `binding_levels` 精确追踪泛型作用域，支持 DeBruijn 索引系统，确保嵌套泛型正确翻译
 
 ### 5.2 XXDeclRef 与泛型实参
 
@@ -402,30 +533,288 @@ pub struct FunDeclRef {
    }
    ```
 
-**GenericParams 结构** (`types.rs` 约 248 行)：
+### 5.3.1 GenericParams 与 GenericArgs 深度剖析
+
+**核心概念**：`GenericParams` 是声明侧的形式参数集合，`GenericArgs` 是使用侧的实际参数集合。两者结构对应，ID 一一映射。
+
+#### GenericParams 完整结构
+
+**定义位置**：`charon/src/ast/types.rs` 第 248 行
+
 ```rust
 pub struct GenericParams {
-    pub regions: Vector<RegionId, RegionVar>,                    // 生命周期参数
-    pub types: Vector<TypeVarId, TypeVar>,                       // 类型参数
-    pub const_generics: Vector<ConstGenericVarId, ConstGenericVar>, // 常量参数
-    pub trait_clauses: Vector<TraitClauseId, TraitClause>,      // trait 约束
+    // 基础三大类泛型参数
+    pub regions: Vector<RegionId, RegionVar>,
+    pub types: Vector<TypeVarId, TypeVar>,
+    pub const_generics: Vector<ConstGenericVarId, ConstGenericVar>,
+    
+    // trait 约束与谓词
+    pub trait_clauses: Vector<TraitClauseId, TraitClause>,
     pub regions_outlive: Vec<RegionBinder<RegionOutlives>>,
     pub types_outlive: Vec<RegionBinder<TypeOutlives>>,
     pub trait_type_constraints: Vector<TraitTypeConstraintId, RegionBinder<TraitTypeConstraint>>,
 }
 ```
 
-**GenericArgs 结构** (`types.rs` 约 184 行)：
+#### 字段详解
+
+**1. 基础泛型参数（需要实例化）**
+
+- **`regions`**：生命周期参数集合
+  - 类型：`Vector<RegionId, RegionVar>`
+  - 用途：存储所有生命周期参数如 `'a`, `'b`
+  - 实例化时对应 `GenericArgs::regions`
+
+- **`types`**：类型参数集合
+  - 类型：`Vector<TypeVarId, TypeVar>`
+  - 用途：存储类型参数如 `T`, `U`
+  - 实例化时对应 `GenericArgs::types`
+
+- **`const_generics`**：常量泛型参数集合
+  - 类型：`Vector<ConstGenericVarId, ConstGenericVar>`
+  - 用途：存储常量参数如 `const N: usize`
+  - 实例化时对应 `GenericArgs::const_generics`
+
+**2. trait_clauses - Trait 约束子句**
+
+**类型**：`Vector<TraitClauseId, TraitClause>`
+
+**作用**：存储 trait 约束，即 `where` 子句中的 trait bound
+
+**TraitClause 结构** (`types/vars.rs`)：
 ```rust
-pub struct GenericArgs {
-    pub regions: Vector<RegionId, Region>,                       // 生命周期实参
-    pub types: Vector<TypeVarId, Ty>,                           // 类型实参
-    pub const_generics: Vector<ConstGenericVarId, ConstGeneric>, // 常量实参
-    pub trait_refs: Vector<TraitClauseId, TraitRef>,           // trait 实例
+pub struct TraitClause {
+    pub clause_id: TraitClauseId,        // 子句 ID
+    pub span: Option<Span>,              // 源码位置
+    pub origin: PredicateOrigin,         // 约束来源
+    pub trait_: PolyTraitDeclRef,        // 实现的 trait
 }
 ```
 
-**映射关系**：`GenericParams` 定义形式参数，`GenericArgs` 提供实际参数，ID 一一对应
+**示例**：
+```rust
+fn process<T: Clone + Display>(x: T) { ... }
+```
+对应两个 trait_clauses：
+- Clause 0: `T: Clone`
+- Clause 1: `T: Display`
+
+实例化时，`GenericArgs::trait_refs` 提供每个 clause 的具体 trait 实现引用
+
+**3. regions_outlive - 生命周期outlives约束**
+
+**类型**：`Vec<RegionBinder<RegionOutlives>>`
+
+**作用**：表达生命周期之间的outlives关系（`'a: 'b` 表示 `'a` outlives `'b`）
+
+**RegionOutlives 定义**：
+```rust
+pub type RegionOutlives = OutlivesPred<Region, Region>;
+pub struct OutlivesPred<T, U>(pub T, pub U);  // T outlives U
+```
+
+**示例**：
+```rust
+fn foo<'a, 'b: 'a>(x: &'a str, y: &'b str) { ... }
+//        ^^^^^^ 表示 'b: 'a，即 'b outlives 'a
+```
+对应一个 `regions_outlive` 条目：`OutlivesPred('b, 'a)`
+
+**为何用 `RegionBinder`**：约束可能引入新的局部生命周期（如 `for<'c>`），需要绑定器包裹
+
+**4. types_outlive - 类型outlives约束**
+
+**类型**：`Vec<RegionBinder<TypeOutlives>>`
+
+**作用**：表达类型对生命周期的outlives关系
+
+**TypeOutlives 定义**：
+```rust
+pub type TypeOutlives = OutlivesPred<Ty, Region>;
+// 第一个是类型，第二个是生命周期
+```
+
+**示例**：
+```rust
+fn bar<'a, T: 'a>(data: T) { ... }
+//        ^^^^^ 表示 T: 'a，即 T 的所有引用至少存活 'a
+```
+对应一个 `types_outlive` 条目：`OutlivesPred(T, 'a)`
+
+**实际用途**：确保泛型类型中的引用满足生命周期要求
+
+**5. trait_type_constraints - Trait 关联类型约束**
+
+**类型**：`Vector<TraitTypeConstraintId, RegionBinder<TraitTypeConstraint>>`
+
+**作用**：约束 trait 的关联类型为特定类型
+
+**TraitTypeConstraint 结构** (`types.rs` 第 176 行)：
+```rust
+pub struct TraitTypeConstraint {
+    pub trait_ref: TraitRef,      // trait 引用
+    pub type_name: TraitItemName, // 关联类型名称
+    pub ty: Ty,                   // 约束的具体类型
+}
+```
+
+**示例**：
+```rust
+fn process<T>(x: T) 
+where 
+    T: Iterator<Item = String>
+    //          ^^^^^^^^^^^^^^ 这是 trait_type_constraint
+{
+    ...
+}
+```
+
+**解析**：
+- `trait_ref`：指向 `Iterator` trait
+- `type_name`：`Item`（关联类型名）
+- `ty`：`String`（约束类型）
+
+**更复杂示例**：
+```rust
+trait Container {
+    type Elem;
+    type Iter: Iterator;
+}
+
+fn complex<C>(c: C) 
+where 
+    C: Container<Elem = i32, Iter = std::vec::IntoIter<i32>>
+    //          ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //          约束1           约束2
+{
+    ...
+}
+```
+
+生成两个 `trait_type_constraints`：
+1. `Container::Elem = i32`
+2. `Container::Iter = std::vec::IntoIter<i32>`
+
+**为何独立于 trait_clauses**：关联类型约束不是简单的 trait bound，而是对 trait 内部类型的等式约束，需要记录三元组 `(trait, assoc_type_name, concrete_type)`
+
+#### GenericArgs 完整结构
+
+**定义位置**：`charon/src/ast/types.rs` 第 184 行
+
+```rust
+pub struct GenericArgs {
+    pub regions: Vector<RegionId, Region>,
+    pub types: Vector<TypeVarId, Ty>,
+    pub const_generics: Vector<ConstGenericVarId, ConstGeneric>,
+    pub trait_refs: Vector<TraitClauseId, TraitRef>,
+}
+```
+
+#### GenericArgs 字段详解
+
+**1-3. 基础参数实参**
+
+- **`regions`**：生命周期实参，对应 `GenericParams::regions`
+- **`types`**：类型实参，对应 `GenericParams::types`
+- **`const_generics`**：常量实参，对应 `GenericParams::const_generics`
+
+**4. trait_refs - Trait 实现引用**
+
+**类型**：`Vector<TraitClauseId, TraitRef>`
+
+**作用**：为 `GenericParams::trait_clauses` 中的每个 clause 提供具体的 trait 实现
+
+**TraitRef 结构** (`types.rs` 第 130 行)：
+```rust
+pub struct TraitRef {
+    pub kind: TraitRefKind,           // 实现来源
+    pub trait_decl_ref: PolyTraitDeclRef, // trait 声明引用
+}
+```
+
+**映射关系**：
+- `GenericParams::trait_clauses[i]` 声明"需要某个 trait"
+- `GenericArgs::trait_refs[i]` 提供"具体哪个实现满足此 trait"
+
+**示例**：
+```rust
+// 声明
+fn sort<T: Ord>(items: &mut [T]) { ... }
+//      GenericParams::trait_clauses[0] = T: Ord
+
+// 调用
+sort::<String>(&mut data);
+//     GenericArgs::types[0] = String
+//     GenericArgs::trait_refs[0] = impl Ord for String
+```
+
+#### 完整实例
+
+**Rust 代码**：
+```rust
+trait Container {
+    type Item;
+}
+
+fn process<'a, T, const N: usize>(data: &'a [T; N]) 
+where
+    T: Clone + Container<Item = String>,
+    T: 'a,
+{
+    ...
+}
+
+// 调用
+process::<'static, Vec<u8>, 10>(&array);
+```
+
+**GenericParams 内容**：
+```rust
+GenericParams {
+    regions: ['a],
+    types: [T],
+    const_generics: [N: usize],
+    trait_clauses: [
+        Clause(0): T: Clone,
+        Clause(1): T: Container,
+    ],
+    types_outlive: [
+        T: 'a,
+    ],
+    trait_type_constraints: [
+        Container::Item = String,
+    ],
+    regions_outlive: [],
+}
+```
+
+**GenericArgs 内容**：
+```rust
+GenericArgs {
+    regions: ['static],
+    types: [Vec<u8>],
+    const_generics: [10],
+    trait_refs: [
+        TraitRef(0): impl Clone for Vec<u8>,
+        TraitRef(1): impl Container for Vec<u8>,
+    ],
+}
+```
+
+#### 设计理念
+
+**分离约束与参数**：
+- `regions/types/const_generics` + `trait_clauses` 需要调用者提供实参
+- `regions_outlive/types_outlive/trait_type_constraints` 是编译器检查的约束，不需实例化
+
+**Vector vs Vec 区别**：
+- `Vector<Id, T>`：索引化集合，ID 作为索引直接访问，用于参数
+- `Vec<T>`：顺序集合，用于约束列表
+
+**为何 trait_clauses 单独字段**：
+trait bound 需要在实例化时提供具体实现（witness），而其他约束仅需验证满足
+
+这套设计使 Charon 能精确表达 Rust 复杂的泛型系统，同时为下游验证工具提供清晰的语义
 
 ### 5.4 DeBruijnIndex 系统
 
