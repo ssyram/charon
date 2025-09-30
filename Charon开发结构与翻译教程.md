@@ -4,9 +4,9 @@
 
 ## 1. 仓库功能概述
 
-**Charon 主功能**：将 Rust crate 编译为 LLBC (Low-Level Borrow Calculus) 中间表示
+**Charon 主功能**：将 Rust crate 编译为 LLBC (Low-Level Borrow Calculus) 中间表示或 ULLBC (Unstructured LLBC) 中间表示
 - 输入：Rust 源代码项目
-- 处理：通过 Rustc 获取 MIR → 翻译为 ULLBC → 变换为 LLBC
+- 处理：通过 Rustc 获取 MIR $\to$ 翻译为 ULLBC [ $\to$ 变换为 LLBC ]
 - 输出：JSON 格式的 (U)LLBC 文件，供下游形式化验证工具使用
 
 **charon-ml 功能**：为 OCaml 工具提供 AST 解析
@@ -73,9 +73,9 @@ charon/                          # 项目根目录
 
 ## 3. Charon 整体工作机制
 
-### 3.1 完整调用链路
+### 3.1 完整调用流程
 
-**入口流程**：`charon` → `charon-driver` → Rustc → MIR → translate → transform
+**入口流程**：`charon` $\to$ `charon-driver` $\to$ Rustc $\to$ Callback (MIR) $\to$ translate $\to$ transform
 
 **各阶段关键函数**：
 
@@ -85,26 +85,32 @@ charon/                          # 项目根目录
    - 调用 `cargo` 或直接运行 Rustc
 
 2. **charon-driver** (`charon/src/bin/charon-driver/main.rs`)
-   - `main()` → `run_charon()` 入口
-   - `driver::run_rustc_driver()` 启动 Rustc 编译
+   - `main()` $\to$ `run_charon()` 入口
+   - `driver::run_rustc_driver()` 启动 Rustc 编译。
+   > 注：这是 Rust 工具开发的标准做法，即用 `charon-driver` 这个编译的 Binary 作为 Rustc 的 Wrapper，调用 Cargo 的时候使用的 Rustc 将会是 `charon-driver`，而 `charon-driver` 首先运行 Rustc 正常语法分析流程，到 MIR 阶段调用回调函数
    - Rustc 回调配置在 `driver.rs` 中
 
 3. **driver.rs 关键配置** (`charon/src/bin/charon-driver/driver.rs`)
    - `run_rustc_driver()` 设置 Rustc 回调
    - `after_analysis()` 回调：MIR 生成完成后被调用
-   - 在此调用 `translate_crate::translate()` 开始翻译
+   - 在此调用**关键函数** `translate_crate::translate()` 启动翻译流程
 
 4. **翻译调度** (`translate/translate_crate.rs`)
+   - 这个阶段负责从 Rustc 引入源码信息翻译为 ULLBC 表示，注意，翻译的过程尽管能直接和 Rustc 交互，但是实际上引入了 Hax 作为**快捷**中间层，将 Rustc MIR 转为更符合翻译需求的 Hax 表示
+   > 事实上在纳入单态化框架前，Charon 的翻译只使用 Rustc 的 DefId 所以 Hax 本质只是一个**加速**工具，但在纳入单态化框架后，Hax 的作用变得更加重要，因为 Hax 能够直接表示单态化后的项，而且这个变换过程只在 Hax 中完成，使得绕开 Hax 直接使用 Rustc 则需要面对 Hax 内部变换信息缺失（例如引入单态化后事实上在 Hax 中有并不对应任何 Rustc 实体的单态化 DefId ，利用这种 DefId 对 Rustc 查询将直接 panic）的问题从而基本不可能
    - `translate()` 函数：翻译主入口
    - 创建 `TranslateCtx` 上下文
-   - 初始化并启动翻译循环
+   - 初始化并启动且负责整个翻译循环，详细描述见下文
 
-5. **变换阶段** (回到 `charon-driver/main.rs`)
+5. **(U)LLBC 变换阶段** (回到 `charon-driver/main.rs`)
+   - 这个阶段执行先执行 ULLBC 的变形后转为 LLBC 再执行 LLBC 的变形，这些变形**不会**引入新的 Rustc 翻译项，即不会新增来自源码的信息，只对已有信息进行进一步计算，实现例如 `[i]` 这种 Index 访问的函数化等规范化操作
    - 翻译完成后在 `run_charon()` 中
    - 遍历执行 `transformation_passes()`
    - 最后序列化输出
 
-### 3.2 关键转换点代码
+### 3.2 关键转换点代码实例
+
+这里给出各阶段关键代码片段，帮助理解整体调用。
 
 ```rust
 // 入口: charon/src/bin/charon/main.rs
@@ -147,7 +153,9 @@ pub fn translate(tcx: TyCtxt, options: CliOpts) -> TransformCtx {
 
 ## 4. 翻译阶段详细流程
 
-### 4.1 翻译抽象算法
+翻译阶段是 Charon 能力完善的核心，负责将 Rustc MIR 转为 ULLBC。其核心是一个基于队列的工作调度系统，确保所有需要翻译的项都被处理且仅处理一次。
+
+### 4.1 翻译抽象算法描述
 
 **核心循环** (`translate_crate.rs` 约 674 行)：
 ```rust
@@ -162,11 +170,16 @@ while let Some(item_src) = ctx.items_to_translate.pop_first() {
 1. **初始化**：创建 `TranslateCtx`，包含空的 `items_to_translate` 队列
 2. **种子加入**：调用 `enqueue_module_item()` 将起始项（通常是 crate 根）加入队列
 3. **循环处理**：从队列中取出一项，调用 `translate_item()` 翻译
-4. **依赖发现**：翻译过程中遇到依赖项，通过 `enqueue` 加入队列
+4. **依赖发现**：翻译过程中遇到依赖项（定义的函数，使用的库函数，库类型，类型涉及的类型等等），通过 `enqueue` 加入队列，这里的翻译主体类型是 `TransItemSource` 类型，其中包含 `RustcItem` 和 `TransItemSourceKind` 两个核心字段，前者表示具体引用的 Rustc 实体（实际上是 Hax 实体），后者表示这个实体的 Charon 目标类型。
+> 注意，一个 `RustcItem` 可能会对应多个 `TransItemSource`，例如：`RustcItem` 对应一个具体的 trait 的时候，`TransItemSource` 可能是 `Trait` 表示这个 trait 本体的翻译，也可能是 `VTable` 表示的是这个 trait 的虚表结构体的定义。
 5. **去重检查**：`processed` 集合确保每项只翻译一次
 6. **完成条件**：队列为空时翻译结束
 
-### 4.2 TranslateCtx 核心字段
+### 4.2 核心数据结构解析
+
+#### `TranslateCtx` 结构体
+
+`TranslateCtx` 是翻译阶段的核心全局上下文，管理**总体翻译**状态和数据。
 
 **全局翻译上下文** (`translate/translate_ctx.rs` 约 48 行)：
 ```rust
@@ -180,7 +193,7 @@ pub struct TranslateCtx<'tcx> {
     pub processed: BTreeSet<TransItemSource>,           // 已处理集合
     
     // 注册与存储
-    pub id_map: HashMap<TransItemSource, AnyTransId>,   // 源 → ID 映射
+    pub id_map: HashMap<TransItemSource, AnyTransId>,   // 源 -> ID 映射
     pub translated: TranslatedCrate,                     // 翻译结果存储
     
     // 错误处理
@@ -193,7 +206,14 @@ pub struct TranslateCtx<'tcx> {
 - `items_to_translate`：BTreeSet 保证确定性顺序，存储待翻译项
 - `processed`：防止重复翻译同一项
 - `id_map`：记录已注册项的 ID，用于引用
-- `translated`：存储翻译完成的所有声明
+- `translated`: 类型为 `TranslatedCrate`，负责存储所有翻译定义结果，但是不保证翻译顺序，即无法认为翻译到某个实体一定能拿到另外一个实体的定义
+
+#### `TranslatedCrate` 结构体
+
+这个类型是整个 Charon 的翻译结果存储类型，从翻译阶段不断新增实体进行完善后在 transform 阶段进行清理后最终输出。从中我们可以一窥 (U)LLBC 的整体结构。
+
+???
+
 
 ### 4.3 enqueue vs register 机制
 
@@ -228,12 +248,13 @@ let type_id = ctx.register_no_enqueue(span, type_src);  // 只需 ID 不翻译�
 **项分派流程** (`translate_items.rs` 约 13 行)：
 ```rust
 pub(crate) fn translate_item(&mut self, item_src: &TransItemSource) {
+    ...
     match item_src.kind {
-        TransItemSourceKind::Fun => self.translate_function(...),
-        TransItemSourceKind::Global => self.translate_global(...),
-        TransItemSourceKind::Type => self.translate_type(...),
-        TransItemSourceKind::TraitDecl => self.translate_trait_decl(...),
-        TransItemSourceKind::TraitImpl(_) => self.translate_trait_impl(...),
+        TransItemSourceKind::Fun => { ... self.translate_function(...) },
+        TransItemSourceKind::Global => { ... self.translate_global(...) },
+        TransItemSourceKind::Type => { ... self.translate_type(...) },
+        TransItemSourceKind::TraitDecl => { ... self.translate_trait_decl(...) },
+        TransItemSourceKind::TraitImpl(_) => { ... self.translate_trait_impl(...) },
         // ...其他类型
     }
 }
@@ -256,9 +277,23 @@ pub enum RustcItem {
 - `ClosureMethod`：闭包方法
 - ...更多特殊类型
 
+### 4.5 危险的后门
+
+事实上除了执行 `enqueue` 等待后续在 `translate_crate::translate` 函数中的循环中被处理外，还有一个**非常危险**的后门捷径：`charon_driver::translate::translate_items::get_or_translate` 函数。
+
+这个函数将会直接对给定的 CharonId 进行翻译并返回其**定义结果**，而不仅是像 `register_and_enqueue` 那样仅仅是注册并等待后续翻译，只返回 CharonID 。这个的好处是可以在 Translate 阶段**直接获得其他定义的实际内容而不仅是引用其 ID**。
+
+但是这个操作**本质上非常危险**，因为很可能在一些路径中导致循环翻译，从而引发无限递归。
+
+一般而言，正确的做法应该是使用 `register_and_enqueue` 注册并等待后续翻译，而不是直接调用 `get_or_translate` 进行即时翻译。同时，如果需要进行后续翻译，应该作为一个 pass 在 transform 阶段等所有翻译完成后再进行，而不是在 translate 阶段中直接进行。
+
+> 例如，计算类型指针的元数据类型时，应该获得类型的定义才能知道其是否 DST 是否拥有元数据类型。这个计算我的设计是在 translate 阶段只放一个提示的 Placeholder ，然后在 transform 阶段的一个 pass 中对所有 PlaceHolder 进行替换，而不是在 translate 阶段直接调用 `get_or_translate` 进行翻译。
+
 ## 5. translate 模块深度剖析
 
 ### 5.1 ItemTransCtx 增强上下文
+
+`ItemTransCtx` 是项级翻译上下文，管理**单个项**的翻译状态和数据。其由 `translate_item()` 通过给定的 `TransItemSource` 创建并按照 `TransItemSourceKind` 传递给具体对应翻译函数。其中包含 `TranslateCtx` 的引用以便访问全局状态。
 
 **项级翻译上下文** (`translate_ctx.rs` 约 74 行)：
 ```rust
@@ -268,7 +303,7 @@ pub(crate) struct ItemTransCtx<'tcx, 'ctx> {
     pub item_id: Option<AnyTransId>,              // 当前项 ID
     
     // ⭐ 泛型绑定核心
-    pub binding_levels: BindingStack<BindingLevel>,  // 绑定层级栈
+    pub binding_levels: BindingStack<BindingLevel>,  // 泛型定义绑定层级栈
     pub parent_trait_clauses: Vector<TraitClauseId, TraitClause>,
     pub item_trait_clauses: HashMap<TraitItemName, Vector<TraitClauseId, TraitClause>>,
 }
@@ -276,21 +311,56 @@ pub(crate) struct ItemTransCtx<'tcx, 'ctx> {
 
 **binding_levels 作用**：
 - 管理嵌套泛型作用域
-- 栈结构：栈顶是最内层绑定器
-- 支持 `DeBruijnIndex` 变量查找
+- 栈结构：栈顶是最内层绑定器，即最**贴近**当前位置的泛型参数绑定
+- 支持 `DeBruijnIndex` 变量查找，其中从最内层开始编号为 0 即栈顶为 0
 
-### 5.2 泛型处理机制
+### 5.2 XXDeclRef 与泛型实参
+
+在 Charon 中，Item 实体的引用不仅仅是一个 ID，而是一个**携带泛型实参**的引用结构，例如 `FunDeclRef`，这样可以区分同一函数声明的不同实例化。
+
+**FunDeclRef 结构** (`gast.rs` 约 205 行)：
+```rust
+pub struct FunDeclRef {
+    pub id: FunDeclId,              // 函数声明 ID
+    pub generics: BoxedArgs,        // 泛型实参
+}
+```
+
+**优势**：
+- 明确区分声明 vs 使用
+- 支持同一声明的多个实例化
+- 携带完整类型信息
+
+**对比**：
+- 仅用 `FunDeclId`：无法区分 `Vec<u32>` vs `Vec<String>`
+- 使用 `FunDeclRef`：完整记录实例化信息
+
+<!-- ### 5.2 泛型处理机制
 
 **Early Bound vs Late Bound**：
 - **Early Bound**：项级泛型参数 `<T>`，编译时已知，可单态化
 - **Late Bound**：局部量化 `for<'a>`，运行时绑定，保留 binder
 
-**单态化策略**：
+**单态化框架处理策略**：
 - Early Bound 类型参数：替换为具体类型
 - Late Bound 生命周期：保留在 `RegionBinder<T>` 中
 - 常量泛型：视情况实例化
 
+这一段整个都是错的！要点如下：
+- Charon 不区分 Early Bound 和 Late Bound 只是 Late Bound 一定在 Early Bound **之后**
+- Charon 的单态化框架只对 Early Bound 进行单态化，Late Bound 很可能会保留在定义中，而 Late Bound 只可能是生命周期参数，所以换句话说：即使单态化翻译，依然可能遇到要处理 Late Bound 生命周期参数的情况
+- 这个标题为“泛型处理机制”，上面两个要点只是其中很小一部分，你要重点陈述的泛型机制要包括：
+    + GenericParams 和 GenericArgs 的定义详解，里面到底包含什么东西
+    + Binder 和 RegionBinder 的定义详解，里面到底包含什么，在 Rust 中对应什么。要提到：RegionBinder 是 Binder 的特例，而且是 Charon 原创，Rustc 中全都是 Binder 。
+    + DeBruijnIndex 和几种 DeBruijn 变量的管理和使用，其与 binding_levels 的具体关系，列举一个详细的嵌套的例子
+    + 具体 binding_levels 的管理，其中的内容分别有什么用
+    + 特别提到特殊的 DynPred 机制，为什么它的类型是 Binder<Ty> ，其代表什么意思
+    + 对于 Clause ，详解其数据结构和类型，特别是提到 TraitClause 和 TraitRef / TraitDeclRef 的区别和联系，同时，要特别提到 `Trait<...> for Type` 会被表示为 `Trait<Type, ...>` ，即对 Trait 的引用的**第一个参数**是实现类型。
+-->
+
 ### 5.3 translate_def_generics 详解
+
+处理定义项的泛型参数的核心函数是 `translate_def_generics` 。
 
 **四重职责** (`translate_generics.rs` 约 406 行)：
 
@@ -366,11 +436,6 @@ pub struct DeBruijnId {
 }
 ```
 
-**为何从 0 开始**：
-- 最内层绑定器访问频率最高
-- 0 起点减少索引计算开销
-- 符合直觉：当前作用域即 index 0
-
 **DeBruijnVar 结构**：
 ```rust
 pub enum DeBruijnVar<Id> {
@@ -392,7 +457,47 @@ fn f<'a>(                              // 层级 2
 - `'b`: `Bound(1, b)` - 中间层
 - `'a`: `Free(a)` - 顶层（经过 `unbind_item_vars` pass 后）
 
+更详细见 `charon/src/ast/types/vars.rs` ，有详细的 DeBruijn 变量使用示例：
+```rust
+fn f<'a, 'b>(x: for<'c> fn(&'b u8, &'c u16, for<'d> fn(&'b u32, &'c u64, &'d u128)) -> u64) {}
+     ^^^^^^         ^^       ^       ^          ^^       ^        ^        ^
+       |       inner binder  |       |     inner binder  |        |        |
+ top-level binder            |       |                   |        |        |
+                       Bound(1, b)   |              Bound(2, b)   |     Bound(0, d)
+                                     |                            |
+                                 Bound(0, c)                 Bound(1, c)
+```
+
+这里可以看到 `'b` 在两个不同的嵌套层级中被引用，分别对应不同的 `DeBruijnId` ，例如其中右边的引用 `&'b u32` 对应 `Bound(2, b)` ，因为它要跨越 `for<'d>` 和 `for<'c>` 两个 binder 才能到达 `'b` 的定义。
+
+而事实上，`'a` 和 `'b` 都位于同一个 binding_levels ，所以 `DeBruijnVar` 事实上有两个变量，第一个是 DeBruijnId ，第二个则是同 Binding 下**从左往右**数的索引，所以其实第二个 `&'b u32` 应该是 `DeBruijnVar::Bound(2, 1)` 。
+
+> 对于 Eurydice 使用 (U)LLBC 端来说见到对 `'b` 引用将会是 `DeBruijnVar::Free(1)` ，这是经过了 Transform 阶段的变换，但是在 Translate 阶段中仍然是 `DeBruijnVar::Bound(2, 1)` 。将定义的顶层作为 `Free` 是为了方便后端处理。
+
 ### 5.5 Binder vs RegionBinder
+
+Binder 是一个 Item 内部的绑定器，`Binder<K>` 指代对 `K` 类型对象绑定一系列的新的泛型参数。出现的地方在需要绑定泛型参数的地方，例如 trait 方法，trait 关联类型，dyn 类型，函数指针类型等。
+
+例如：
+```rust
+trait MyTrait {
+    type AssocType<'a>;  // 这里的 'a 就是一个 Binder
+    fn method<T>(&self, x: T);  // 这里的 T 就是一个 Binder
+}
+```
+
+对于 Trait 对象来说，它引用它自己的 `method` 方法时，`T` 是未知类型，所以需要用一个 `Binder` 来表示这个 `T` 是一个泛型参数。同样的情况发生在其关联类型 `AssocType` 中，所以在 `TraitDecl` 中它的关联类型和关联方法列表的数据类型都是 `Binder<...>`：
+```rust
+pub types: Vec<Binder<TraitAssocTy>>,
+...
+pub methods: Vec<Binder<TraitMethod>>,
+```
+
+> 特别注意，来自函数式编程的读者可能会误以为 `Binder<T>` 类比于 `lambda (x : T). E`，即绑定的参数自身是 `T` 类型。但实际上 `Binder<T>` 应该类比于 `lambda (X : GenericParam). (E : T)`，即 `T` 是内部表达式的类型，而绑定的参数类型则永远是 `GenericParam` 。
+
+另外一方面，`RegionBinder` 是 `Binder` 的一个特例类型，其只绑定生命周期参数。`RegionBinder` 是 Charon 独创的，因为在 Rustc 中所有的绑定器都是 `Binder`，但是在 Charon 中生命周期参数的绑定器使用 `RegionBinder` 可以更清晰地表达其只绑定生命周期参数的语义。因为在很多地方（特别指代下文谈及的 Late Bound 生命周期参数）都只能绑定生命周期参数，所以使用 `RegionBinder` 可以避免误用 `Binder` 绑定类型参数或常量参数。
+
+> 例如函数指针 `fn<...>(Args) -> Ret` 中 `...` 只能是生命周期参数，所以函数指针的类型在 `TyKind` 中是：`FnPtr(RegionBinder<(Vec<Ty>, Ty)>),`
 
 **RegionBinder** (`types.rs` 约 198 行)：
 ```rust
@@ -415,24 +520,12 @@ pub struct Binder<T> {
 - `RegionBinder`：`for<'a>` 函数指针类型
 - `Binder`：trait 方法（可能有类型参数）
 
-### 5.6 DeclRef 与泛型实参
+### 5.6 Early Bound, Late Bound 泛型与单态化处理机制
 
-**DeclRef 结构** (`gast.rs` 约 205 行)：
-```rust
-pub struct FunDeclRef {
-    pub id: FunDeclId,              // 函数声明 ID
-    pub generics: BoxedArgs,        // 泛型实参
-}
-```
+在 Rustc 中有区分 Early Bound 和 Late Bound 的概念，Early Bound 泛型参数是项级别的泛型参数 `<T>`，Late Bound 泛型参数是局部量化的 `for<'a>` 形式的生命周期参数。
 
-**优势**：
-- 明确区分声明 vs 使用
-- 支持同一声明的多个实例化
-- 携带完整类型信息
+但是 Charon 并不区分 Early Bound 和 Late Bound ，只是 Late Bound 一定在 Early Bound **之后**。Charon 的单态化框架只对 Early Bound 进行单态化，Late Bound 很可能会保留在定义中，而 Late Bound 只可能是生命周期参数，所以换句话说：即使单态化翻译，依然可能遇到要处理 Late Bound 生命周期参数的情况。
 
-**对比**：
-- 仅用 `FunDeclId`：无法区分 `Vec<u32>` vs `Vec<String>`
-- 使用 `FunDeclRef`：完整记录实例化信息
 
 ### 5.7 函数体翻译流程
 
@@ -446,11 +539,11 @@ Hax MIR
   ↓ translate_def_generics (translate_generics.rs)
 泛型环境设置
   ↓ translate_body (translate_bodies.rs)
-函数体 → ULLBC
+函数体 -> ULLBC
   ↓ transform passes
 清理和优化
   ↓ ullbc_to_llbc
-控制流重构 → LLBC
+控制流重构 -> LLBC
 ```
 
 **关键函数**：
@@ -469,13 +562,13 @@ Hax MIR
 - **Sanity**：完整性检查（如 `check_generics`）
 
 **执行顺序** (`transform/mod.rs`)：
-```rust
+```
 INITIAL_CLEANUP_PASSES      // 初始清理
-  → ULLBC_PASSES            // ULLBC 专用
-  → ullbc_to_llbc           // 控制流重构
-  → LLBC_PASSES             // LLBC 专用
-  → SHARED_FINALIZING_PASSES // 最终清理
-  → FINAL_CLEANUP_PASSES    // 完整性检查
+  -> ULLBC_PASSES            // ULLBC 专用
+  -> ullbc_to_llbc           // 控制流重构
+  -> LLBC_PASSES             // LLBC 专用
+  -> SHARED_FINALIZING_PASSES // 最终清理
+  -> FINAL_CLEANUP_PASSES    // 完整性检查
 ```
 
 **关键 Pass 示例**：
@@ -484,46 +577,7 @@ INITIAL_CLEANUP_PASSES      // 初始清理
 - `reconstruct_asserts`：重构断言
 - `ops_to_function_calls`：操作符转函数调用
 
-## 7. Trait/Impl 设计
-
-**核心策略**：方法独立存在 + 引用机制
-
-**方法存储**：
-```rust
-// 方法作为独立 FunDecl 存储
-pub struct FunDecl {
-    pub def_id: FunDeclId,
-    pub generics: GenericParams,
-    // ...
-}
-
-// Trait 通过 Binder<FunDeclRef> 引用方法
-pub struct TraitDecl {
-    pub methods: Vec<(TraitItemName, Binder<FunDeclRef>)>,
-    // ...
-}
-```
-
-**泛型"平铺"策略**：
-```rust
-// Rust 代码
-trait MyTrait<T> {
-    fn method(&self, x: T);
-}
-impl<U: Clone> MyTrait<U> for Vec<U> { ... }
-
-// Charon 表示
-TraitImpl {
-    generics: [U],           // impl 块泛型
-    impl_trait: TraitDeclRef {
-        id: MyTrait,
-        generics: [U],       // trait 实例化参数
-    },
-    // method 独立存储，带有 [U] 泛型参数
-}
-```
-
-## 8. 构建与运行
+## 7. 构建与运行
 
 ### 基本构建
 ```bash
@@ -534,6 +588,9 @@ make test           # 运行测试
 
 ### 使用示例
 ```bash
+# 对一整个 Cargo 项目生成 LLBC ，类比 cargo build
+./bin/charon cargo
+
 # 生成人类可读 LLBC
 ./bin/charon rustc --print-llbc -- file.rs
 
@@ -556,7 +613,7 @@ RUST_LOG=charon::translate=debug ./bin/charon ...
 RUST_LOG=charon::translate::translate_generics=trace ./bin/charon ...
 ```
 
-## 9. 调试与打印
+## 8. 调试与打印
 
 ### trace! 宏使用
 ```rust
@@ -564,30 +621,12 @@ RUST_LOG=charon::translate::translate_generics=trace ./bin/charon ...
 trace!("Processing item: {item_id:?}");
 
 // 上下文感知打印
-trace!("{}", item_ctx.with_ctx(|| format!("Current generics: {generics}")));
+trace!("{}", item_ctx.with_ctx(&ctx.into_fmt()));
 ```
 
-### 定位泛型/生命周期错误三步法
+注意，因为 Charon 中存储的内容都是 ID 而非具体内容，所以打印时需要上下文信息才能正确显示。这里的上下文核心指的是 `TranslatedCrate`，它存储了所有 ID 对应的具体定义。但是 `TranslateCtx` 和 `ItemTransCtx` 都实现了对应 Trait 方法都可以调用 `into_fmt()` 从而使用作打印上下文。
 
-**步骤 1: 打印 binding_levels**
-```rust
-trace!("Current binding levels: {:#?}", ctx.binding_levels);
-// 输出栈结构，检查层级是否正确
-```
-
-**步骤 2: 检查变量映射**
-```rust
-trace!("Type vars map: {:#?}", binding_level.type_vars_map);
-trace!("Early region vars: {:#?}", binding_level.early_region_vars);
-```
-
-**步骤 3: 验证 DeclRef**
-```rust
-trace!("DeclRef - id: {:?}, generics: {:#?}", decl_ref.id, decl_ref.generics);
-// 检查泛型实参是否完整匹配
-```
-
-## 10. charon-ml 简述
+## 9. charon-ml 简述
 
 **作用**：为 OCaml 下游工具生成 AST 类型定义和反序列化函数
 
@@ -604,9 +643,10 @@ make generate-ml    # 重新生成 charon-ml/src/generated/
 1. 修改 `charon/src/ast/*.rs`
 2. 运行 `make generate-ml`
 3. **勿直接修改** `charon-ml/src/generated/` 内文件
-4. 如需 ML 侧扩展，在 `charon-ml/src/` 下手写新文件
+4. 根据 `make test` 编译需要可能要手动调整例如打印之类的基础设施
+5. 如果发生了 AST 变动，则同时需要调整 `charon/Cargo.toml` 中的版本号，以保证提示下游工具 AST 版本发生变动，同时运行 `make test` 以确保版本号改动同步到 `charon-ml` 中;
 
-## 11. 开发实践与常见陷阱
+## 10. 开发实践与常见陷阱
 
 ### 必跑检查
 ```bash
@@ -632,59 +672,24 @@ cargo test          # 仅 Rust 单元测试
 ### 常见陷阱与解决方案
 
 **绑定层级错误**：
-- 症状：`DeBruijnIndex` 计算错误导致变量查找失败
-- 解决：使用 `lookup_param` 而非手动计算索引
-
-**重复 enqueue**：
-- 症状：相同项多次加入队列
-- 解决：优先用 `register_no_enqueue`，确认是否需要翻译
-
-**泛型实例化时机**：
-- 症状：Early Bound 过早替换导致信息丢失
-- 解决：在 `translate_def_generics` 后再进行类型替换
-
-**生命周期 binder 丢失**：
-- 症状：Late Bound 生命周期被错误单态化
-- 解决：检查 `RegionBinder` 是否正确保留
+- `DeBruijnIndex` 计算错误导致变量查找失败
+- 提示：
+    + 最好不要使用 `skip_binder` 而是使用 `erased`, `move_under_binder()`, `move_from_under_binder()` 等函数智能处理；
+    + 同时，注意 `RegionBinder` 虽然只绑定生命周期，但是依然会让其他信息，例如类型，Clause 等的 DeBruijnIndex 发生变化，所以需要非常谨慎地计算 DeBruijnIndex 。
 
 ### 关键代码路径追踪
 
 **翻译入口路径**：
-1. `charon/main.rs:main` → 设置环境
-2. `charon-driver/main.rs:run_charon` → 调用 Rustc
-3. `driver.rs:after_analysis` → MIR 回调
-4. `translate_crate.rs:translate` → 翻译主循环
-5. `translate_items.rs:translate_item` → 分派具体项
+1. `charon/main.rs:main` $\to$ 设置环境
+2. `charon-driver/main.rs:run_charon` $\to$ 调用 Rustc
+3. `driver.rs:after_analysis` $\to$ MIR 回调
+4. `translate_crate.rs:translate` $\to$ 翻译主循环
+5. `translate_items.rs:translate_item` $\to$ 分派具体项
 
 **错误处理**：所有错误通过 `register_error!` 宏收集到 `ErrorCtx`
 
-## 12. FAQ
 
-**Q: 单态化后为何仍有生命周期 binder？**  
-A: 仅 Early Bound 参数被单态化，Late Bound 生命周期保留在 `RegionBinder` 中。
-
-**Q: DeBruijnIndex 有何用途？**  
-A: 通过层级索引准确引用嵌套作用域中的绑定变量，避免名字冲突。
-
-**Q: 何时触发重复 enqueue？**  
-A: 当翻译过程中发现新依赖项且该项尚未在 `processed` 集合中时自动 enqueue。
-
-**Q: transform passes 可否跳过？**  
-A: 部分可选（通过命令行标志），但 `ullbc_to_llbc` 等核心 pass 必须执行。
-
-**Q: DeclRef 相比直接 ID 的优势？**  
-A: 明确携带泛型实参，支持同一声明的多种实例化，完整记录类型信息。
-
-**Q: binding_levels vs Binder vs RegionBinder 区别？**  
-A: `binding_levels` 是翻译时栈结构；`Binder` 是 AST 节点（完整泛型）；`RegionBinder` 仅处理生命周期。
-
-**Q: 如何处理递归类型定义？**  
-A: 通过 `reorder_decls` pass 检测依赖图强连通分量，识别互递归定义组。
-
-**Q: 泛型替换何时发生？**  
-A: Early Bound 在 `translate_def_generics` 中建立映射，实际替换在类型翻译时；Late Bound 保留不替换。
-
-## 13. 术语速查表
+## 附录
 
 | 英文术语 | 中文解释 | 上下文示例 |
 |----------|----------|------------|
@@ -692,14 +697,10 @@ A: Early Bound 在 `translate_def_generics` 中建立映射，实际替换在类
 | early bound | 早期绑定 - 编译时确定 | 类型参数 `<T>` |
 | late bound | 晚期绑定 - 局部作用域 | 生命周期 `for<'a>` |
 | monomorphization | 单态化 - 泛型实例化 | `Vec<u32>` |
-| substitution | 替换 - 参数到实参映射 | `T` → `u32` |
-| instantiation | 实例化 - 创建具体实例 | 泛型 → 具体类型 |
+| substitution | 替换 - 参数到实参映射 | `T` $\to$ `u32` |
+| instantiation | 实例化 - 创建具体实例 | 泛型 $\to$ 具体类型 |
 | visitor | 访问器 - AST 遍历模式 | `Drive`, `DriveMut` |
 | pass | 变换步骤 - transform 阶段单元 | `UllbcPass` |
 | DeBruijn index | 德布勒恩索引 - 嵌套绑定计数 | `Bound(1, var)` |
 | enqueue | 入队 - 加入翻译队列 | `register_and_enqueue` |
 | register | 注册 - 分配 ID | `register_no_enqueue` |
-
----
-
-此教程从整体概览到详细机制层层递进，帮助新开发者快速理解 Charon 架构。详细实现请参考源码中的具体函数和模块。
