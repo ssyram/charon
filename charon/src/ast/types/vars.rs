@@ -141,7 +141,7 @@ pub struct ConstGenericVar {
 
 /// A trait predicate in a signature, of the form `Type: Trait<Args>`. This functions like a
 /// variable binder, to which variables of the form `TraitRefKind::Clause` can refer to.
-#[derive(Debug, Clone, Serialize, Deserialize, Drive, DriveMut, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, Drive, DriveMut)]
 pub struct TraitClause {
     /// Index identifying the clause among other clauses bound at the same level.
     pub clause_id: TraitClauseId,

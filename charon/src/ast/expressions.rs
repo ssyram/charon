@@ -437,18 +437,7 @@ pub struct TraitMethodRef {
 }
 
 #[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    EnumAsGetters,
-    Serialize,
-    Deserialize,
-    Drive,
-    DriveMut,
-    Hash,
-    PartialOrd,
-    Ord,
+    Debug, Clone, PartialEq, Eq, EnumAsGetters, Serialize, Deserialize, Drive, DriveMut, Hash,
 )]
 pub enum FunIdOrTraitMethodRef {
     #[charon::rename("FunId")]
@@ -471,9 +460,7 @@ impl From<FunDeclId> for FunIdOrTraitMethodRef {
     }
 }
 
-#[derive(
-    Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Drive, DriveMut, Hash, PartialOrd, Ord,
-)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Drive, DriveMut, Hash)]
 pub struct FnPtr {
     pub func: Box<FunIdOrTraitMethodRef>,
     pub generics: BoxedArgs,

@@ -562,7 +562,7 @@ impl ItemTransCtx<'_, '_> {
                 ..
             } => {
                 // The method is vtable safe so it has no generics, hence we can reuse the impl
-                // generics.
+                // generics -- the lifetime binder will be added as `Erased` in `translate_fn_ptr`.
                 let item_ref = impl_def.this().with_def_id(self.hax_state(), item_def_id);
                 let shim_ref = self
                     .translate_fn_ptr(span, &item_ref, TransItemSourceKind::VTableMethod)?
