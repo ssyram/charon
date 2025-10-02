@@ -253,15 +253,6 @@ type match_config = {
           ["std::ops::Index<Vec<@T>, usize>::index"]. Otherwise, you will have
           to refer to the [index] function in the proper [impl] block for [Vec].
       *)
-  match_mono : bool;
-      (** If true, handle monomorphized names specially. When matching names
-          that end with a [PeMonomorphized] element, use the monomorphized
-          generic arguments instead of the regular arguments.
-
-          This allows matching monomorphized instances like
-          [test_crate::{Container::<i32>}::new::<i32>] where the [<i32>] part
-          comes from the monomorphized element and [::<i32>] part comes from
-          function-level generics. Both are allowed by design. *)
 }
 
 (** Mapped expressions.
@@ -449,27 +440,24 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
      a PeMonomorphized element, use the monomorphized args and continue matching
      without that element *)
   let n, g =
-    if c.match_mono then
-      match List.rev n with
-      | PeMonomorphized mono_args :: rest_rev ->
-          (* In this case, we may still have some late-bound generics in `g`, this could ONLY happen for regions *)
-          let regions_count, types_count, const_generics_count, trait_refs_count
-              =
-            TypesUtils.generic_args_lengths g
-          in
-          assert (
-            types_count = 0 && const_generics_count = 0 && trait_refs_count = 0);
-          (* We additionally append the regions from `g` to the monomorphized args, so that we can match against them. *)
-          let merged_args =
-            if regions_count > 0 then begin
-              (* Late-bound regions are appended after the monomorphized ones. *)
-              { mono_args with regions = mono_args.regions @ g.regions }
-            end
-            else mono_args
-          in
-          (List.rev rest_rev, merged_args)
-      | _ -> (n, g)
-    else (n, g)
+    match List.rev n with
+    | PeMonomorphized mono_args :: rest_rev ->
+        (* In this case, we may still have some late-bound generics in `g`, this could ONLY happen for regions *)
+        let regions_count, types_count, const_generics_count, trait_refs_count =
+          TypesUtils.generic_args_lengths g
+        in
+        assert (
+          types_count = 0 && const_generics_count = 0 && trait_refs_count = 0);
+        (* We additionally append the regions from `g` to the monomorphized args, so that we can match against them. *)
+        let merged_args =
+          if regions_count > 0 then begin
+            (* Late-bound regions are appended after the monomorphized ones. *)
+            { mono_args with regions = mono_args.regions @ g.regions }
+          end
+          else mono_args
+        in
+        (List.rev rest_rev, merged_args)
+    | _ -> (n, g)
   in
   let ret =
     match (p, n) with
@@ -532,22 +520,6 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
 and match_name (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
     (n : T.name) : bool =
   match_name_with_generics ctx c p n TypesUtils.empty_generic_args
-
-(** Convenience function for matching monomorphized names. This is equivalent to
-    calling match_name with match_mono=true in the config. *)
-and match_name_mono (ctx : 'fun_body ctx) (c : match_config) (p : pattern)
-    (n : T.name) : bool =
-  let mono_config = { c with match_mono = true } in
-  match_name ctx mono_config p n
-
-(** Convenience function for matching monomorphized names with generics. This is
-    equivalent to calling match_name_with_generics with match_mono=true in the
-    config. *)
-and match_name_with_generics_mono (ctx : 'fun_body ctx) (c : match_config)
-    ?(m : maps = mk_empty_maps ()) (p : pattern) (n : T.name)
-    (g : T.generic_args) : bool =
-  let mono_config = { c with match_mono = true } in
-  match_name_with_generics ctx mono_config ~m p n g
 
 and match_pattern_with_type_id (ctx : 'fun_body ctx) (c : match_config)
     (m : maps) (pid : pattern) (id : T.type_id) (generics : T.generic_args) :
@@ -1144,7 +1116,6 @@ let name_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config) (n : T.name) :
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           match_mono = false;
          }
          pat n);
   (* Return *)
@@ -1167,7 +1138,6 @@ let name_with_generics_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           match_mono = false;
          }
          pat n args);
   (* Return *)
@@ -1223,7 +1193,6 @@ let fn_ptr_to_pattern (ctx : 'fun_body ctx) (c : to_pat_config)
          {
            map_vars_to_vars = true;
            match_with_trait_decl_refs = c.use_trait_decl_refs;
-           match_mono = false;
          }
          pat func);
   (* Return *)

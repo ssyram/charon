@@ -80,12 +80,7 @@ module PatternTest = struct
     let match_with_trait_decl_refs = true in
     {
       ctx;
-      match_config =
-        {
-          map_vars_to_vars = false;
-          match_with_trait_decl_refs;
-          match_mono = false;
-        };
+      match_config = { map_vars_to_vars = false; match_with_trait_decl_refs };
       print_config = { tgt };
       fmt_env = ctx_to_fmt_env ctx;
       to_pat_config = { tgt; use_trait_decl_refs = match_with_trait_decl_refs };
