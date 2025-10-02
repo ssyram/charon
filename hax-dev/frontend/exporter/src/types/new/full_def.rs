@@ -470,23 +470,20 @@ fn gen_dyn_sig<'tcx>(
         None => def_id,
     };
     
-    // Check if the method has its own generics - if so, it's not vtable safe
-    // because you can't specify those generics when calling through a trait object
+    // Check if the method has its own type or const generics - if so, it's not vtable safe
+    // because you can't specify those generics when calling through a trait object.
+    // Note: lifetime generics are allowed in vtable-safe methods.
     let method_generics = tcx.generics_of(origin_trait_method_id);
     
-    // Get the trait def_id to know how many generics belong to the trait
-    let trait_def_id = match assoc_item.container {
-        ty::AssocItemContainer::Trait => assoc_item.container_id(tcx),
-        ty::AssocItemContainer::Impl => {
-            // Get the trait that the impl is implementing
-            let impl_def_id = assoc_item.container_id(tcx);
-            tcx.impl_trait_ref(impl_def_id)?.skip_binder().def_id
-        }
-    };
-    let trait_generics = tcx.generics_of(trait_def_id);
+    // Check if the method has its own type or const parameters (lifetimes are OK)
+    let has_own_type_or_const_params = method_generics.own_params.iter().any(|param| {
+        matches!(
+            param.kind,
+            ty::GenericParamDefKind::Type { .. } | ty::GenericParamDefKind::Const { .. }
+        )
+    });
     
-    // If the method has more generics than the trait, it's not vtable safe
-    if method_generics.count() > trait_generics.count() {
+    if has_own_type_or_const_params {
         return None;
     }
     
