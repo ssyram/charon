@@ -1,34 +1,11 @@
-fn bar() {
-    let mut i = 0;
-    for j in (0..24).step_by(6) {
-        i = i + j;
-    }
-    assert_eq!(i, 36);
-}
+//@ charon-args=--monomorphize
 
-fn main1() {
-    bar();
-    let mut i = 0;
-    for j in (0..24).step_by(6) {
-        i = i + j;
-    }
-    for j in (0..24).step_by(6) {
-        i = i + j;
-    }
-}
-
-fn main2() {
-    main1();
-    for j in (0..24).step_by(6) {
-    }
-    for j in (0..24).step_by(6) {
-    }
-}
+// Minimal reproduction of the IntoIterator error
+// This is caused by using `for` loops which desugar to IntoIterator
+// The error occurs because monomorphization tries to process the std
+// iterator traits, which reference themselves recursively
 
 fn main() {
-    main2();
-    for j in 0..24 {
-    }
-    for j in 0..24 {
+    for _ in 0..1 {
     }
 }

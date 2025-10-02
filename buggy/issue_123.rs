@@ -1,39 +1,27 @@
-enum Gamma2 {
-    V95_232 = 95_232,
-    V261_888 = 261_888,
-}
+//@ charon-args=--monomorphize
 
-enum E1 {
-    C1 = 0xffffffff,
-    C2 = -0xffffffff,
-    C3 = 0x0fffffff
-}
+// Minimal reproduction of enum discriminant index out of bounds error
+// This happens when monomorphizing code that has:
+// 1. An enum with #[derive(PartialEq)] and multiple variants with explicit discriminants
+// 2. Another enum that is cast to an integer type via a function
+// 3. Both are used in main
 
 #[derive(PartialEq)]
+enum E1 {
+    A = 1,
+    B = 2,
+}
+
 enum E2 {
-    C1 = 0xff,
-    C2 = -1,
+    C = 3,
+    D = 4,
 }
 
-enum E3 {
-    C1 = 0xff
-}
-
-enum E4 {
-    C1 = 0x7f,
-    C2 = -0x7e
-}
-
-enum E {
-    One = 1,
-    Five = 5,
-}
-
-fn fun(e: E) -> i32 {
+fn fun(e: E2) -> i32 {
     e as i32
 }
 
 fn main() {
-    assert_eq!(E2::C2 as isize, -1);
-    assert_eq!(fun(E::One), 1);
+    let _ = E1::A as isize;
+    let _ = fun(E2::C);
 }
