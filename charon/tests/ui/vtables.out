@@ -793,6 +793,35 @@ fn {impl LifetimeTrait for i32}::lifetime_method<'a, '_1>(@1: &'_1 (i32), @2: &'
     return
 }
 
+// Full name: test_crate::{impl LifetimeTrait for i32}::lifetime_method::{vtable_method}
+fn {impl LifetimeTrait for i32}::lifetime_method::{vtable_method}<'a, '_1>(@1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), @2: &'a (i32)) -> &'a (i32)
+{
+    let @0: &'a (i32); // return
+    let @1: &'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // arg #1
+    let @2: &'a (i32); // arg #2
+    let @3: &'_1 (i32); // anonymous local
+
+    storage_live(@0)
+    storage_live(@1)
+    storage_live(@2)
+    storage_live(@3)
+    @3 := concretize<&'_1 ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), &'_1 (i32)>(move (@1))
+    @0 := {impl LifetimeTrait for i32}::lifetime_method<'a, '_1>(move (@3), move (@2))
+    return
+}
+
+// Full name: test_crate::{impl LifetimeTrait for i32}::{vtable}
+fn {impl LifetimeTrait for i32}::{vtable}() -> test_crate::LifetimeTrait::{vtable}<i32>
+{
+    let ret@0: test_crate::LifetimeTrait::{vtable}<i32>; // return
+
+    ret@0 := test_crate::LifetimeTrait::{vtable} { size: const (Opaque(unknown size)), align: const (Opaque(unknown align)), drop: const (Opaque(unknown drop)), method_lifetime_method: const ({impl LifetimeTrait for i32}::lifetime_method::{vtable_method}<'_, '_>), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    return
+}
+
+// Full name: test_crate::{impl LifetimeTrait for i32}::{vtable}
+static {impl LifetimeTrait for i32}::{vtable}: test_crate::LifetimeTrait::{vtable}<i32> = {impl LifetimeTrait for i32}::{vtable}()
+
 // Full name: test_crate::{impl LifetimeTrait for i32}
 impl LifetimeTrait for i32 {
     parent_clause0 = MetaSized<i32>
@@ -934,6 +963,14 @@ fn main()
     let @60: &'_ (i64); // anonymous local
     let @61: &'_ (i64); // anonymous local
     let @62: i64; // anonymous local
+    let @63: &'_ (i32); // anonymous local
+    let @64: &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)); // anonymous local
+    let @65: &'_ (i32); // anonymous local
+    let @66: &'_ (i32); // anonymous local
+    let @67: i32; // anonymous local
+    let @68: &'_ (i32); // anonymous local
+    let @69: &'_ (i32); // anonymous local
+    let @70: i32; // anonymous local
 
     storage_live(@21)
     storage_live(@22)
@@ -977,6 +1014,14 @@ fn main()
     storage_live(@60)
     storage_live(@61)
     storage_live(@62)
+    storage_live(@63)
+    storage_live(@64)
+    storage_live(@65)
+    storage_live(@66)
+    storage_live(@67)
+    storage_live(@68)
+    storage_live(@69)
+    storage_live(@70)
     storage_live(x@1)
     storage_live(@2)
     storage_live(@3)
@@ -1164,6 +1209,30 @@ fn main()
         storage_dead(@59)
         storage_dead(@58)
         storage_dead(@55)
+        storage_live(@63)
+        storage_live(@64)
+        storage_live(@65)
+        storage_live(@66)
+        storage_live(@67)
+        @67 := const (100 : i32)
+        @66 := &@67
+        @65 := &*(@66)
+        @64 := unsize_cast<&'_ (i32), &'_ ((dyn exists<_dyn> [@TraitClause0]: LifetimeTrait<_dyn> + _dyn : '_ + @TraitClause1_0::Ty = i32)), {impl LifetimeTrait for i32}>(move (@65))
+        storage_dead(@65)
+        storage_live(@68)
+        storage_live(@69)
+        storage_live(@70)
+        @70 := const (200 : i32)
+        @69 := &@70
+        @68 := &*(@69)
+        @63 := use_lifetime_trait<'_, '_>(move (@64), move (@68))
+        storage_dead(@68)
+        storage_dead(@64)
+        storage_dead(@70)
+        storage_dead(@69)
+        storage_dead(@67)
+        storage_dead(@66)
+        storage_dead(@63)
         @0 := ()
         storage_dead(@54)
         storage_dead(a@51)
