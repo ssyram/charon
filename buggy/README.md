@@ -23,11 +23,11 @@ This directory contains minimal reproducers for bugs in Charon's `--monomorphize
 
 ## Bug 3 & 4: Iterator Trait Ambiguity (step_by.rs, symcrust.rs)
 
-**Error**: `Could not find a clause for <T as std::iter::IntoIterator> in the current context: Ambiguity`
+**Error**: `Could not find a clause for <T as MyIntoIterator> in the current context: Unimplemented`
 
-**Trigger**: Using `for` loops, which desugar to `IntoIterator` calls.
+**Trigger**: Traits with recursive bounds, specifically a trait method that has a where clause like `Self::Item: MyIntoIterator`, creating a recursive dependency between traits.
 
-**Details**: The monomorphization process encounters recursive or self-referential trait implementations in the standard library's iterator traits, causing trait resolution ambiguity.
+**Details**: The monomorphization process encounters traits with recursive bounds (similar to `Iterator::flatten` in std which has `where Self::Item: IntoIterator`). When monomorphizing, charon cannot resolve the clause for the associated type implementing the trait, causing a "Could not find a clause" error. This is now reproduced locally without std dependencies by implementing custom `MyIterator` and `MyIntoIterator` traits with the same recursive structure.
 
 ## Bug 5: Missing Default Trait Method in Impl (issue_49.rs)
 
@@ -78,6 +78,10 @@ charon rustc --monomorphize --input buggy/issue_123.rs
 charon rustc --monomorphize --input buggy/step_by.rs
 
 # Should fail with IntoIterator ambiguity
+charon rustc --monomorphize --input buggy/symcrust.rs
+
+# Should fail with trait clause error (now in local code, not std)
+charon rustc --monomorphize --input buggy/step_by.rs
 charon rustc --monomorphize --input buggy/symcrust.rs
 
 # Should succeed but check extracted code for completeness
