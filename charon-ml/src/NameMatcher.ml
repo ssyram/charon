@@ -513,6 +513,10 @@ let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
         | ImplElemTrait impl_id ->
             match_expr_with_trait_impl_id ctx c pty impl_id
             && match_name_with_generics ctx c p n g)
+    | PIdent (pid, _, pg) :: p, _ :: n when pid = "_" ->
+        assert (pg = []);
+        (* Wildcard: skip this element in the name *)
+        match_name_with_generics ctx c p n g
     | _ -> false
   in
   ret
