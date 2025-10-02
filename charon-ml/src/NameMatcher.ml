@@ -436,9 +436,9 @@ let match_literal (pl : literal) (l : Values.literal) : bool =
 let rec match_name_with_generics (ctx : 'fun_body ctx) (c : match_config)
     ?(m : maps = mk_empty_maps ()) (p : pattern) (n : T.name)
     (g : T.generic_args) : bool =
-  (* Handle monomorphized matching: if match_mono is true and the name ends with 
-     a PeMonomorphized element, use the monomorphized args and continue matching
-     without that element *)
+  (* Handle monomorphized matching: if the name ends with a PeMonomorphized
+     element, use the monomorphized args and continue matching without that
+     element *)
   let n, g =
     match List.rev n with
     | PeMonomorphized mono_args :: rest_rev ->
@@ -1481,8 +1481,7 @@ module NameMatcherMap = struct
     | [] | [ PeMonomorphized _ ] ->
         (* For tree search, we also consider monomorphized elements as terminal
            since they represent instantiation details, not logical structure.
-           However, if match_mono is enabled in the config, this should be
-           handled by the calling context. *)
+           The monomorphized matching is always handled by the calling context. *)
         if g = TypesUtils.empty_generic_args then node_v else None
     | _ ->
         (* Explore the children *)
