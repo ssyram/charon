@@ -1,12 +1,17 @@
-fn inner() -> Result<(), u8> {
-    Err(1)
+//@ charon-args=--monomorphize
+
+// Simplified version that reproduces the Result<Infallible, E> bug
+// without using std library
+
+enum Never {}
+
+enum MyResult<T, E> {
+    Ok(T),
+    Err(E),
 }
 
-fn call_it() -> Result<(), u8> {
-    inner()?;
-    Ok(())
-}
+fn use_result(_r: MyResult<Never, u8>) {}
 
 fn main() {
-    assert_eq!(call_it(), Err(1))
+    use_result(MyResult::Err(1));
 }

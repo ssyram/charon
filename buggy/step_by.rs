@@ -1,34 +1,66 @@
-fn bar() {
-    let mut i = 0;
-    for j in (0..24).step_by(6) {
-        i = i + j;
+//@ charon-args=--monomorphize
+
+// Minimal reproduction of the Iterator/IntoIterator trait ambiguity error
+// This reproduces the issue locally without using std library.
+// The bug occurs when monomorphization encounters traits with recursive bounds.
+
+trait MyIterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+    
+    // Method with recursive bound: Self::Item: MyIntoIterator
+    // This is similar to Iterator::flatten in std
+    fn my_flatten(self) -> MyFlatten<Self>
+    where
+        Self: Sized,
+        Self::Item: MyIntoIterator,
+    {
+        MyFlatten { iter: self }
     }
-    assert_eq!(i, 36);
 }
 
-fn main1() {
-    bar();
-    let mut i = 0;
-    for j in (0..24).step_by(6) {
-        i = i + j;
-    }
-    for j in (0..24).step_by(6) {
-        i = i + j;
+trait MyIntoIterator {
+    type Item;
+    type IntoIter: MyIterator<Item = Self::Item>;
+    fn into_iter(self) -> Self::IntoIter;
+}
+
+struct MyRange {
+    start: i32,
+    end: i32,
+}
+
+struct MyFlatten<I> {
+    iter: I,
+}
+
+impl MyIterator for MyRange {
+    type Item = i32;
+    fn next(&mut self) -> Option<i32> {
+        if self.start < self.end {
+            let val = self.start;
+            self.start += 1;
+            Some(val)
+        } else {
+            None
+        }
     }
 }
 
-fn main2() {
-    main1();
-    for j in (0..24).step_by(6) {
+impl MyIntoIterator for MyRange {
+    type Item = i32;
+    type IntoIter = MyRange;
+    fn into_iter(self) -> MyRange {
+        self
     }
-    for j in (0..24).step_by(6) {
+}
+
+fn use_iterator() {
+    let mut iter = MyRange { start: 0, end: 1 };
+    while let Some(_) = iter.next() {
     }
 }
 
 fn main() {
-    main2();
-    for j in 0..24 {
-    }
-    for j in 0..24 {
-    }
+    use_iterator();
 }
