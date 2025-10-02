@@ -93,4 +93,5 @@ fn main() {
     z.dummy();
     let a: &dyn Both32And64 = &42;
     a.both_operate(&100, &200);
+    use_lifetime_trait(&100, &200);
 }
