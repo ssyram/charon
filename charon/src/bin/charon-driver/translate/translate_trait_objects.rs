@@ -227,7 +227,7 @@ impl ItemTransCtx<'_, '_> {
         )?;
         let hax::FullDefKind::AssocFn {
             sig,
-            vtable_receiver: Some(_),
+            dyn_sig: Some(_),
             ..
         } = item_def.kind()
         else {
@@ -236,7 +236,7 @@ impl ItemTransCtx<'_, '_> {
 
         let item_name = self.t_ctx.translate_trait_item_name(item_def_id)?;
         // It's ok to translate the method signature in the context of the trait because
-        // `vtable_safe: true` ensures the method has no generics of its own.
+        // `dyn_sig.is_some()` ensures the method has no generics of its own.
         let sig = self.translate_fun_sig(span, sig)?;
         let ty = TyKind::FnPtr(sig).into_ty();
 
@@ -550,7 +550,7 @@ impl ItemTransCtx<'_, '_> {
         // Exit if the item isn't a vtable safe method.
         match self.poly_hax_def(&item.decl_def_id)?.kind() {
             hax::FullDefKind::AssocFn {
-                vtable_receiver: Some(_),
+                dyn_sig: Some(_),
                 ..
             } => {}
             _ => return Ok(()),
@@ -928,7 +928,8 @@ impl ItemTransCtx<'_, '_> {
         self.check_no_monomorphize(span)?;
 
         let hax::FullDefKind::AssocFn {
-            vtable_receiver: Some(vtable_receiver),
+            dyn_sig: Some(dyn_sig),
+            sig: target_signature,
             ..
         } = impl_func_def.kind()
         else {
@@ -939,18 +940,24 @@ impl ItemTransCtx<'_, '_> {
             );
         };
 
+        // Replace to get the true signature of the shim function.
+        // As `translate_function_signature` will use the `sig` field of the `hax::FullDef`
+        let shim_func_def = {
+            let mut def = impl_func_def.clone();
+            let hax::FullDefKind::AssocFn { sig, .. } = &mut def.kind else {
+                unreachable!()
+            };
+            *sig = dyn_sig.clone();
+            def
+        };
+
         // compute the correct signature for the shim
-        let mut signature = self.translate_function_signature(impl_func_def, &item_meta)?;
+        let signature = self.translate_function_signature(&shim_func_def, &item_meta)?;
 
-        let target_receiver = signature.inputs[0].clone();
-
-        // Use the vtable_receiver as the shim receiver type, but substitute generics
-        // with concrete types from the impl context
-        let dyn_receiver = self.translate_ty(span, vtable_receiver)?;
-        signature.inputs[0] = dyn_receiver;
+        let target_receiver = self.translate_ty(span, &target_signature.value.inputs[0])?;
 
         trace!(
-            "[VtableShim] Obtained dyn receiver type: {}",
+            "[VtableShim] Obtained dyn signature with receiver type: {}",
             signature.inputs[0].with_ctx(&self.into_fmt())
         );
 
