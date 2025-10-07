@@ -51,7 +51,7 @@ use indexmap::IndexMap;
         TranslatedCrate, TypeDeclKind, TypeId, TypeParam, TypeVarId, llbc_ast::StatementId,
         ullbc_ast::BlockData, ullbc_ast::BlockId, ullbc_ast::ExprBody, ullbc_ast::StatementKind,
         ullbc_ast::TerminatorKind, ullbc_ast::SwitchTargets,
-        UnOp, UnsizingMetadata, Local, Variant, VariantId, LocalId, CopyNonOverlapping, Layout, VariantLayout, PtrMetadata, VTable,
+        UnOp, UnsizingMetadata, Local, Variant, VariantId, LocalId, CopyNonOverlapping, Layout, VariantLayout, PtrMetadata,
         TraitAssocTy, TraitAssocConst, TraitMethod, TraitAssocTyImpl,
         for<T: AstVisitable> Box<T>,
         for<T: AstVisitable> Option<T>,
@@ -73,7 +73,7 @@ use indexmap::IndexMap;
         for<T: AstVisitable> Binder<T>,
         llbc_block: llbc_ast::Block, llbc_statement: llbc_ast::Statement,
         ullbc_statement: ullbc_ast::Statement, ullbc_terminator: ullbc_ast::Terminator,
-        AggregateKind, FnPtr, ItemKind, ItemMeta, Span, ConstantExpr,
+        AggregateKind, FnPtr, ItemSource, ItemMeta, Span, ConstantExpr,
         FunDeclId, GlobalDeclId, TypeDeclId, TraitDeclId, TraitImplId,
         FunDecl, GlobalDecl, TypeDecl, TraitDecl, TraitImpl,
     )
@@ -145,7 +145,7 @@ impl<K: Any, T: AstVisitable> AstVisitable for IndexMap<K, T> {
     skip(
         AbortKind, BinOp, BorrowKind, ConstantExpr, ConstGeneric, FieldId, FieldProjKind,
         TypeDeclRef, FunDeclId, FnPtrKind, GenericArgs, GlobalDeclRef, IntegerTy, IntTy, UIntTy,
-        NullOp, RefKind, ScalarValue, Span, Ty, TypeDeclId, TypeId, UnOp, VariantId, LocalId,
+        NullOp, RefKind, ScalarValue, Span, Ty, TypeDeclId, TypeId, UnOp, VariantId,
         TraitRef, LiteralTy, Literal,
     ),
     // Types that we unconditionally explore.
@@ -155,7 +155,7 @@ impl<K: Any, T: AstVisitable> AstVisitable for IndexMap<K, T> {
         ullbc_ast::BlockData, ullbc_ast::ExprBody, ullbc_ast::StatementKind,
         ullbc_ast::TerminatorKind, ullbc_ast::SwitchTargets, CopyNonOverlapping,
         llbc_ast::StatementId,
-        Body, Opaque, Locals, Local,
+        Body, Opaque, Local,
         for<T: BodyVisitable> Box<T>,
         for<T: BodyVisitable> Option<T>,
         for<T: BodyVisitable, E: BodyVisitable> Result<T, E>,
@@ -168,7 +168,7 @@ impl<K: Any, T: AstVisitable> AstVisitable for IndexMap<K, T> {
     // type but can be overridden.
     override(
         AggregateKind, Call, FnOperand, FnPtr,
-        Operand, Place, ProjectionElem, Rvalue,
+        Operand, Place, ProjectionElem, Rvalue, Locals, LocalId,
         llbc_block: llbc_ast::Block,
         llbc_statement: llbc_ast::Statement,
         ullbc_statement: ullbc_ast::Statement,

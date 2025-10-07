@@ -12,7 +12,7 @@ use crate::{
     transform::utils::GenericsSource,
 };
 
-use super::{TransformCtx, ctx::TransformPass};
+use crate::transform::{TransformCtx, ctx::TransformPass};
 
 #[derive(Visitor)]
 struct CheckGenericsVisitor<'a> {
@@ -40,6 +40,31 @@ impl VisitorWithBinderStack for CheckGenericsVisitor<'_> {
 }
 
 impl CheckGenericsVisitor<'_> {
+    fn check_concretization_ty_match(&self, src_ty: &Ty, tar_ty: &Ty) {
+        match (src_ty.kind(), tar_ty.kind()) {
+            (TyKind::Ref(.., src_kind), TyKind::Ref(.., tar_kind)) => {
+                assert_eq!(src_kind, tar_kind);
+            }
+            (TyKind::RawPtr(.., src_kind), TyKind::RawPtr(.., tar_kind)) => {
+                assert_eq!(src_kind, tar_kind);
+            }
+            (
+                TyKind::Adt(TypeDeclRef { id: src_id, .. }),
+                TyKind::Adt(TypeDeclRef { id: tar_id, .. }),
+            ) => {
+                assert_eq!(src_id, tar_id);
+            }
+            _ => {
+                let fmt = &self.ctx.into_fmt();
+                self.error(format!(
+                    "Invalid concretization targets: from \"{}\" to \"{}\"",
+                    src_ty.with_ctx(fmt),
+                    tar_ty.with_ctx(fmt)
+                ));
+            }
+        }
+    }
+
     fn error(&self, message: impl Display) {
         let msg = format!(
             "Found inconsistent generics {}:\n{message}\n\
@@ -253,7 +278,7 @@ impl VisitAst for CheckGenericsVisitor<'_> {
                 let fmt = &self.ctx.into_fmt();
                 let args_fmt = &self.val_fmt_ctx();
                 self.zip_assert_match(
-                    &tdecl.parent_clauses,
+                    &tdecl.implied_clauses,
                     parent_trait_refs,
                     fmt,
                     args_fmt,
@@ -309,6 +334,15 @@ impl VisitAst for CheckGenericsVisitor<'_> {
             }
         }
     }
+    fn visit_rvalue(&mut self, x: &Rvalue) -> ::std::ops::ControlFlow<Self::Break> {
+        match x {
+            Rvalue::UnaryOp(UnOp::Cast(CastKind::Concretize(src, tar)), _) => {
+                self.check_concretization_ty_match(src, tar);
+            }
+            _ => {}
+        }
+        Continue(())
+    }
     fn enter_global_decl_ref(&mut self, x: &GlobalDeclRef) {
         self.assert_matches_item(x.id, &x.generics);
     }
@@ -327,8 +361,8 @@ impl VisitAst for CheckGenericsVisitor<'_> {
         let tdecl_fmt = fmt1.push_binder(Cow::Borrowed(&tdecl.generics));
         let args_fmt = &self.val_fmt_ctx();
         self.zip_assert_match(
-            &tdecl.parent_clauses,
-            &timpl.parent_trait_refs,
+            &tdecl.implied_clauses,
+            &timpl.implied_trait_refs,
             &tdecl_fmt,
             args_fmt,
             "trait parent clauses",

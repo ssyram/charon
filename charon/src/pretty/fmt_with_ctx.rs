@@ -4,7 +4,6 @@ use crate::{
     formatter::*,
     gast,
     llbc_ast::{self as llbc, *},
-    reorder_decls::*,
     transform::utils::GenericsSource,
     ullbc_ast::{self as ullbc, *},
 };
@@ -288,6 +287,9 @@ impl<C: AstFormatter> FmtWithCtx<C> for CastKind {
             }
             CastKind::Transmute(src, tgt) => {
                 write!(f, "transmute<{}, {}>", src.with_ctx(ctx), tgt.with_ctx(ctx))
+            }
+            CastKind::Concretize(ty, ty1) => {
+                write!(f, "concretize<{}, {}>", ty.with_ctx(ctx), ty1.with_ctx(ctx))
             }
         }
     }
@@ -1045,6 +1047,9 @@ impl<C: AstFormatter> FmtWithCtx<C> for Place {
                             write!(f, "({sub}).{field_id}")
                         }
                     },
+                    ProjectionElem::PtrMetadata => {
+                        write!(f, "{sub}.metadata")
+                    }
                     ProjectionElem::Index {
                         offset,
                         from_end: true,
@@ -1199,7 +1204,11 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Rvalue::Use(x) => write!(f, "{}", x.with_ctx(ctx)),
-            Rvalue::Ref(place, borrow_kind) => {
+            Rvalue::Ref {
+                place,
+                kind: borrow_kind,
+                ptr_metadata,
+            } => {
                 let borrow_kind = match borrow_kind {
                     BorrowKind::Shared => "&",
                     BorrowKind::Mut => "&mut ",
@@ -1207,14 +1216,40 @@ impl<C: AstFormatter> FmtWithCtx<C> for Rvalue {
                     BorrowKind::UniqueImmutable => "&uniq ",
                     BorrowKind::Shallow => "&shallow ",
                 };
-                write!(f, "{borrow_kind}{}", place.with_ctx(ctx))
+                if ptr_metadata.ty().is_unit() {
+                    // Hide unit metadata
+                    write!(f, "{borrow_kind}{}", place.with_ctx(ctx))?;
+                } else {
+                    write!(
+                        f,
+                        "{borrow_kind}{} with_metadata({})",
+                        place.with_ctx(ctx),
+                        ptr_metadata.with_ctx(ctx)
+                    )?;
+                }
+                Ok(())
             }
-            Rvalue::RawPtr(place, mutability) => {
+            Rvalue::RawPtr {
+                place,
+                kind: mutability,
+                ptr_metadata,
+            } => {
                 let ptr_kind = match mutability {
                     RefKind::Shared => "&raw const ",
                     RefKind::Mut => "&raw mut ",
                 };
-                write!(f, "{ptr_kind}{}", place.with_ctx(ctx))
+                if ptr_metadata.ty().is_unit() {
+                    // Hide unit metadata
+                    write!(f, "{ptr_kind}{}", place.with_ctx(ctx))?;
+                } else {
+                    write!(
+                        f,
+                        "{ptr_kind}{} with_metadata({})",
+                        place.with_ctx(ctx),
+                        ptr_metadata.with_ctx(ctx)
+                    )?;
+                }
+                Ok(())
             }
 
             Rvalue::BinaryOp(binop, x, y) => {
@@ -1540,13 +1575,13 @@ impl<C: AstFormatter> FmtWithCtx<C> for TraitDecl {
         let (generics, clauses) = self.generics.fmt_with_ctx_with_trait_clauses(ctx);
         write!(f, "{generics}{clauses}")?;
 
-        let any_item = !self.parent_clauses.is_empty()
+        let any_item = !self.implied_clauses.is_empty()
             || !self.consts.is_empty()
             || !self.types.is_empty()
             || !self.methods.is_empty();
         if any_item {
             write!(f, "\n{{\n")?;
-            for c in &self.parent_clauses {
+            for c in &self.implied_clauses {
                 writeln!(
                     f,
                     "{TAB_INCR}parent_clause{} : {}",
@@ -1646,13 +1681,13 @@ impl<C: AstFormatter> FmtWithCtx<C> for TraitImpl {
         };
         write!(f, "{newline}{{")?;
 
-        let any_item = !self.parent_trait_refs.is_empty()
+        let any_item = !self.implied_trait_refs.is_empty()
             || !self.consts.is_empty()
             || !self.types.is_empty()
             || !self.methods.is_empty();
         if any_item {
             writeln!(f)?;
-            for (i, c) in self.parent_trait_refs.iter().enumerate() {
+            for (i, c) in self.implied_trait_refs.iter().enumerate() {
                 let i = TraitClauseId::new(i);
                 writeln!(f, "{TAB_INCR}parent_clause{i} = {}", c.with_ctx(ctx))?;
             }
@@ -1817,6 +1852,9 @@ impl<C: AstFormatter> FmtWithCtx<C> for Ty {
                 };
                 write!(f, "{value}",)
             }
+            TyKind::PtrMetadata(ty) => {
+                write!(f, "PtrMetadata<{}>", ty.with_ctx(ctx))
+            }
             TyKind::Error(msg) => write!(f, "type_error(\"{msg}\")"),
         }
     }
@@ -1919,7 +1957,6 @@ impl<C: AstFormatter> FmtWithCtx<C> for UnOp {
         match self {
             UnOp::Not => write!(f, "~"),
             UnOp::Neg(mode) => write!(f, "{}.-", mode),
-            UnOp::PtrMetadata => write!(f, "ptr_metadata"),
             UnOp::Cast(kind) => write!(f, "{}", kind.with_ctx(ctx)),
         }
     }

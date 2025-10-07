@@ -2,7 +2,6 @@ use crate::ast::*;
 use crate::formatter::{FmtCtx, IntoFormatter};
 use crate::ids::Vector;
 use crate::pretty::FmtWithCtx;
-use crate::reorder_decls::DeclarationsGroups;
 use derive_generic_visitor::{ControlFlow, Drive, DriveMut};
 use index_vec::Idx;
 use macros::{EnumAsGetters, EnumIsA, VariantIndexArity, VariantName};
@@ -37,7 +36,6 @@ generate_index_type!(TraitImplId, "TraitImpl");
     Drive,
     DriveMut,
 )]
-#[charon::rename("AnyDeclId")]
 #[charon::variants_prefix("Id")]
 pub enum ItemId {
     Type(TypeDeclId),
@@ -108,6 +106,41 @@ pub enum ItemRefMut<'ctx> {
     TraitImpl(&'ctx mut TraitImpl),
 }
 
+/// A (group of) top-level declaration(s), properly reordered.
+/// "G" stands for "generic"
+#[derive(
+    Debug, Clone, VariantIndexArity, VariantName, EnumAsGetters, EnumIsA, Serialize, Deserialize,
+)]
+#[charon::variants_suffix("Group")]
+pub enum GDeclarationGroup<Id> {
+    /// A non-recursive declaration
+    NonRec(Id),
+    /// A (group of mutually) recursive declaration(s)
+    Rec(Vec<Id>),
+}
+
+/// A (group of) top-level declaration(s), properly reordered.
+#[derive(
+    Debug, Clone, VariantIndexArity, VariantName, EnumAsGetters, EnumIsA, Serialize, Deserialize,
+)]
+#[charon::variants_suffix("Group")]
+pub enum DeclarationGroup {
+    /// A type declaration group
+    Type(GDeclarationGroup<TypeDeclId>),
+    /// A function declaration group
+    Fun(GDeclarationGroup<FunDeclId>),
+    /// A global declaration group
+    Global(GDeclarationGroup<GlobalDeclId>),
+    ///
+    TraitDecl(GDeclarationGroup<TraitDeclId>),
+    ///
+    TraitImpl(GDeclarationGroup<TraitImplId>),
+    /// Anything that doesn't fit into these categories.
+    Mixed(GDeclarationGroup<ItemId>),
+}
+
+pub type DeclarationsGroups = Vec<DeclarationGroup>;
+
 #[derive(Default, Clone, Drive, DriveMut, Serialize, Deserialize)]
 pub struct TargetInfo {
     /// The pointer size of the target in bytes.
@@ -156,6 +189,9 @@ pub struct TranslatedCrate {
     pub trait_decls: Vector<TraitDeclId, TraitDecl>,
     /// The translated trait declarations
     pub trait_impls: Vector<TraitImplId, TraitImpl>,
+    /// A `const UNIT: () = ();` used whenever we make a thin pointer/reference to avoid creating a
+    /// local `let unit = ();` variable. It is always `Some`.
+    pub unit_metadata: Option<GlobalDeclRef>,
     /// The re-ordered groups of declarations, initialized as empty.
     #[drive(skip)]
     pub ordered_decls: Option<DeclarationsGroups>,
@@ -256,11 +292,13 @@ impl<'ctx> ItemRef<'ctx> {
     }
 
     /// Get information about the parent of this item, if any.
-    pub fn parent_info(&self) -> &'ctx ItemKind {
+    pub fn parent_info(&self) -> &'ctx ItemSource {
         match self {
-            ItemRef::Fun(d) => &d.kind,
-            ItemRef::Global(d) => &d.kind,
-            ItemRef::Type(_) | ItemRef::TraitDecl(_) | ItemRef::TraitImpl(_) => &ItemKind::TopLevel,
+            ItemRef::Fun(d) => &d.src,
+            ItemRef::Global(d) => &d.src,
+            ItemRef::Type(_) | ItemRef::TraitDecl(_) | ItemRef::TraitImpl(_) => {
+                &ItemSource::TopLevel
+            }
         }
     }
 

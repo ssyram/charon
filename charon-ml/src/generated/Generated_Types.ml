@@ -104,7 +104,7 @@ and fun_decl_id = (FunDeclId.id[@visitors.opaque])
 and global_decl_id = (GlobalDeclId.id[@visitors.opaque])
 
 (** The id of a translated item. *)
-and any_decl_id =
+and item_id =
   | IdType of type_decl_id
   | IdFun of fun_decl_id
   | IdGlobal of global_decl_id
@@ -418,7 +418,7 @@ and trait_param = {
 
 (** A reference to a trait *)
 and trait_ref = {
-  trait_id : trait_instance_id;
+  kind : trait_ref_kind;
   trait_decl_ref : trait_decl_ref region_binder;
       (** Not necessary, but useful *)
 }
@@ -429,7 +429,7 @@ and trait_ref = {
     definition. Note that every path designated by [TraitInstanceId] refers to a
     *trait instance*, which is why the [[TraitRefKind::Clause]] variant may seem
     redundant with some of the other variants. *)
-and trait_instance_id =
+and trait_ref_kind =
   | TraitImpl of trait_impl_ref
       (** A specific top-level implementation item. *)
   | Clause of trait_clause_id de_bruijn_var
@@ -573,6 +573,9 @@ and ty =
           given that the type here is polymorpohic in the late-bound variables
           (those that could appear in a function pointer type like
           [for<'a> fn(&'a u32)]), we need to bind them here. *)
+  | TPtrMetadata of ty
+      (** As a marker of taking out metadata from a given type The internal type
+          is assumed to be a type variable *)
   | TError of string  (** A type that could not be computed or was incorrect. *)
 
 (** Reference to a type declaration or builtin type. *)
@@ -643,6 +646,10 @@ type abort_kind =
       (** Unwind had to stop for Abi reasons or because cleanup code panicked
           again. *)
 
+(** Describes modifiers to the alignment and packing of the corresponding type.
+    Represents [repr(align(n))] and [repr(packed(n))]. *)
+and alignment_modifier = Align of int | Pack of int
+
 (** Additional information for closures. *)
 and closure_info = {
   kind : closure_kind;
@@ -693,6 +700,21 @@ and field_id = (FieldId.id[@visitors.opaque])
     } *)
 and impl_elem = ImplElemTy of ty binder | ImplElemTrait of trait_impl_id
 
+(** Meta information about an item (function, trait decl, trait impl, type decl,
+    global). *)
+and item_meta = {
+  name : name;
+  span : span;
+  source_text : string option;
+      (** The source code that corresponds to this item. *)
+  attr_info : attr_info;  (** Attributes and visibility. *)
+  is_local : bool;
+      (** [true] if the type decl is a local type decl, [false] if it comes from
+          an external crate. *)
+  lang_item : string option;
+      (** If the item is built-in, record its internal builtin identifier. *)
+}
+
 (** Item kind: whether this function/const is part of a trait declaration, trait
     implementation, or neither.
 
@@ -714,7 +736,7 @@ and impl_elem = ImplElemTy of ty binder | ImplElemTrait of trait_impl_id
           fn test(...) { ... } // regular
       }
     ]} *)
-and item_kind =
+and item_source =
   | TopLevelItem  (** This item stands on its own. *)
   | ClosureItem of closure_info
       (** This is a closure in a function body.
@@ -751,21 +773,10 @@ and item_kind =
 
           Fields:
           - [impl_ref] *)
-
-(** Meta information about an item (function, trait decl, trait impl, type decl,
-    global). *)
-and item_meta = {
-  name : name;
-  span : span;
-  source_text : string option;
-      (** The source code that corresponds to this item. *)
-  attr_info : attr_info;  (** Attributes and visibility. *)
-  is_local : bool;
-      (** [true] if the type decl is a local type decl, [false] if it comes from
-          an external crate. *)
-  lang_item : string option;
-      (** If the item is built-in, record its internal builtin identifier. *)
-}
+  | VTableMethodShimItem
+      (** The method shim wraps a concrete implementation of a method into a
+          function that takes [dyn Trait] as its [Self] type. This shim casts
+          the receiver to the known concrete type and calls the real method. *)
 
 (** Simplified type layout information.
 
@@ -841,11 +852,40 @@ and path_elem =
 and ptr_metadata =
   | NoMetadata  (** Types that need no metadata, namely [T: Sized] types. *)
   | Length
-      (** Metadata for [[T]], [str], and user-defined types that directly or
-          indirectly contain one of these two. *)
-  | VTable of v_table
-      (** Metadata for [dyn Trait] and user-defined types that directly or
-          indirectly contain a [dyn Trait]. *)
+      (** Metadata for [[T]] and [str], and user-defined types that directly or
+          indirectly contain one of the two. Of type [usize]. Notably, length
+          for [[T]] denotes the number of elements in the slice. While for [str]
+          it denotes the number of bytes in the string. *)
+  | VTable of type_decl_ref
+      (** Metadata for [dyn Trait], referring to the vtable struct, also for
+          user-defined types that directly or indirectly contain a [dyn Trait].
+          Of type [&'static vtable] *)
+  | InheritFrom of ty
+      (** Unknown due to generics, but will inherit from the given type. This is
+          consistent with [<Ty as Pointee>::Metadata]. Of type
+          [TyKind::Metadata(Ty)]. *)
+
+(** Describes which layout algorithm is used for representing the corresponding
+    type. Depends on the [#[repr(...)]] used. *)
+and repr_algorithm =
+  | Rust
+      (** The default layout algorithm. Used without an explicit [ŗepr] or for
+          [repr(Rust)]. *)
+  | C  (** The C layout algorithm as enforced by [repr(C)]. *)
+
+(** The representation options as annotated by the user.
+
+    NOTE: This does not include less common/unstable representations such as
+    [#[repr(simd)]] or the compiler internal [#[repr(linear)]]. Similarly, enum
+    discriminant representations are encoded in [[Variant::discriminant]] and
+    [[DiscriminantLayout]] instead. This only stores whether the discriminant
+    type was derived from an explicit annotation. *)
+and repr_options = {
+  repr_algo : repr_algorithm;
+  align_modif : alignment_modifier option;
+  transparent : bool;
+  explicit_discr_type : bool;
+}
 
 (** Describes how we represent the active enum variant in memory. *)
 and tag_encoding =
@@ -876,7 +916,7 @@ and type_decl = {
   def_id : type_decl_id;
   item_meta : item_meta;  (** Meta information associated with the item. *)
   generics : generic_params;
-  src : item_kind;
+  src : item_source;
       (** The context of the type: distinguishes top-level items from
           closure-related items. *)
   kind : type_decl_kind;  (** The type kind: enum, struct, or opaque. *)
@@ -884,14 +924,11 @@ and type_decl = {
       (** The layout of the type. Information may be partial because of generics
           or dynamically- sized types. If rustc cannot compute a layout, it is
           [None]. *)
-  ptr_metadata : ptr_metadata option;
-      (** The metadata associated with a pointer to the type. This is [None] if
-          we could not compute it because of generics. The information is
-          *accurate* if it is [Some] while if it is [None], it may still be
-          theoretically computable but due to some limitation to be fixed, we
-          are unable to obtain the info. See
-          [translate_types::{impl ItemTransCtx}::translate_ptr_metadata] for
-          more details. *)
+  ptr_metadata : ptr_metadata;
+      (** The metadata associated with a pointer to the type. *)
+  repr : repr_options option;
+      (** The representation options of this type declaration as annotated by
+          the user. Is [None] for foreign type declarations. *)
 }
 
 and type_decl_kind =
@@ -909,10 +946,6 @@ and type_decl_kind =
       (** Used if an error happened during the extraction, and we don't panic on
           error. *)
 
-(** A placeholder for the vtable of a trait object. To be implemented in the
-    future when [dyn Trait] is fully supported. *)
-and v_table = unit
-
 and variant = {
   span : span;
   attr_info : attr_info;
@@ -920,9 +953,9 @@ and variant = {
   fields : field list;
   discriminant : literal;
       (** The discriminant value outputted by [std::mem::discriminant] for this
-          variant. This is different than the discriminant stored in memory (the
-          one controlled by [repr]). That one is described by
-          [[DiscriminantLayout]] and [[TagEncoding]]. *)
+          variant. This can be different than the discriminant stored in memory
+          (called [tag]). That one is described by [[DiscriminantLayout]] and
+          [[TagEncoding]]. *)
 }
 
 and variant_id = (VariantId.id[@visitors.opaque])
