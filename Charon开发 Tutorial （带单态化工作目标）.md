@@ -104,7 +104,7 @@ charon/                          # 项目根目录
    > 4. **Trait 解析支持**：Hax 负责创建 TraitRefKind::Clause 和 TraitRefKind::ParentClause 数据。Rustc 只提供 TraitDeclRef（在 Charon 术语中），当我们询问"如何证明这个 trait 被实现"时，如果 Rustc 能找到 impl 块，它会给我们。但对于类似 `T: Clone` 这样的约束（它成立是因为我们在 `fn foo<T: Clone>` 内部），Rustc 不会直接告诉我们这是一个 Clause，Hax 需要构建这些信息
    > 5. **支持多态与单态模式**：对于同时支持多态和单态翻译的场景，Hax 的 FullDef 抽象能够统一处理两种模式的差异，简化实现
    > 
-   > 值得注意的是，虽然理论上可以绕过 Hax 直接使用 Rustc，但这会带来显著的额外负担，包括需要自行处理所有 Rustc 查询的复杂性、应对接口变化，以及在单态化模式下处理 Hax 特有的 DefId（如不对应 Rustc 实体的单态化 DefId，直接用于 Rustc 查询会 panic）。因此实践中 Hax 是不可或缺的
+   > 值得注意的是，虽然理论上可以绕过 Hax 直接使用 Rustc，但这会带来显著的额外负担，包括需要自行处理所有 Rustc 查询的复杂性、应对接口变化，因此实践中 Hax 是不可或缺的
    - `translate()` 函数：翻译主入口
    - 创建 `TranslateCtx` 上下文
    - 初始化并启动且负责整个翻译循环，详细描述见下文
