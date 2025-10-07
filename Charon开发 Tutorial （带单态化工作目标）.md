@@ -92,7 +92,7 @@ charon/                          # 项目根目录
 
 3. **driver.rs 关键配置** (`charon/src/bin/charon-driver/driver.rs`)
    - `run_rustc_driver()` 设置 Rustc 回调
-   - `after_analysis()` 回调：MIR 生成完成后被调用
+   - `after_expansion()` 回调：MIR 生成完成后被调用
    - 在此调用**关键函数** `translate_crate::translate()` 启动翻译流程
 
 4. **翻译调度** (`translate/translate_crate.rs`)
