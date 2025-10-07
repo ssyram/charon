@@ -96,8 +96,15 @@ charon/                          # 项目根目录
    - 在此调用**关键函数** `translate_crate::translate()` 启动翻译流程
 
 4. **翻译调度** (`translate/translate_crate.rs`)
-   - 这个阶段负责从 Rustc 引入源码信息翻译为 ULLBC 表示，注意，翻译的过程尽管能直接和 Rustc 交互，但是实际上引入了 Hax 作为**快捷**中间层，将 Rustc MIR 转为更符合翻译需求的 Hax 表示
-   > 事实上在纳入单态化框架前，Charon 的翻译只使用 Rustc 的 DefId 所以 Hax 本质只是一个**加速**工具，但在纳入单态化框架后，Hax 的作用变得更加重要，因为 Hax 能够直接表示单态化后的项，而且这个变换过程只在 Hax 中完成，使得绕开 Hax 直接使用 Rustc 则需要面对 Hax 内部变换信息缺失（例如引入单态化后事实上在 Hax 中有并不对应任何 Rustc 实体的单态化 DefId ，利用这种 DefId 对 Rustc 查询将直接 panic）的问题从而基本不可能
+   - 这个阶段负责从 Rustc 引入源码信息翻译为 ULLBC 表示，注意，翻译的过程尽管能直接和 Rustc 交互，但是实际上引入了 Hax 作为**关键抽象层**，将 Rustc MIR 转为更符合翻译需求的 Hax 表示
+   > **Hax 的核心作用**：Hax 并非简单的加速工具，而是 Charon 架构中的关键组件，其主要职责包括：
+   > 1. **处理所有 Rustc 查询**：Hax 承担了与 Rustc 交互的所有复杂性，使得 Charon 代码无需直接处理 Rustc 的底层细节
+   > 2. **应对 Rustc 接口变化**：Hax 隔离了 Rustc 接口的潜在变化，使 Charon 对 Rustc 版本更新更加健壮
+   > 3. **DefId 抽象**：Hax 的 DefId 可以表示 Rustc 的 DefId 或者提升常量（promoted constant，后者在 Rustc 中没有独立的 DefId）
+   > 4. **Trait 解析支持**：Hax 负责创建 TraitRefKind::Clause 和 TraitRefKind::ParentClause 数据，因为 Rustc 不直接提供这些信息
+   > 5. **支持多态与单态模式**：对于同时支持多态和单态翻译（如当前的 Charon），Hax 的抽象变得更加关键。如果没有 Hax 提供的 FullDef 这样的中间抽象来统一处理多态/单态差异，直接使用 Rustc 将面临更大的实现复杂度
+   > 
+   > 特别地，在单态化模式下，Hax 能够直接表示单态化后的项，并且这个变换过程只在 Hax 中完成。Hax 中可能存在不对应任何 Rustc 实体的单态化 DefId，直接用这种 DefId 对 Rustc 查询将导致 panic，因此绕开 Hax 直接使用 Rustc 基本不可行
    - `translate()` 函数：翻译主入口
    - 创建 `TranslateCtx` 上下文
    - 初始化并启动且负责整个翻译循环，详细描述见下文
