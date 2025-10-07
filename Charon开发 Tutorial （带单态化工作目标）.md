@@ -96,8 +96,15 @@ charon/                          # 项目根目录
    - 在此调用**关键函数** `translate_crate::translate()` 启动翻译流程
 
 4. **翻译调度** (`translate/translate_crate.rs`)
-   - 这个阶段负责从 Rustc 引入源码信息翻译为 ULLBC 表示，注意，翻译的过程尽管能直接和 Rustc 交互，但是实际上引入了 Hax 作为**快捷**中间层，将 Rustc MIR 转为更符合翻译需求的 Hax 表示
-   > 事实上在纳入单态化框架前，Charon 的翻译只使用 Rustc 的 DefId 所以 Hax 本质只是一个**加速**工具，但在纳入单态化框架后，Hax 的作用变得更加重要，因为 Hax 能够直接表示单态化后的项，而且这个变换过程只在 Hax 中完成，使得绕开 Hax 直接使用 Rustc 则需要面对 Hax 内部变换信息缺失（例如引入单态化后事实上在 Hax 中有并不对应任何 Rustc 实体的单态化 DefId ，利用这种 DefId 对 Rustc 查询将直接 panic）的问题从而基本不可能
+   - 这个阶段负责从 Rustc 引入源码信息翻译为 ULLBC 表示，注意，翻译的过程尽管能直接和 Rustc 交互，但是实际上引入了 Hax 作为**关键抽象层**，将 Rustc MIR 转为更符合翻译需求的 Hax 表示
+   > **Hax 的核心作用**：Hax 是 Charon 架构中的重要组件，其主要职责包括：
+   > 1. **处理所有 Rustc 查询**：Hax 承担了与 Rustc 交互的复杂性，使得 Charon 代码无需直接处理 Rustc 的底层细节
+   > 2. **应对 Rustc 接口变化**：Hax 隔离了 Rustc 接口的潜在变化，使 Charon 对 Rustc 版本更新更加健壮
+   > 3. **DefId 抽象**：Hax 的 DefId 可以表示 Rustc 的 DefId 或者提升常量（promoted constant，后者在 Rustc 中没有独立的 DefId）
+   > 4. **Trait 解析支持**：Hax 负责创建 TraitRefKind::Clause 和 TraitRefKind::ParentClause 数据。Rustc 只提供 TraitDeclRef（在 Charon 术语中），当我们询问"如何证明这个 trait 被实现"时，如果 Rustc 能找到 impl 块，它会给我们。但对于类似 `T: Clone` 这样的约束（它成立是因为我们在 `fn foo<T: Clone>` 内部），Rustc 不会直接告诉我们这是一个 Clause，Hax 需要构建这些信息
+   > 5. **支持多态与单态模式**：对于同时支持多态和单态翻译的场景，Hax 的 FullDef 抽象能够统一处理两种模式的差异，简化实现
+   > 
+   > 值得注意的是，虽然理论上可以绕过 Hax 直接使用 Rustc，但这会带来显著的额外负担，包括需要自行处理所有 Rustc 查询的复杂性、应对接口变化，以及在单态化模式下处理 Hax 特有的 DefId（如不对应 Rustc 实体的单态化 DefId，直接用于 Rustc 查询会 panic）。因此实践中 Hax 是不可或缺的
    - `translate()` 函数：翻译主入口
    - 创建 `TranslateCtx` 上下文
    - 初始化并启动且负责整个翻译循环，详细描述见下文
@@ -130,8 +137,8 @@ fn run_charon(options: CliOpts) {
 
 // 回调: charon/src/bin/charon-driver/driver.rs
 impl Callbacks for CharonCallbacks {
-    fn after_analysis(&mut self, compiler: &Compiler) {
-        // Rustc 分析完成，MIR 可用
+    fn after_expansion(&mut self, compiler: &Compiler) {
+        // Rustc expansion 完成，MIR 可用
         let tcx = compiler.tcx();  // 获取类型上下文
         translate_crate::translate(tcx, options)  // ← 启动翻译
     }
@@ -1396,7 +1403,7 @@ cargo test          # 仅 Rust 单元测试
 **翻译入口路径**：
 1. `charon/main.rs:main` $\to$ 设置环境
 2. `charon-driver/main.rs:run_charon` $\to$ 调用 Rustc
-3. `driver.rs:after_analysis` $\to$ MIR 回调
+3. `driver.rs:after_expansion` $\to$ MIR 回调
 4. `translate_crate.rs:translate` $\to$ 翻译主循环
 5. `translate_items.rs:translate_item` $\to$ 分派具体项
 
