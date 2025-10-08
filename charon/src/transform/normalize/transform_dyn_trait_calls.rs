@@ -112,83 +112,10 @@ impl<'a> DynTraitCallTransformer<'a> {
             );
         };
 
-        // 2. Get correct generics for vtable ref from `dyn_self_ty`
-        //    The binder contains all target generics info.
-        let TyKind::DynTrait(DynPredicate { binder }) = dyn_self_ty.kind() else {
-            raise_error!(
-                self.ctx,
-                self.span,
-                "Expected dyn trait type for dyn method calling receiver, found {}",
-                dyn_self_ty.with_ctx(&self.ctx.into_fmt())
-            );
-        };
-
-        // 3. Prepare "basic part" of generics from trait ref (without associated types)
-        // The trait ref `dyn Trait<_dyn, Arg1, ..., ArgN>`, no associated types.
-        // First trait clause is the target one for vtable, guaranteed by `DynPredicate`.
-        let trait_ref = binder.params.trait_clauses[0].trait_.clone().erase();
-        // Type vars (except `_dyn`) are one level deeper, move out after removing `_dyn`.
-        trace!(
-            "Getting vtable ref with trait-decl-ref {}.",
-            trait_ref.with_ctx(&self.ctx.into_fmt())
-        );
-        let mut generics = trait_ref.generics.clone();
-        // Remove the first `_dyn` type argument
-        generics.types.remove_and_shift_ids(TypeVarId::ZERO);
-        // Move out of predicate binder for `_dyn`
-        generics = generics.move_from_under_binder().unwrap();
-
-        // 4. Prepare associated types part in same order as vtable's generics
-        // Utilise the vtable ref form:
-        // `{vtable}<TraitArg1, ..., SuperTrait::Assoc1, ..., Self::AssocN>`
-        //
-        // Use trait ID + assoc name (`Trait::AssocTy`) to uniquely identify
-        let assoc_tys = vtable_ref
-            .generics
-            .types
-            .iter()
-            .filter_map(|ty| {
-                if let TyKind::TraitType(tref, name) = &ty.kind() {
-                    Some((tref.trait_decl_ref.skip_binder.id, name.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        // Find correct type argument from dyn trait's constraints for each assoc type.
-        for (trait_id, assoc_name) in assoc_tys {
-            // Find it
-            let Some(assoc_ty) = binder.params.trait_type_constraints.iter().find_map(|c| {
-                let c = c.clone().erase();
-                if c.trait_ref.trait_decl_ref.skip_binder.id == trait_id
-                    && c.type_name == assoc_name
-                {
-                    // Move potentially bounded type out of `_dyn` binder
-                    Some(c.ty.clone().move_from_under_binder().unwrap())
-                } else {
-                    None
-                }
-            }) else {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Could not find associated type {}::{} for vtable of trait {} in dyn Trait type: {}",
-                    trait_id.with_ctx(&self.ctx.into_fmt()),
-                    assoc_name,
-                    trait_name,
-                    dyn_self_ty.with_ctx(&self.ctx.into_fmt())
-                );
-            };
-            // Push it
-            generics.types.push(assoc_ty);
-        }
-
-        // 5. Return vtable ref's ID with correct generics
-        Ok(TypeDeclRef {
-            id: vtable_ref.id,
-            generics,
-        })
+        let vtable_ref = vtable_ref
+            .clone()
+            .substitute_with_self(&trait_pred.generics, &trait_ref.kind);
+        Ok(vtable_ref)
     }
 
     /// Get the correct field index for a method in the vtable struct.
