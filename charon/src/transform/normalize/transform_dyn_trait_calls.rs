@@ -23,33 +23,10 @@
 use super::super::ctx::UllbcPass;
 use crate::{
     errors::Error, formatter::IntoFormatter, pretty::FmtWithCtx, raise_error, register_error,
-    transform::TransformCtx, ullbc_ast::*,
+    transform::{ctx::UllbcStatementTransformCtx, TransformCtx}, ullbc_ast::*,
 };
 
-/// Transformer for dynamic trait calls that holds common state and provides methods
-/// for the transformation operations.
-struct DynTraitCallTransformer<'a> {
-    ctx: &'a TransformCtx,
-    span: Span,
-    statements: &'a mut Vec<Statement>,
-    locals: &'a mut Locals,
-}
-
-impl<'a> DynTraitCallTransformer<'a> {
-    fn new(
-        ctx: &'a TransformCtx,
-        span: Span,
-        statements: &'a mut Vec<Statement>,
-        locals: &'a mut Locals,
-    ) -> Self {
-        Self {
-            ctx,
-            span,
-            statements,
-            locals,
-        }
-    }
-
+impl<'a> UllbcStatementTransformCtx<'a> {
     /// Detect if a call should be transformed to use vtable dispatch
     /// Returns the trait reference and method name for the dyn trait call if found
     fn detect_dyn_trait_call<'b>(&self, call: &'b Call) -> Option<(&'b TraitRef, &'b TraitItemName)> {
@@ -310,20 +287,11 @@ impl<'a> DynTraitCallTransformer<'a> {
 pub struct Transform;
 
 impl UllbcPass for Transform {
-    fn transform_body(&self, ctx: &mut TransformCtx, body: &mut ExprBody) {
-        for (block_id, block) in body.body.iter_mut_indexed() {
-            // Check terminator for calls
-            if let TerminatorKind::Call { call, .. } = &mut block.terminator.kind {
-                trace!("Found call in block {}: {:?}", block_id, call.func);
-                let span = block.terminator.span;
-                let mut transformer = DynTraitCallTransformer::new(
-                    ctx,
-                    span,
-                    &mut block.statements,
-                    &mut body.locals,
-                );
-                let _ = transformer.transform_dyn_trait_call(call);
+    fn transform_function(&self, ctx: &mut TransformCtx, decl: &mut FunDecl) {
+        decl.transform_ullbc_terminators(ctx, |ctx, term| {
+            if let TerminatorKind::Call { call, .. } = &mut term.kind {
+                let _ = ctx.transform_dyn_trait_call(call);
             }
-        }
+        });
     }
 }
