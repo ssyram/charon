@@ -219,62 +219,35 @@ pub struct TranslateCtx<'tcx> {
 
 This type is Charon's overall translation result storage. It continuously adds entities during the translation stage, is refined, then cleaned up during the transform stage before final output. From this we can glimpse the overall structure of (U)LLBC.
 
-**Definition Location**: `charon/src/ast/krate.rs` line 154
-
 ```rust
 pub struct TranslatedCrate {
     // Metadata
-    pub crate_name: String,
-    pub options: crate::options::CliOpts,
-    pub target_information: TargetInfo,
+    pub crate_name: String,                     // Crate name
+    pub options: crate::options::CliOpts,       // CLI options, take effect during the translating stage
+    pub target_information: TargetInfo,         // Target platform information, e.g., pointer size, endianness, etc.
     
     // Name mappings
-    pub item_names: HashMap<ItemId, Name>,
-    pub short_names: HashMap<ItemId, Name>,
+    pub item_names: HashMap<ItemId, Name>,      // Full names for all items (even failed translations)
+    pub short_names: HashMap<ItemId, Name>,     // Short names where the last PathElem is unique
     
-    // Core translation results
-    pub files: Vector<FileId, File>,
-    pub type_decls: Vector<TypeDeclId, TypeDecl>,
-    pub fun_decls: Vector<FunDeclId, FunDecl>,
-    pub global_decls: Vector<GlobalDeclId, GlobalDecl>,
-    pub trait_decls: Vector<TraitDeclId, TraitDecl>,
-    pub trait_impls: Vector<TraitImplId, TraitImpl>,
+    // Translation (temporary) results
+    pub files: Vector<FileId, File>,                        // Source files
+    pub type_decls: Vector<TypeDeclId, TypeDecl>,           // Type definitions (struct/enum/union)
+    pub fun_decls: Vector<FunDeclId, FunDecl>,              // Function definitions
+    pub global_decls: Vector<GlobalDeclId, GlobalDecl>,     // Global constants and static variables
+    pub trait_decls: Vector<TraitDeclId, TraitDecl>,        // Trait declarations
+    pub trait_impls: Vector<TraitImplId, TraitImpl>,        // Trait implementations
     
     // Special items
-    pub unit_metadata: Option<GlobalDeclRef>,
-    pub ordered_decls: Option<DeclarationsGroups>,
+    pub unit_metadata: Option<GlobalDeclRef>,               // `const UNIT: () = ();` for thin pointer/reference metadata
+    pub ordered_decls: Option<DeclarationsGroups>,          // Re-ordered declaration groups (initialized during transform stage)
 }
 ```
 
-**Field Explanations**:
-
-1. **Metadata Fields**:
-   - `crate_name`: The name of the translated crate
-   - `options`: CLI options used when calling Charon (for downstream tools to verify)
-   - `target_information`: Target platform information (pointer size, endianness, etc.)
-
-2. **Name Mappings**:
-   - `item_names`: Maps each `ItemId` to its full `Name` (available even for failed translations)
-   - `short_names`: Maps `ItemId` to short names where the last PathElem is unique
-   - Invariant: Any existing `ItemId` must have an associated name after translation
-
-3. **Core Translation Results** (using `Vector<Id, T>` for indexed storage):
-   - `files`: Translated source files information
-   - `type_decls`: Type definitions (struct/enum/union)
-   - `fun_decls`: Function definitions
-   - `global_decls`: Global constants and static variables
-   - `trait_decls`: Trait declarations
-   - `trait_impls`: Trait implementations
-
-4. **Special Items**:
-   - `unit_metadata`: A `const UNIT: () = ();` used for thin pointer/reference metadata
-   - `ordered_decls`: Re-ordered declaration groups (initialized during transform stage)
-
 **Key Design Points**:
 - Uses `Vector<Id, T>` (essentially `IndexVec<Id, Option<T>>`) to allow IDs to exist before their content is filled
-- Storage order doesn't guarantee dependencies are available when translating an item
+  When registering an item, it allocates an ID and reserves a slot in the vector (as `None`), then fills in the content after translation
 - `ItemId` enum unifies all item types: `Type | Fun | Global | TraitDecl | TraitImpl`
-- Supports both direct access via ID and iteration over all items
 
 
 ### 4.3 enqueue vs register Mechanism
@@ -284,7 +257,7 @@ pub struct TranslatedCrate {
 | Operation | Function | Register ID | Add to Queue | Use Case |
 |-----------|----------|-------------|--------------|----------|
 | enqueue | `register_and_enqueue` | ✓ | ✓ | Discover new dependencies that need translation |
-| register | `register_no_enqueue` | ✓ | ✗ | Only need ID reference, no content translation |
+| register | `register_no_enqueue` | ✓ | ✗ | Only need ID reference, no content translation (* may still be translated if enqueued in other places) |
 
 **register_and_enqueue** (`translate_crate.rs` around line 289):
 - Allocate or get ID
@@ -295,15 +268,6 @@ pub struct TranslatedCrate {
 - Only allocate or get ID
 - Don't add to translation queue
 - Used for opaque items or known existing items
-
-**Typical Call Scenarios**:
-```rust
-// Scenario 1: Encounter a call when translating a function
-let callee_id = ctx.register_and_enqueue(span, callee_src); // Need to translate the called function
-
-// Scenario 2: Reference an opaque external type
-let type_id = ctx.register_no_enqueue(span, type_src);  // Only need ID, don't translate content
-```
 
 ### 4.4 translate_item Dispatch
 
@@ -341,15 +305,15 @@ pub enum RustcItem {
 
 ### 4.5 The Dangerous Backdoor
 
-In fact, besides using `enqueue` to wait for subsequent processing in the loop of the `translate_crate::translate` function, there is a **very dangerous** backdoor shortcut: the `charon_driver::translate::translate_items::get_or_translate` function.
+In fact, besides using `enqueue` to wait for subsequent processing in the loop of the `translate_crate::translate` function, there is a **dangerous** backdoor shortcut: the `charon_driver::translate::translate_items::get_or_translate` function.
 
-This function will directly translate a given CharonId and return its **definition result**, rather than just registering and waiting for subsequent translation like `register_and_enqueue` does (which only returns the CharonID). The benefit is that you can **directly obtain the actual content of other definitions rather than just referencing their IDs** during the Translate stage.
+This function will directly translate a given CharonId and return its **definition result**, rather than just registering and waiting for subsequent translation like `register_and_enqueue` does (which only returns the CharonID). The benefit is that one can **directly obtain the actual content of other definitions rather than just referencing their IDs** during the Translate stage.
 
-However, this operation is **inherently very dangerous** because it can easily lead to circular translation in some code paths, triggering infinite recursion.
+However, this operation is **inherently dangerous** because it may somehow lead to circular translation in some code paths.
 
-Generally speaking, the correct approach should be to use `register_and_enqueue` to register and wait for subsequent translation, rather than directly calling `get_or_translate` for immediate translation. Also, if further translation is needed, it should be done as a pass in the transform stage after all translation is complete, rather than directly during the translate stage.
+Generally speaking, the recommended approach should be to use `register_and_enqueue` to register and wait for subsequent translation, rather than directly calling `get_or_translate` for immediate translation. Also, if further translation is needed, it should be done as a pass in the transform stage after all translation is complete, rather than directly during the translate stage.
 
-> For example, when calculating the metadata type of a type pointer, you should obtain the type's definition to know whether it's a DST and whether it has a metadata type. My design for this calculation is to place a Placeholder hint during the translate stage, then replace all PlaceHolders in a pass during the transform stage, rather than directly calling `get_or_translate` for translation during the translate stage.
+> For example, when calculating the metadata type of a type pointer, one should obtain the type's definition to know whether it's a DST and whether it has a metadata type. My design for this calculation is to place a Placeholder hint during the translate stage, then replace all PlaceHolders in a pass during the transform stage, rather than directly calling `get_or_translate` for translation during the translate stage.
 
 ## 5. In-Depth Analysis of the translate Module
 
