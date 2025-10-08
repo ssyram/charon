@@ -132,6 +132,7 @@ fn run_charon(options: CliOpts) {
     for pass in transformation_passes(&options) {
         pass.run(&mut ctx);
     }
+    // Potential error-handling
 }
 
 // Callback: charon/src/bin/charon-driver/driver.rs
@@ -163,7 +164,7 @@ The translation stage is the core of Charon's capabilities, responsible for conv
 
 ### 4.1 Translation Abstract Algorithm Description
 
-**Core Loop** (`translate_crate.rs` around line 674):
+**Core Loop** (`translate_crate.rs` around line 676 in function `translate`):
 ```rust
 while let Some(item_src) = ctx.items_to_translate.pop_first() {
     if ctx.processed.insert(item_src.clone()) {
