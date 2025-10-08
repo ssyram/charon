@@ -976,3 +976,578 @@ When processing `process`:
 2. Then collect `process<U>`
 3. Final GenericParams: `[T, U]`
 
+#### Detailed push_generics_for_def_without_parents
+
+**Location**: Same file, line 355
+
+```rust
+fn push_generics_for_def_without_parents(
+    &mut self,
+    _span: Span,
+    def: &hax::FullDef,
+    include_late_bound: bool,
+) -> Result<(), Error> {
+    // Lines 362-384: Handle ParamEnv (Early Bound parameters and predicates)
+    if let Some(param_env) = def.param_env() {
+        self.push_generic_params(&param_env.generics)?;
+        let origin = match &def.kind { ... };
+        self.register_predicates(&param_env.predicates, origin.clone())?;
+    }
+    
+    // Lines 386-403: Handle closure upvar lifetimes
+    if let hax::FullDefKind::Closure { args, .. } = def.kind()
+        && include_late_bound
+    { ... }
+    
+    // Lines 413-424: Handle Late Bound lifetimes
+    if let Some(signature) = signature
+        && include_late_bound
+    { ... }
+    
+    Ok(())
+}
+```
+
+**Execution Stages**:
+
+**Stage 1: Early Bound Parameter Collection (Lines 362-365)**
+```rust
+if let Some(param_env) = def.param_env() {
+    self.push_generic_params(&param_env.generics)?;
+    // ...
+}
+```
+- `param_env()`: Rustc's ParamEnv, contains Early Bound generics
+- `push_generic_params`: Iterate and add parameters
+
+**push_generic_params Implementation (Line 291)**:
+```rust
+pub(crate) fn push_generic_params(&mut self, generics: &hax::TyGenerics) -> Result<(), Error> {
+    for param in &generics.params {
+        self.push_generic_param(param)?;
+    }
+    Ok(())
+}
+```
+
+**push_generic_param Implementation (Lines 298-332)**:
+```rust
+pub(crate) fn push_generic_param(&mut self, param: &hax::GenericParamDef) -> Result<(), Error> {
+    match &param.kind {
+        hax::GenericParamDefKind::Lifetime => {
+            let region = hax::EarlyParamRegion {
+                index: param.index,
+                name: param.name.clone(),
+            };
+            let _ = self.innermost_binder_mut().push_early_region(region);
+        }
+        hax::GenericParamDefKind::Type { .. } => {
+            let _ = self
+                .innermost_binder_mut()
+                .push_type_var(param.index, param.name.clone());
+        }
+        hax::GenericParamDefKind::Const { ty, .. } => {
+            // Translate const type
+            let ty = self.translate_ty(span, ty)?;
+            match ty.kind().as_literal() {
+                Some(ty) => self.innermost_binder_mut().push_const_generic_var(
+                    param.index,
+                    *ty,
+                    param.name.clone(),
+                ),
+                None => raise_error!(...),
+            }
+        }
+    }
+    Ok(())
+}
+```
+
+**Parameter Addition Details**:
+- **Lifetime**: Call `push_early_region`
+  - Add to `params.regions`
+  - Record in `early_region_vars` mapping (Rust index → Charon RegionId)
+- **Type**: Call `push_type_var`
+  - Add to `params.types`
+  - Record in `type_vars_map`
+- **Const**: Call `push_const_generic_var`
+  - Must first translate type (must be literal type)
+  - Add to `params.const_generics`
+  - Record in `const_generic_vars_map`
+
+**Stage 2: Predicate Registration (Lines 366-383)**
+```rust
+let origin = match &def.kind {
+    FullDefKind::Adt { .. } | FullDefKind::TyAlias { .. } | FullDefKind::AssocTy { .. } 
+        => PredicateOrigin::WhereClauseOnType,
+    FullDefKind::Fn { .. } | FullDefKind::AssocFn { .. } | ...
+        => PredicateOrigin::WhereClauseOnFn,
+    FullDefKind::TraitImpl { .. } | FullDefKind::InherentImpl { .. } 
+        => PredicateOrigin::WhereClauseOnImpl,
+    FullDefKind::Trait { .. } | FullDefKind::TraitAlias { .. } 
+        => PredicateOrigin::WhereClauseOnTrait,
+    _ => panic!("Unexpected def: {def:?}"),
+};
+self.register_predicates(&param_env.predicates, origin.clone())?;
+```
+
+- **origin determination**: Determine predicate source based on item type
+- **register_predicates**: Translate and add predicates to `GenericParams`
+  - trait_clauses
+  - regions_outlive
+  - types_outlive
+  - trait_type_constraints
+
+**Stage 3: Closure upvar Lifetimes (Lines 386-403)**
+```rust
+if let hax::FullDefKind::Closure { args, .. } = def.kind()
+    && include_late_bound
+{
+    args.upvar_tys.iter().for_each(|ty| {
+        if matches!(
+            ty.kind(),
+            hax::TyKind::Ref(
+                hax::Region { kind: hax::RegionKind::ReErased },
+                ..
+            )
+        ) {
+            self.the_only_binder_mut().push_upvar_region();
+        }
+    });
+}
+```
+
+- **Special handling**: Closures' by-ref upvars introduce additional lifetimes
+- **Detection**: Look for upvars with type `&'erased T`
+- **Addition**: Call `push_upvar_region` to add anonymous lifetime
+
+**Stage 4: Late Bound Lifetimes (Lines 413-424)**
+```rust
+let signature = match &def.kind {
+    hax::FullDefKind::Fn { sig, .. } => Some(sig),
+    hax::FullDefKind::AssocFn { sig, .. } => Some(sig),
+    _ => None,
+};
+if let Some(signature) = signature
+    && include_late_bound
+{
+    let innermost_binder = self.innermost_binder_mut();
+    assert!(innermost_binder.bound_region_vars.is_empty());
+    innermost_binder.push_params_from_binder(signature.rebind(()))?;
+}
+```
+
+- **Applicable**: Only functions have Late Bound parameters
+- **Extraction**: Extract binder from function signature
+- **Addition**: `push_params_from_binder` iterates and adds
+- **Assertion**: Ensure `bound_region_vars` was previously empty (Late Bound added last)
+
+**push_params_from_binder Implementation (Line 120)**:
+```rust
+pub(crate) fn push_params_from_binder(&mut self, binder: hax::Binder<()>) -> Result<(), Error> {
+    assert!(
+        self.bound_region_vars.is_empty(),
+        "Trying to use two binders at the same binding level"
+    );
+    use hax::BoundVariableKind::*;
+    for p in binder.bound_vars {
+        match p {
+            Region(region) => {
+                self.push_bound_region(region);
+            }
+            Ty(_) => {
+                panic!("Unexpected locally bound type variable");
+            }
+    Ok(())
+}
+```
+
+#### Back to translate_def_generics
+
+**Line 441: Consistency Check**
+```rust
+self.innermost_binder_mut().params.check_consistency();
+```
+- **Purpose**: Verify internal consistency of GenericParams
+- **Checks**:
+  - Vector sizes match
+  - ID ordering is correct
+  - No duplicate references
+
+**Line 442: Success Return**
+```rust
+Ok(())
+```
+
+#### Complete Execution Example
+
+**Rust Code**:
+```rust
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+
+impl<T: Clone> Iterator for Vec<T> {
+    type Item = T;
+    fn next(&mut self) -> Option<T> { ... }
+}
+```
+
+**Execution Flow When Translating `Vec<T>::next`**:
+
+1. **translate_def_generics Entry**
+   - `binding_levels` initially empty
+   - Create top-level BindingLevel
+
+2. **push_generics_for_def**
+   - Detect parent: `impl<T: Clone> Iterator for Vec<T>`
+   - Recursive call to process impl block
+
+3. **Process impl Block Generics**
+   - `push_generic_params`: Add `T`
+   - `register_predicates`: Add `T: Clone`
+
+4. **Process next Method's Own Generics**
+   - ParamEnv: Empty (method has no own generics)
+   - Late Bound: Lifetime of `&mut self`
+
+5. **Final GenericParams**:
+```rust
+GenericParams {
+    regions: ['_next_lifetime],  // Late Bound
+    types: [T],                   // From impl block
+    const_generics: [],
+    trait_clauses: [T: Clone],    // From impl block
+    regions_outlive: [],
+    types_outlive: [],
+    trait_type_constraints: [],
+}
+```
+
+#### Key Design Decisions
+
+**1. Why Separate Early/Late Processing**
+- Early Bound: Known at compile time, needs monomorphization
+- Late Bound: Locally quantified, preserve binder structure
+- Separate processing ensures semantic correctness
+
+**2. Why Process Parent Generics First**
+- Ensure ordering: Parent parameters before child parameters
+- Match Rust semantics: Child items can reference parent generics
+- Simplify DeBruijn index calculation
+
+**3. Why Special Handling for Closure upvars**
+- Rust introduces implicit lifetimes for closures' by-ref upvars
+- These lifetimes are not in ParamEnv
+- Need to infer from upvar types
+
+**4. Why Consistency Check Needed**
+- Verify translation correctness
+- Catch errors early
+- Ensure GenericParams can be safely used
+
+#### Collaboration with Other Functions
+
+**Callers**:
+- `translate_function_signature`
+- `translate_type_decl`
+- `translate_trait_decl`
+- All translation functions that need generic environment
+
+**Callees**:
+- `push_generics_for_def`: Recursive collection
+- `push_generic_params`: Add parameters
+- `register_predicates`: Add predicates
+- `push_params_from_binder`: Add Late Bound
+
+**Subsequent Usage**:
+- Look up generic variables when translating types
+- Provide template when building `GenericArgs`
+- Extract `GenericParams` when generating AST
+
+This function is the cornerstone of Charon's generic system, ensuring all subsequent translation happens in the correct generic context.
+
+## 6. Transform Stage Overview
+
+**Purpose**: Structure cleanup and normalization, preparing clean LLBC for downstream tools
+
+**Pass Classification**:
+- **Normalize**: Normalize representation (e.g., `expand_associated_types`)
+- **Simplify**: Simplify structure (e.g., `remove_unit_locals`)
+- **Sanity**: Completeness checks (e.g., `check_generics`)
+
+**Execution Order** (`transform/mod.rs`):
+```
+INITIAL_CLEANUP_PASSES      // Initial cleanup
+  -> ULLBC_PASSES            // ULLBC-specific
+  -> ullbc_to_llbc           // Control flow reconstruction
+  -> LLBC_PASSES             // LLBC-specific
+  -> SHARED_FINALIZING_PASSES // Final cleanup
+  -> FINAL_CLEANUP_PASSES    // Completeness checks
+```
+
+**Key Pass Examples**:
+- `monomorphize`: Monomorphic instantiation
+- `reorder_decls`: Dependency graph ordering
+- `reconstruct_asserts`: Reconstruct assertions
+- `ops_to_function_calls`: Convert operators to function calls
+
+## 7. Build and Run
+
+### Basic Build
+```bash
+make build          # Release mode build (Rust + OCaml)
+make build-dev      # Debug mode build
+make test           # Run tests
+```
+
+### Usage Examples
+```bash
+# Generate LLBC for an entire Cargo project, analogous to cargo build
+../bin/charon cargo
+
+# Generate human-readable LLBC
+../bin/charon rustc --print-llbc -- file.rs
+
+# Generate JSON file
+../bin/charon rustc --dest-file output.llbc -- file.rs
+
+# Generate only ULLBC
+../bin/charon rustc --ullbc --dest-file output.ullbc -- file.rs
+```
+
+### Log Debugging
+```bash
+# Enable all trace logs
+RUST_LOG=trace ./bin/charon ...
+
+# Filter specific module
+RUST_LOG=charon::translate=debug ./bin/charon ...
+
+# Precise control
+RUST_LOG=charon::translate::translate_generics=trace ./bin/charon ...
+```
+
+## 8. Debugging and Printing
+
+### Using the trace! Macro
+```rust
+// Basic tracing
+trace!("Processing item: {item_id:?}");
+
+// Context-aware printing
+trace!("{}", item_ctx.with_ctx(&ctx.into_fmt()));
+```
+
+Note that because Charon stores IDs rather than concrete content, context information is needed for correct display when printing. The core context here refers to `TranslatedCrate`, which stores all ID-to-definition mappings. However, both `TranslateCtx` and `ItemTransCtx` implement corresponding trait methods and can call `into_fmt()` to be used as print context.
+
+## 9. charon-ml Overview
+
+**Purpose**: Generate AST type definitions and deserialization functions for OCaml downstream tools
+
+**Command**:
+```bash
+make generate-ml    # Regenerate charon-ml/src/generated/
+```
+
+**Mechanism Comparison**:
+- **Auto-generated**: `Generated_*.ml` - AST types + JSON parsers
+- **Hand-written**: `Print*.ml`, `NameMatcher.ml` - Utility functions
+
+**Steps to Modify AST**:
+1. Modify `charon/src/ast/*.rs`
+2. Run `make generate-ml`
+3. **Do not directly modify** files in `charon-ml/src/generated/`
+4. Manually adjust infrastructure like printing based on `make test` compilation needs
+5. If AST changes occurred, also adjust the version number in `charon/Cargo.toml` to notify downstream tools of AST version changes, and run `make test` to ensure version number changes sync to `charon-ml`
+
+## 10. Development Practices and Common Pitfalls
+
+### Must-Run Checks
+```bash
+make test           # Complete test suite
+cargo test          # Rust unit tests only
+```
+
+### Minimal Steps to Add a Pass
+1. Create `my_pass.rs` under `transform/`
+2. Implement `UllbcPass` or `LlbcPass` trait:
+   ```rust
+   pub struct MyPass;
+   impl UllbcPass for MyPass {
+       fn transform_body(&self, ctx: &mut TransformCtx, body: &mut ExprBody) {
+           // Implementation logic
+       }
+       fn name(&self) -> &str { "MyPass" }
+   }
+   ```
+3. Register in the appropriate array in `transform/mod.rs`
+4. Add test cases
+
+### Common Pitfalls and Solutions
+
+**Binding Level Errors**:
+- `DeBruijnIndex` calculation errors lead to variable lookup failures
+- Tips:
+    + Avoid using `skip_binder`; instead use `erased`, `move_under_binder()`, `move_from_under_binder()` and other intelligent handling functions
+    + Note that although `RegionBinder` only binds lifetimes, it still changes the DeBruijnIndex of other information like types and Clauses, so DeBruijnIndex must be calculated very carefully
+
+### Key Code Path Tracking
+
+**Translation Entry Path**:
+1. `charon/main.rs:main` → Set up environment
+2. `charon-driver/main.rs:run_charon` → Invoke Rustc
+3. `driver.rs:after_expansion` → MIR callback
+4. `translate_crate.rs:translate` → Main translation loop
+5. `translate_items.rs:translate_item` → Dispatch specific items
+
+**Error Handling**: All errors are collected into `ErrorCtx` via the `register_error!` macro
+
+
+## 11. Future Work: Complete Monomorphization Support
+
+### Overview
+
+Charon currently has framework-level support for monomorphization (via the `--monomorphize` flag), but two key limitations prevent full functionality:
+
+1. **Incorrect Trait Definition Monomorphization**: The current mechanism generates monomorphized trait definitions that don't conform to Rust semantics
+2. **Trait Objects Cannot Be Monomorphized**: `dyn Trait` types don't support monomorphization because associated types cannot be specified
+
+Both problems stem from the current **wholesale monomorphization** strategy using `ItemRef`, requiring a redesign of the monomorphization mechanism to correctly handle trait-related scenarios.
+
+### Problem 1: Incorrect Monomorphization of Trait Definitions
+
+#### Current Problem Manifestation
+
+**Current Implementation** (`translate/translate_crate.rs` line 406):
+```rust
+let item = if self.monomorphize() && item.has_param {
+    item.erase(&self.hax_state_with_id())  // Wholesale monomorphization
+} else {
+    item.clone()
+};
+```
+
+This approach directly monomorphizes `ItemRef`, **including trait definitions themselves**, leading to:
+
+**Error Scenario Example**:
+```rust
+// Rust source
+trait MyTrait<T> {
+    fn process(&self, x: T) -> T;
+}
+
+impl MyTrait<i32> for i32 { }
+impl MyTrait<i32> for bool { }
+```
+
+**Current Charon Output (Incorrect)**:
+Not only trait impls are output, but also two monomorphized trait **definitions**:
+> Note: In (U)LLBC, `T : Trait<...>` is represented as `Trait::<T, ...>` where `...` are other generic parameters of `Trait`.
+```rust
+// Full name: test::MyTrait::<i32, i32>
+trait MyTrait::<i32, i32>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<i32>
+    parent_clause1 : [@TraitClause1]: Sized::<i32>
+    fn process<'_0> = test::MyTrait::process::<i32, i32><'_0_0>
+    vtable: test::MyTrait::{vtable}::<i32, i32>
+}
+
+// Full name: test::MyTrait::<bool, i32>
+trait MyTrait::<bool, i32>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized::<bool>
+    parent_clause1 : [@TraitClause1]: Sized::<i32>
+    fn process<'_0> = test::MyTrait::process::<bool, i32><'_0_0>
+    vtable: test::MyTrait::{vtable}::<bool, i32>
+}
+```
+
+**Problem Analysis**:
+- In Rust semantics, there's only one trait **definition**, the Self implementation parameter should be preserved
+- Trait **implementations** (impl) are what get monomorphized for specific types
+
+**Expected Charon Output**:
+```rust
+// Full name: test::MyTrait::<i32>
+trait MyTrait::<i32> <Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    parent_clause1 : [@TraitClause1]: Sized<i32>
+    fn process<'_0> = test::MyTrait::process<'_0_0, Self, i32>[Self]
+    vtable: test::MyTrait::{vtable}::<i32>
+}
+```
+
+**Key Principles**:
+- `Self` parameter: **Always preserved**, because a trait can be implemented by multiple types
+- Other generic parameters: **Should be monomorphized**, generating one trait **definition** per parameter value set
+
+#### Specific Problem Root Cause and Solution
+
+The current monomorphized translation's `RustcItem` directly passes the **entire** `ItemRef` to Hax, and Hax directly replaces generic parameters with concrete parameters from `ItemRef` when translating **all** items. However, this **should not** include the `Self` parameter. In other words, the generated `hax::FullDef` should not contain the concrete type of `Self`. But this may cause different `RustcItem::Mono(ItemRef)` to point to the same `hax::FullDef`, resulting in different `TraitId` for the same definition. This also requires Charon cooperation to avoid overlap. An imaginable solution is to replace the first parameter with a fixed Placeholder when translating `TraitDecl` referenced by `ItemRef`, so it won't duplicate during `enqueue`, and Hax needs to translate `Self` instead of directly replacing it.
+
+
+### Problem 2: Trait Objects Cannot Be Monomorphized
+
+#### Current Problem Manifestation
+
+**Trait object syntax**:
+```rust
+trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+}
+
+// Trait objects must explicitly specify all associated types
+let iter: Box<dyn Iterator<Item = i32>> = ...;
+```
+
+**Key Requirement**: `dyn Trait` must **explicitly specify all associated types**
+
+**Current hax::ItemRef Limitation**:
+In Hax, the `ItemRef` structure cannot express associated type bindings, defined as follows:
+```rust
+/// Contents of `ItemRef`.
+#[derive_group(Serializers)]
+#[derive(Clone, Debug, JsonSchema, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ItemRefContents {
+    /// The item being refered to.
+    pub def_id: DefId,
+    /// The generics passed to the item. If `in_trait` is `Some`, these are only the generics of
+    /// the method/type/const itself; generics for the traits are available in
+    /// `in_trait.unwrap().trait`.
+    pub generic_args: Vec<GenericArg>,
+    /// Witnesses of the trait clauses required by the item, e.g. `T: Sized` for `Option<T>` or `B:
+    /// ToOwned` for `Cow<'a, B>`. Same as above, for associated items this only includes clauses
+    /// for the item itself.
+    pub impl_exprs: Vec<ImplExpr>,
+    /// If we're referring to a trait associated item, this gives the trait clause/impl we're
+    /// referring to.
+    pub in_trait: Option<ImplExpr>,
+    /// Whether this contains any reference to a type/lifetime/const parameter.
+    pub has_param: bool,
+    /// Whether this contains any reference to a type/const parameter.
+    pub has_non_lt_param: bool,
+}
+```
+
+Thus, we cannot express syntax like `dyn Trait<AssocTy=T>`. This requires extending the `ItemRef` structure on the Hax side to support associated type bindings.
+
+## Appendix
+
+| English Term | Chinese Translation | Context Example |
+|--------------|---------------------|-----------------|
+| binder | 绑定器 - Syntax structure that introduces variables | `for<'a>`, `Binder<T>` |
+| early bound | 早期绑定 - Determined at compile time | Type parameter `<T>` |
+| late bound | 晚期绑定 - Local scope | Lifetime `for<'a>` |
+| monomorphization | 单态化 - Generic instantiation | `Vec<u32>` |
+| substitution | 替换 - Parameter to argument mapping | `T` → `u32` |
+| instantiation | 实例化 - Creating concrete instances | Generic → Concrete type |
+| visitor | 访问器 - AST traversal pattern | `Drive`, `DriveMut` |
+| pass | 变换步骤 - Transform stage unit | `UllbcPass` |
+| DeBruijn index | 德布勒恩索引 - Nested binding count | `Bound(1, var)` |
+| enqueue | 入队 - Add to translation queue | `register_and_enqueue` |
+| register | 注册 - Allocate ID | `register_no_enqueue` |
