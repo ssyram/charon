@@ -404,10 +404,8 @@ impl<'a> DynTraitCallTransformer<'a> {
         let (vtable_place, method_ptr_place) = self.create_vtable_locals(&vtable_ref, &field_ty);
 
         // Extract vtable pointer
-        self.statements.push(self.generate_vtable_extraction(
-            &vtable_place,
-            &dyn_trait_place,
-        ));
+        self.statements
+            .push(self.generate_vtable_extraction(&vtable_place, &dyn_trait_place));
 
         // Extract method pointer from vtable
         self.statements
