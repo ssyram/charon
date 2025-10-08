@@ -158,20 +158,8 @@ impl<'a> UllbcStatementTransformCtx<'a> {
             RefKind::Shared,
         ));
 
-        let vtable_place = self.locals.new_var(None, vtable_ty);
-        // push the storage-live statements for the new locals
-        self.statements.push(Statement {
-            span: self.span,
-            kind: StatementKind::StorageLive(vtable_place.as_local().unwrap()),
-            comments_before: vec![],
-        });
-
-        let method_ptr_place = self.locals.new_var(None, method_ptr_ty.clone());
-        self.statements.push(Statement {
-            span: self.span,
-            kind: StatementKind::StorageLive(method_ptr_place.as_local().unwrap()),
-            comments_before: vec![],
-        });
+        let vtable_place = self.fresh_var(None, vtable_ty);
+        let method_ptr_place = self.fresh_var(None, method_ptr_ty.clone());
 
         (vtable_place, method_ptr_place)
     }
