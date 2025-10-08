@@ -72,7 +72,7 @@ impl<'a> DynTraitCallTransformer<'a> {
     /// Matches associated types from the vtable's generics with the dyn trait's constraints.
     ///
     /// Rustc guarantees all associated types are specified in a `dyn Trait` type.
-    fn get_vtable_ref(&self, trait_ref: &TraitRef, dyn_self_ty: &Ty) -> Result<TypeDeclRef, Error> {
+    fn get_vtable_ref(&self, trait_ref: &TraitRef) -> Result<TypeDeclRef, Error> {
         // Get vtable_ref's ID with trait-ref's generics from dyn-self applied.
         // Add associated types in correct order following the vtable's generics.
 
@@ -111,7 +111,8 @@ impl<'a> DynTraitCallTransformer<'a> {
                 trait_name
             );
         };
-
+        
+        let trait_pred = trait_ref.trait_decl_ref.clone().erase();
         let vtable_ref = vtable_ref
             .clone()
             .substitute_with_self(&trait_pred.generics, &trait_ref.kind);
@@ -252,46 +253,6 @@ impl<'a> DynTraitCallTransformer<'a> {
         }
     }
 
-    /// The receiver type can be one of the following (as per Rustc):
-    /// - `&[mut] dyn Trait`
-    /// - `*[mut] dyn Trait`
-    /// - `Box<dyn Trait>`
-    /// - `Rc<dyn Trait>`
-    /// - `Arc<dyn Trait>`
-    /// - `Pin<T>` where `T` is one of the above
-    ///
-    /// See: https://doc.rust-lang.org/reference/items/traits.html#dyn-compatibility
-    /// for more details.
-    ///
-    /// This function gets the internal `dyn Trait` out
-    fn unpack_dyn_trait_ty(&self, ty: &Ty) -> Result<Ty, Error> {
-        match ty.kind() {
-            TyKind::Ref(_, inner_ty, _) => self.unpack_dyn_trait_ty(inner_ty),
-            TyKind::RawPtr(inner_ty, _) => self.unpack_dyn_trait_ty(inner_ty),
-            TyKind::Adt(type_decl_ref) => {
-                let generics = &type_decl_ref.generics;
-                if !generics.types.is_empty() {
-                    let first_arg = generics.types.get(TypeVarId::new(0)).unwrap();
-                    self.unpack_dyn_trait_ty(first_arg)
-                } else {
-                    raise_error!(
-                        self.ctx,
-                        self.span,
-                        "Expected dyn trait type for dyn method calling receiver, found {}",
-                        ty.with_ctx(&self.ctx.into_fmt())
-                    );
-                }
-            }
-            TyKind::DynTrait(_) => Ok(ty.clone()),
-            _ => raise_error!(
-                self.ctx,
-                self.span,
-                "Expected dyn trait type for dyn method calling receiver, found {}",
-                ty.with_ctx(&self.ctx.into_fmt())
-            ),
-        }
-    }
-
     fn fun_ty_from_call(&self, call: &Call) -> Result<Ty, Error> {
         let input = call.args.iter().map(|arg| arg.ty().clone()).collect();
         let output = call.dest.ty().clone();
@@ -317,10 +278,8 @@ impl<'a> DynTraitCallTransformer<'a> {
                 panic!("Unexpected constant as dyn trait receiver");
             }
         };
-        let receiver_ty = dyn_trait_place.ty().clone();
-        let dyn_self_ty = self.unpack_dyn_trait_ty(&receiver_ty)?;
 
-        let vtable_ref = self.get_vtable_ref(&trait_ref, &dyn_self_ty)?;
+        let vtable_ref = self.get_vtable_ref(&trait_ref)?;
 
         // 3. Get the correct field index & type for the method
         let field_id = self.get_method_field_id(&vtable_ref, &method_name)?;
