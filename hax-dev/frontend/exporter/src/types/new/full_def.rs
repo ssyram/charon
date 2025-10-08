@@ -339,6 +339,11 @@ pub enum FullDefKind<Body> {
     Closure {
         args: ClosureArgs,
         is_const: bool,
+        /// The function signature when this closure's method is used in a vtable. `None` if the
+        /// method is not vtable safe. `Some(sig)` if it is vtable safe, where `sig` is the trait
+        /// method declaration's signature with `Self` replaced by `dyn Trait` and associated types
+        /// normalized.
+        vtable_sig: Option<PolyFnSig>,
         /// Info required to construct a virtual `FnOnce` impl for this closure.
         fn_once_impl: Box<VirtualTraitImpl>,
         /// Info required to construct a virtual `FnMut` impl for this closure.
@@ -486,6 +491,50 @@ fn gen_vtable_sig<'tcx>(
 
     // Instantiate and normalize the signature.
     let method_decl_sig = tcx.fn_sig(method_decl_id).instantiate(tcx, trait_args);
+    let normalized_sig = normalize(tcx, s.typing_env(), method_decl_sig);
+
+    Some(normalized_sig.sinto(s))
+}
+
+#[cfg(feature = "rustc")]
+fn gen_closure_vtable_sig<'tcx>(
+    s: &impl UnderOwnerState<'tcx>,
+    _closure_ty: rustc_middle::ty::Ty<'tcx>,
+    trait_ref: ty::TraitRef<'tcx>,
+) -> Option<PolyFnSig> {
+    let tcx = s.base().tcx;
+    let trait_id = trait_ref.def_id;
+    
+    // Get the call method from the Fn/FnMut/FnOnce trait
+    let method_def_id = tcx
+        .associated_items(trait_id)
+        .in_definition_order()
+        .find(|item| matches!(item.kind, ty::AssocKind::Fn { .. }))?
+        .def_id;
+    
+    let decl_assoc_item = tcx.associated_item(method_def_id);
+    if !rustc_trait_selection::traits::is_vtable_safe_method(tcx, trait_id, decl_assoc_item) {
+        return None;
+    }
+
+    // Compute dyn_self for this closure's trait impl
+    let dyn_self = dyn_self_ty(tcx, s.typing_env(), trait_ref)?;
+
+    // dyn_self is of form `dyn Trait<Args...>`, we extract the trait args
+    let ty::Dynamic(preds, _, _) = dyn_self.kind() else {
+        return None;
+    };
+    let ty::ExistentialPredicate::Trait(existential_trait_ref) = preds[0].skip_binder() else {
+        return None;
+    };
+
+    // Build a full list of args for the trait: dyn_self + trait args
+    let mut full_args = vec![ty::GenericArg::from(dyn_self)];
+    full_args.extend(existential_trait_ref.args.iter());
+    let trait_args = tcx.mk_args(&full_args);
+
+    // Instantiate and normalize the signature.
+    let method_decl_sig = tcx.fn_sig(method_def_id).instantiate(tcx, trait_args);
     let normalized_sig = normalize(tcx, s.typing_env(), method_decl_sig);
 
     Some(normalized_sig.sinto(s))
@@ -762,9 +811,23 @@ where
             let fn_mut_trait = tcx.lang_items().fn_mut_trait().unwrap();
             let fn_trait = tcx.lang_items().fn_trait().unwrap();
             let drop_trait = tcx.lang_items().drop_trait().unwrap();
+            
+            // Determine the appropriate trait for vtable_sig based on closure kind
+            // FnOnce is not dyn-compatible, so we use FnMut or Fn when available
+            let vtable_trait_ref = match closure.kind() {
+                ty::ClosureKind::Fn => Some(ty::TraitRef::new(tcx, fn_trait, trait_args)),
+                ty::ClosureKind::FnMut => Some(ty::TraitRef::new(tcx, fn_mut_trait, trait_args)),
+                ty::ClosureKind::FnOnce => None, // FnOnce is not dyn-compatible
+            };
+            
+            let vtable_sig = vtable_trait_ref.and_then(|trait_ref| {
+                gen_closure_vtable_sig(s, closure_ty, trait_ref)
+            });
+            
             FullDefKind::Closure {
                 is_const: tcx.constness(def_id) == rustc_hir::Constness::Const,
                 args: ClosureArgs::sfrom(s, def_id, closure),
+                vtable_sig,
                 once_shim: get_closure_once_shim(s, closure_ty),
                 drop_glue: get_drop_glue_shim(s, args),
                 drop_impl: virtual_impl_for(
