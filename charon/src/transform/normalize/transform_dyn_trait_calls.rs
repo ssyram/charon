@@ -22,14 +22,24 @@
 
 use super::super::ctx::UllbcPass;
 use crate::{
-    errors::Error, formatter::IntoFormatter, pretty::FmtWithCtx, raise_error, register_error,
-    transform::{ctx::{BodyTransformCtx, UllbcStatementTransformCtx}, TransformCtx}, ullbc_ast::*,
+    errors::Error,
+    formatter::IntoFormatter,
+    pretty::FmtWithCtx,
+    raise_error, register_error,
+    transform::{
+        TransformCtx,
+        ctx::{BodyTransformCtx, UllbcStatementTransformCtx},
+    },
+    ullbc_ast::*,
 };
 
 impl<'a> UllbcStatementTransformCtx<'a> {
     /// Detect if a call should be transformed to use vtable dispatch
     /// Returns the trait reference and method name for the dyn trait call if found
-    fn detect_dyn_trait_call<'b>(&self, call: &'b Call) -> Option<(&'b TraitRef, &'b TraitItemName)> {
+    fn detect_dyn_trait_call<'b>(
+        &self,
+        call: &'b Call,
+    ) -> Option<(&'b TraitRef, &'b TraitItemName)> {
         // Check if this is a regular function call
         let FnOperand::Regular(fn_ptr) = &call.func else {
             return None; // Not a regular function call
@@ -87,7 +97,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
                 trait_name
             );
         };
-        
+
         let trait_pred = trait_ref.trait_decl_ref.clone().erase();
         let vtable_ref = vtable_ref
             .clone()
@@ -162,15 +172,14 @@ impl<'a> UllbcStatementTransformCtx<'a> {
     }
 
     /// Generate the statement that extracts the vtable pointer from the dyn trait object
-    fn insert_vtable_extraction(
-        &mut self,
-        vtable_place: &Place,
-        dyn_trait_place: &Place,
-    ) {
+    fn insert_vtable_extraction(&mut self, vtable_place: &Place, dyn_trait_place: &Place) {
         let ptr_metadata_place = dyn_trait_place
             .clone()
             .project(ProjectionElem::PtrMetadata, vtable_place.ty().clone());
-        self.insert_assn_stmt(vtable_place.clone(), Rvalue::Use(Operand::Copy(ptr_metadata_place)));
+        self.insert_assn_stmt(
+            vtable_place.clone(),
+            Rvalue::Use(Operand::Copy(ptr_metadata_place)),
+        );
     }
 
     /// Generate the statement that extracts the method pointer from the vtable
@@ -182,22 +191,31 @@ impl<'a> UllbcStatementTransformCtx<'a> {
     ) {
         let vtable_deref_ty = match vtable_place.ty().kind() {
             TyKind::RawPtr(inner_ty, _) | TyKind::Ref(_, inner_ty, _) => inner_ty.clone(),
-            _ => panic!("Expected pointer / reference type for the vtable place, got: {}", vtable_place.ty().with_ctx(&self.ctx.into_fmt())),
+            _ => panic!(
+                "Expected pointer / reference type for the vtable place, got: {}",
+                vtable_place.ty().with_ctx(&self.ctx.into_fmt())
+            ),
         };
 
         let vtable_def_id = match vtable_deref_ty.kind() {
             TyKind::Adt(adt_ref) => match adt_ref.id {
                 TypeId::Adt(def_id) => def_id,
-                _ => panic!("Expected ADT type ID for the vtable struct, got: {}", adt_ref.id.with_ctx(&self.ctx.into_fmt())),
+                _ => panic!(
+                    "Expected ADT type ID for the vtable struct, got: {}",
+                    adt_ref.id.with_ctx(&self.ctx.into_fmt())
+                ),
             },
-            _ => panic!("Expected ADT type for the vtable struct, got: {}", vtable_deref_ty.with_ctx(&self.ctx.into_fmt())),
+            _ => panic!(
+                "Expected ADT type for the vtable struct, got: {}",
+                vtable_deref_ty.with_ctx(&self.ctx.into_fmt())
+            ),
         };
 
         // Create vtable dereference: *vtable
         let vtable_deref_place = Place {
             kind: PlaceKind::Projection(Box::new(vtable_place.clone()), ProjectionElem::Deref),
             ty: vtable_deref_ty,
-        }; 
+        };
 
         // Create method field projection: (*vtable).method_field
         let method_field_place = Place {
@@ -256,11 +274,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
         self.insert_vtable_extraction(&vtable_place, &dyn_trait_place);
 
         // Extract method pointer from vtable
-        self.insert_method_pointer_extraction(
-            &method_ptr_place,
-            &vtable_place,
-            field_id,
-        );
+        self.insert_method_pointer_extraction(&method_ptr_place, &vtable_place, field_id);
 
         // 6. Transform the original call to use the function pointer
         call.func = FnOperand::Move(method_ptr_place);
