@@ -23,7 +23,7 @@
 use super::super::ctx::UllbcPass;
 use crate::{
     errors::Error, formatter::IntoFormatter, pretty::FmtWithCtx, raise_error, register_error,
-    transform::{ctx::UllbcStatementTransformCtx, TransformCtx}, ullbc_ast::*,
+    transform::{ctx::{BodyTransformCtx, UllbcStatementTransformCtx}, TransformCtx}, ullbc_ast::*,
 };
 
 impl<'a> UllbcStatementTransformCtx<'a> {
@@ -79,7 +79,6 @@ impl<'a> UllbcStatementTransformCtx<'a> {
         };
 
         // Get vtable ref from definition for correct ID.
-        // Generics in vtable ref are placeholders but provide correct order of the associated types.
         let Some(vtable_ref) = &trait_decl.vtable else {
             raise_error!(
                 self.ctx,
@@ -145,13 +144,11 @@ impl<'a> UllbcStatementTransformCtx<'a> {
     }
 
     /// Create local variables needed for vtable dispatch
-    /// TODO: use the vtable ref to create the correct types
     fn create_vtable_locals(
         &mut self,
         vtable_ref: &TypeDeclRef,
         method_ptr_ty: &Ty,
     ) -> (Place, Place) {
-        // Create vtable type - for now use a raw pointer as placeholder
         // In complete implementation this would be the actual vtable struct type
         let vtable_ty = Ty::new(TyKind::RawPtr(
             Ty::new(TyKind::Adt(vtable_ref.clone())),
@@ -165,57 +162,59 @@ impl<'a> UllbcStatementTransformCtx<'a> {
     }
 
     /// Generate the statement that extracts the vtable pointer from the dyn trait object
-    fn generate_vtable_extraction(
-        &self,
+    fn insert_vtable_extraction(
+        &mut self,
         vtable_place: &Place,
         dyn_trait_place: &Place,
-    ) -> Statement {
+    ) {
         let ptr_metadata_place = dyn_trait_place
             .clone()
             .project(ProjectionElem::PtrMetadata, vtable_place.ty().clone());
-        Statement {
-            span: self.span,
-            kind: StatementKind::Assign(
-                vtable_place.clone(),
-                Rvalue::Use(Operand::Copy(ptr_metadata_place)),
-            ),
-            comments_before: vec!["Extract vtable pointer from dyn trait object".to_string()],
-        }
+        self.insert_assn_stmt(vtable_place.clone(), Rvalue::Use(Operand::Copy(ptr_metadata_place)));
     }
 
     /// Generate the statement that extracts the method pointer from the vtable
-    fn generate_method_pointer_extraction(
-        &self,
+    fn insert_method_pointer_extraction(
+        &mut self,
         method_ptr_place: &Place,
         vtable_place: &Place,
         field_id: FieldId,
-    ) -> Statement {
+    ) {
+        let vtable_deref_ty = match vtable_place.ty().kind() {
+            TyKind::RawPtr(inner_ty, _) | TyKind::Ref(_, inner_ty, _) => inner_ty.clone(),
+            _ => panic!("Expected pointer / reference type for the vtable place, got: {}", vtable_place.ty().with_ctx(&self.ctx.into_fmt())),
+        };
+
+        let vtable_def_id = match vtable_deref_ty.kind() {
+            TyKind::Adt(adt_ref) => match adt_ref.id {
+                TypeId::Adt(def_id) => def_id,
+                _ => panic!("Expected ADT type ID for the vtable struct, got: {}", adt_ref.id.with_ctx(&self.ctx.into_fmt())),
+            },
+            _ => panic!("Expected ADT type for the vtable struct, got: {}", vtable_deref_ty.with_ctx(&self.ctx.into_fmt())),
+        };
+
         // Create vtable dereference: *vtable
         let vtable_deref_place = Place {
             kind: PlaceKind::Projection(Box::new(vtable_place.clone()), ProjectionElem::Deref),
-            ty: Ty::mk_unit(), // placeholder type
-        };
+            ty: vtable_deref_ty,
+        }; 
 
         // Create method field projection: (*vtable).method_field
         let method_field_place = Place {
             kind: PlaceKind::Projection(
                 Box::new(vtable_deref_place),
                 ProjectionElem::Field(
-                    FieldProjKind::Adt(TypeDeclId::new(0), None), // Placeholder vtable type ID
+                    FieldProjKind::Adt(vtable_def_id, None), // Placeholder vtable type ID
                     field_id,
                 ),
             ),
             ty: method_ptr_place.ty.clone(),
         };
 
-        Statement {
-            span: self.span,
-            kind: StatementKind::Assign(
-                method_ptr_place.clone(),
-                Rvalue::Use(Operand::Copy(method_field_place)),
-            ),
-            comments_before: vec!["Get method pointer from vtable".to_string()],
-        }
+        self.insert_assn_stmt(
+            method_ptr_place.clone(),
+            Rvalue::Use(Operand::Copy(method_field_place)),
+        );
     }
 
     fn fun_ty_from_call(&self, call: &Call) -> Result<Ty, Error> {
@@ -254,16 +253,14 @@ impl<'a> UllbcStatementTransformCtx<'a> {
         let (vtable_place, method_ptr_place) = self.create_vtable_locals(&vtable_ref, &field_ty);
 
         // Extract vtable pointer
-        self.statements
-            .push(self.generate_vtable_extraction(&vtable_place, &dyn_trait_place));
+        self.insert_vtable_extraction(&vtable_place, &dyn_trait_place);
 
         // Extract method pointer from vtable
-        self.statements
-            .push(self.generate_method_pointer_extraction(
-                &method_ptr_place,
-                &vtable_place,
-                field_id,
-            ));
+        self.insert_method_pointer_extraction(
+            &method_ptr_place,
+            &vtable_place,
+            field_id,
+        );
 
         // 6. Transform the original call to use the function pointer
         call.func = FnOperand::Move(method_ptr_place);
