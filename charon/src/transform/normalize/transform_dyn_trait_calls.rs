@@ -56,14 +56,9 @@ impl<'a> UllbcStatementTransformCtx<'a> {
     }
 
     /// Get the vtable declaration reference with current generics applied.
-    /// Matches associated types from the vtable's generics with the dyn trait's constraints.
-    ///
-    /// Rustc guarantees all associated types are specified in a `dyn Trait` type.
+    /// The associated types are resolved in the next pass.
     fn get_vtable_ref(&self, trait_ref: &TraitRef) -> Result<TypeDeclRef, Error> {
-        // Get vtable_ref's ID with trait-ref's generics from dyn-self applied.
-        // Add associated types in correct order following the vtable's generics.
-
-        // 0. Prepare trait name for debug/error messages
+        // Prepare trait name for debug/error messages
         let trait_name = trait_ref
             .trait_decl_ref
             .skip_binder
@@ -71,9 +66,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
             .with_ctx(&self.ctx.into_fmt())
             .to_string();
 
-        // 1. Get vtable ref from trait declaration
-        //    Provides: 1) final return ID, 2) correct order of associated types
-        // Firstly, get the trait declaration for the vtable ref it stores.
+        // Get the trait declaration by its ID
         let Some(trait_decl) = self
             .ctx
             .translated
