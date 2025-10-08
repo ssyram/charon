@@ -1163,17 +1163,28 @@ impl ItemTransCtx<'_, '_> {
         let span = item_meta.span;
         self.check_no_monomorphize(span)?;
 
-        let hax::FullDefKind::AssocFn {
-            vtable_sig: Some(vtable_sig),
-            sig: target_signature,
-            ..
-        } = impl_func_def.kind()
-        else {
-            raise_error!(
-                self,
-                span,
-                "Trying to generate a vtable shim for a non-vtable-safe method"
-            );
+        // Extract vtable_sig and target_signature from either AssocFn or Closure
+        let (vtable_sig, target_signature) = match impl_func_def.kind() {
+            hax::FullDefKind::AssocFn {
+                vtable_sig: Some(vtable_sig),
+                sig: target_signature,
+                ..
+            } => (vtable_sig.clone(), target_signature.clone()),
+            hax::FullDefKind::Closure {
+                vtable_sig: Some(vtable_sig),
+                args,
+                ..
+            } => {
+                // For closures, the target signature is the closure's fn_sig
+                (vtable_sig.clone(), args.fn_sig.clone())
+            }
+            _ => {
+                raise_error!(
+                    self,
+                    span,
+                    "Trying to generate a vtable shim for a non-vtable-safe method"
+                );
+            }
         };
 
         // Replace to get the true signature of the shim function.
@@ -1181,10 +1192,16 @@ impl ItemTransCtx<'_, '_> {
         // TODO: this is a hack.
         let shim_func_def = {
             let mut def = impl_func_def.clone();
-            let hax::FullDefKind::AssocFn { sig, .. } = &mut def.kind else {
-                unreachable!()
-            };
-            *sig = vtable_sig.clone();
+            match &mut def.kind {
+                hax::FullDefKind::AssocFn { sig, .. } => {
+                    *sig = vtable_sig.clone();
+                }
+                hax::FullDefKind::Closure { args, .. } => {
+                    // For closures, we need to update the fn_sig to be the vtable_sig
+                    args.fn_sig = vtable_sig.clone();
+                }
+                _ => unreachable!(),
+            }
             def
         };
 
