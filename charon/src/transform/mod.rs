@@ -109,13 +109,13 @@ pub static INITIAL_CLEANUP_PASSES: &[Pass] = &[
     // directly instead of going via a `TraitRef`. This is done before `reorder_decls` to remove
     // some sources of mutual recursion.
     UnstructuredBody(&normalize::skip_trait_refs_when_known::Transform),
+    // Transform dyn trait method calls to vtable function pointer calls
+    // This should be early to handle the calls before other transformations
+    UnstructuredBody(&normalize::transform_dyn_trait_calls::Transform),
 ];
 
 /// Body cleanup passes on the ullbc.
 pub static ULLBC_PASSES: &[Pass] = &[
-    // Transform dyn trait method calls to vtable function pointer calls
-    // This should be early to handle the calls before other transformations
-    UnstructuredBody(&normalize::transform_dyn_trait_calls::Transform),
     // Inline promoted consts into their parent bodies.
     UnstructuredBody(&simplify_output::inline_promoted_consts::Transform),
     // # Micro-pass: merge single-origin gotos into their parent. This drastically reduces the

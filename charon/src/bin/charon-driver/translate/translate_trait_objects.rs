@@ -297,21 +297,14 @@ impl ItemTransCtx<'_, '_> {
         mk_field("size".into(), usize_ty());
         // Field: `align: usize`
         mk_field("align".into(), usize_ty());
-        // Field: `drop: fn<'0>(&'0 mut Self)` -- `Self` is just a placeholder, will be dynified below.
+        // Field: `drop: fn(*mut Self)` -- `Self` is just a placeholder, will be dynified below.
         mk_field("drop".into(), {
             let self_ty = TyKind::TypeVar(DeBruijnVar::new_at_zero(TypeVarId::ZERO)).into_ty();
-            let self_ptr = TyKind::Ref(
-                Region::Var(DeBruijnVar::new_at_zero(RegionId::ZERO)),
-                self_ty.move_under_binder(),
-                RefKind::Mut,
-            )
-            .into_ty();
-            let mut regions = Vector::new();
-            regions.push_with(|index| RegionParam { index, name: None });
-            Ty::new(TyKind::FnPtr(RegionBinder {
-                regions,
-                skip_binder: ([self_ptr].into(), Ty::mk_unit()),
-            }))
+            let self_ptr = TyKind::RawPtr(self_ty, RefKind::Mut).into_ty();
+            Ty::new(TyKind::FnPtr(RegionBinder::empty((
+                [self_ptr].into(),
+                Ty::mk_unit(),
+            ))))
         });
 
         // Add the method pointers (trait aliases don't have methods).
@@ -348,7 +341,7 @@ impl ItemTransCtx<'_, '_> {
     /// struct TraitVTable<TraitArgs.., AssocTys..> {
     ///   size: usize,
     ///   align: usize,
-    ///   drop: fn(&mut dyn Trait<...>),
+    ///   drop: fn(*mut dyn Trait<...>),
     ///   method_name: fn(&dyn Trait<...>, Args..) -> Output,
     ///   ... other methods
     ///   super_trait_0: &'static SuperTrait0VTable

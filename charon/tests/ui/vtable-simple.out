@@ -57,7 +57,7 @@ const UNIT_METADATA: () = @Fun0()
 struct test_crate::Modifiable::{vtable}<T> {
   size: usize,
   align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_))),
+  drop: fn(*mut (dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)),
   method_modify: fn<'_0, '_1>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Modifiable<_dyn, T> + _dyn : '_)), &'_0_1 (T)) -> T,
   super_trait_0: &'static (core::marker::MetaSized::{vtable}),
 }

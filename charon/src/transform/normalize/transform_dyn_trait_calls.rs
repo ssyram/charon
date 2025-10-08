@@ -15,8 +15,8 @@
 //!
 //! to:
 //! ```text
-//! vtable@9 := ptr_metadata(move (@receiver))              // Extract vtable pointer
-//! method_ptr@8 := copy (((*vtable@9).method_check))       // Get method from vtable
+//! vtable@9 := (@receiver).ptr_metadata                      // Extract vtable pointer
+//! method_ptr@8 := copy (((*vtable@9).method_check))         // Get method from vtable
 //! @0 := (move method_ptr@8)(move (@receiver), move (@args)) // Call through function pointer
 //! ```
 
@@ -52,7 +52,7 @@ impl<'a> DynTraitCallTransformer<'a> {
 
     /// Detect if a call should be transformed to use vtable dispatch
     /// Returns the trait reference and method name for the dyn trait call if found
-    fn detect_dyn_trait_call(&self, call: &Call) -> Option<(TraitRef, TraitItemName)> {
+    fn detect_dyn_trait_call<'b>(&self, call: &'b Call) -> Option<(&'b TraitRef, &'b TraitItemName)> {
         // Check if this is a regular function call
         let FnOperand::Regular(fn_ptr) = &call.func else {
             return None; // Not a regular function call
@@ -63,7 +63,7 @@ impl<'a> DynTraitCallTransformer<'a> {
         };
 
         match &trait_ref.kind {
-            TraitRefKind::Dyn => Some((trait_ref.clone(), method_name.clone())),
+            TraitRefKind::Dyn => Some((trait_ref, method_name)),
             _ => None,
         }
     }
@@ -387,8 +387,7 @@ impl<'a> DynTraitCallTransformer<'a> {
             Operand::Copy(place) => place,
             Operand::Move(place) => place,
             Operand::Const(_) => {
-                // Constants should not be dyn trait objects in practice
-                return Ok(None);
+                panic!("Unexpected constant as dyn trait receiver");
             }
         };
         let receiver_ty = dyn_trait_place.ty().clone();
@@ -418,10 +417,6 @@ impl<'a> DynTraitCallTransformer<'a> {
         // 6. Transform the original call to use the function pointer
         call.func = FnOperand::Move(method_ptr_place);
 
-        trace!(
-            "Generated {} new statements for vtable dispatch",
-            self.statements.len()
-        );
         Ok(Some(()))
     }
 }
@@ -430,13 +425,7 @@ pub struct Transform;
 
 impl UllbcPass for Transform {
     fn transform_body(&self, ctx: &mut TransformCtx, body: &mut ExprBody) {
-        trace!(
-            "TransformDynTraitCalls: Processing body with {} blocks",
-            body.body.iter().count()
-        );
-
-        for (block_id, block) in body.body.iter_indexed() {
-
+        for (block_id, block) in body.body.iter_mut_indexed() {
             // Check terminator for calls
             if let TerminatorKind::Call { call, .. } = &mut block.terminator.kind {
                 trace!("Found call in block {}: {:?}", block_id, call.func);
@@ -447,27 +436,8 @@ impl UllbcPass for Transform {
                     &mut block.statements,
                     &mut body.locals,
                 );
-                match transformer.transform_dyn_trait_call(call) {
-                    Ok(Some(_)) => {
-                        trace!("Successfully transformed dynamic trait call");
-                    }
-                    Ok(None) => {
-                        trace!("No transformation needed for this call");
-                    }
-                    Err(e) => {
-                        register_error!(
-                            ctx,
-                            span,
-                            "Failed to transform dynamic trait call: {:?}",
-                            e
-                        );
-                    }
-                }
+                let _ = transformer.transform_dyn_trait_call(call);
             }
         }
-    }
-
-    fn name(&self) -> &str {
-        "TransformDynTraitCalls"
     }
 }

@@ -3,7 +3,7 @@
 struct core::cmp::PartialEq::{vtable}<Rhs> {
   size: usize,
   align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: PartialEq<_dyn, Rhs> + _dyn : '_))),
+  drop: fn(*mut (dyn exists<_dyn> [@TraitClause0]: PartialEq<_dyn, Rhs> + _dyn : '_)),
   method_eq: fn<'_0, '_1>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: PartialEq<_dyn, Rhs> + _dyn : '_)), &'_0_1 (Rhs)) -> bool,
   method_ne: fn<'_0, '_1>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: PartialEq<_dyn, Rhs> + _dyn : '_)), &'_0_1 (Rhs)) -> bool,
 }
@@ -51,7 +51,7 @@ where
 struct core::fmt::Display::{vtable} {
   size: usize,
   align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_))),
+  drop: fn(*mut (dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)),
   method_fmt: fn<'_0, '_1, '_2>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Display<_dyn> + _dyn : '_)), &'_0_1 mut (Formatter<'_0_2>)) -> Result<(), Error>[Sized<()>, Sized<Error>],
 }
 
@@ -104,7 +104,7 @@ pub trait FnMut<Self, Args>
 struct core::ops::function::Fn::{vtable}<Args, Ty0> {
   size: usize,
   align: usize,
-  drop: fn<'_0>(&'_0_0 mut ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = Ty0))),
+  drop: fn(*mut (dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = Ty0)),
   method_call: fn<'_0>(&'_0_0 ((dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = Ty0)), Args) -> Fn<(dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = Ty0), Args>::parent_clause1::parent_clause1::Output,
   super_trait_0: &'static (core::marker::MetaSized::{vtable}),
   super_trait_1: &'static (core::ops::function::FnMut::{vtable}<Args, Fn<(dyn exists<_dyn> [@TraitClause0]: Fn<_dyn, Args> + _dyn : '_ + @TraitClause1_0::parent_clause1::parent_clause1::Output = Ty0), Args>::parent_clause1::parent_clause1::Output>),
