@@ -435,8 +435,7 @@ impl UllbcPass for Transform {
             body.body.iter().count()
         );
 
-        for (block_id, block) in body.body.iter_mut().enumerate() {
-            let block_id = BlockId::new(block_id);
+        for (block_id, block) in body.body.iter_indexed() {
 
             // Check terminator for calls
             if let TerminatorKind::Call { call, .. } = &mut block.terminator.kind {
