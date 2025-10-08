@@ -219,7 +219,62 @@ pub struct TranslateCtx<'tcx> {
 
 This type is Charon's overall translation result storage. It continuously adds entities during the translation stage, is refined, then cleaned up during the transform stage before final output. From this we can glimpse the overall structure of (U)LLBC.
 
-???
+**Definition Location**: `charon/src/ast/krate.rs` line 154
+
+```rust
+pub struct TranslatedCrate {
+    // Metadata
+    pub crate_name: String,
+    pub options: crate::options::CliOpts,
+    pub target_information: TargetInfo,
+    
+    // Name mappings
+    pub item_names: HashMap<ItemId, Name>,
+    pub short_names: HashMap<ItemId, Name>,
+    
+    // Core translation results
+    pub files: Vector<FileId, File>,
+    pub type_decls: Vector<TypeDeclId, TypeDecl>,
+    pub fun_decls: Vector<FunDeclId, FunDecl>,
+    pub global_decls: Vector<GlobalDeclId, GlobalDecl>,
+    pub trait_decls: Vector<TraitDeclId, TraitDecl>,
+    pub trait_impls: Vector<TraitImplId, TraitImpl>,
+    
+    // Special items
+    pub unit_metadata: Option<GlobalDeclRef>,
+    pub ordered_decls: Option<DeclarationsGroups>,
+}
+```
+
+**Field Explanations**:
+
+1. **Metadata Fields**:
+   - `crate_name`: The name of the translated crate
+   - `options`: CLI options used when calling Charon (for downstream tools to verify)
+   - `target_information`: Target platform information (pointer size, endianness, etc.)
+
+2. **Name Mappings**:
+   - `item_names`: Maps each `ItemId` to its full `Name` (available even for failed translations)
+   - `short_names`: Maps `ItemId` to short names where the last PathElem is unique
+   - Invariant: Any existing `ItemId` must have an associated name after translation
+
+3. **Core Translation Results** (using `Vector<Id, T>` for indexed storage):
+   - `files`: Translated source files information
+   - `type_decls`: Type definitions (struct/enum/union)
+   - `fun_decls`: Function definitions
+   - `global_decls`: Global constants and static variables
+   - `trait_decls`: Trait declarations
+   - `trait_impls`: Trait implementations
+
+4. **Special Items**:
+   - `unit_metadata`: A `const UNIT: () = ();` used for thin pointer/reference metadata
+   - `ordered_decls`: Re-ordered declaration groups (initialized during transform stage)
+
+**Key Design Points**:
+- Uses `Vector<Id, T>` (essentially `IndexVec<Id, Option<T>>`) to allow IDs to exist before their content is filled
+- Storage order doesn't guarantee dependencies are available when translating an item
+- `ItemId` enum unifies all item types: `Type | Fun | Global | TraitDecl | TraitImpl`
+- Supports both direct access via ID and iteration over all items
 
 
 ### 4.3 enqueue vs register Mechanism

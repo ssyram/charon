@@ -219,7 +219,62 @@ pub struct TranslateCtx<'tcx> {
 
 这个类型是整个 Charon 的翻译结果存储类型，从翻译阶段不断新增实体进行完善后在 transform 阶段进行清理后最终输出。从中我们可以一窥 (U)LLBC 的整体结构。
 
-???
+**定义位置**：`charon/src/ast/krate.rs` 第 154 行
+
+```rust
+pub struct TranslatedCrate {
+    // 元数据
+    pub crate_name: String,
+    pub options: crate::options::CliOpts,
+    pub target_information: TargetInfo,
+    
+    // 名称映射
+    pub item_names: HashMap<ItemId, Name>,
+    pub short_names: HashMap<ItemId, Name>,
+    
+    // 核心翻译结果
+    pub files: Vector<FileId, File>,
+    pub type_decls: Vector<TypeDeclId, TypeDecl>,
+    pub fun_decls: Vector<FunDeclId, FunDecl>,
+    pub global_decls: Vector<GlobalDeclId, GlobalDecl>,
+    pub trait_decls: Vector<TraitDeclId, TraitDecl>,
+    pub trait_impls: Vector<TraitImplId, TraitImpl>,
+    
+    // 特殊项
+    pub unit_metadata: Option<GlobalDeclRef>,
+    pub ordered_decls: Option<DeclarationsGroups>,
+}
+```
+
+**字段说明**：
+
+1. **元数据字段**：
+   - `crate_name`：翻译的 crate 名称
+   - `options`：调用 Charon 时使用的 CLI 选项（供下游工具验证）
+   - `target_information`：目标平台信息（指针大小、字节序等）
+
+2. **名称映射**：
+   - `item_names`：将每个 `ItemId` 映射到其完整 `Name`（即使翻译失败也可用）
+   - `short_names`：当最后一个 PathElem 唯一时，映射 `ItemId` 到短名称
+   - 不变量：翻译后任何存在的 `ItemId` 必须有关联的名称
+
+3. **核心翻译结果**（使用 `Vector<Id, T>` 进行索引化存储）：
+   - `files`：翻译的源文件信息
+   - `type_decls`：类型定义（struct/enum/union）
+   - `fun_decls`：函数定义
+   - `global_decls`：全局常量和静态变量
+   - `trait_decls`：Trait 声明
+   - `trait_impls`：Trait 实现
+
+4. **特殊项**：
+   - `unit_metadata`：一个 `const UNIT: () = ();` 用于瘦指针/引用元数据
+   - `ordered_decls`：重新排序的声明组（在 transform 阶段初始化）
+
+**关键设计点**：
+- 使用 `Vector<Id, T>`（本质上是 `IndexVec<Id, Option<T>>`）允许 ID 在内容填充前存在
+- 存储顺序不保证翻译某项时其依赖已可用
+- `ItemId` 枚举统一所有项类型：`Type | Fun | Global | TraitDecl | TraitImpl`
+- 支持通过 ID 直接访问和遍历所有项
 
 
 ### 4.3 enqueue vs register 机制
