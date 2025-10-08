@@ -152,7 +152,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
         vtable_ref: &TypeDeclRef,
         method_ptr_ty: &Ty,
     ) -> (Place, Place) {
-        // In complete implementation this would be the actual vtable struct type
+        // Create a raw pointer to the vtable struct type
         let vtable_ty = Ty::new(TyKind::RawPtr(
             Ty::new(TyKind::Adt(vtable_ref.clone())),
             RefKind::Shared,
@@ -215,7 +215,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
             kind: PlaceKind::Projection(
                 Box::new(vtable_deref_place),
                 ProjectionElem::Field(
-                    FieldProjKind::Adt(vtable_def_id, None), // Placeholder vtable type ID
+                    FieldProjKind::Adt(vtable_def_id, None),
                     field_id,
                 ),
             ),
@@ -242,7 +242,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
             None => return Ok(None),
         };
 
-        // 2. Get the dyn trait argument
+        // 2. Get the receiver (first argument)
         if call.args.is_empty() {
             raise_error!(self.ctx, self.span, "Dyn trait call has no arguments!");
         }
@@ -250,7 +250,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
             Operand::Copy(place) => place,
             Operand::Move(place) => place,
             Operand::Const(_) => {
-                panic!("Unexpected constant as dyn trait receiver");
+                panic!("Unexpected constant as receiver for dyn trait method call");
             }
         };
 
@@ -263,13 +263,13 @@ impl<'a> UllbcStatementTransformCtx<'a> {
         // 4. Create local variables for vtable and method pointer
         let (vtable_place, method_ptr_place) = self.create_vtable_locals(&vtable_ref, &field_ty);
 
-        // Extract vtable pointer
+        // 5. Insert statement to extract vtable pointer from the dyn trait object
         self.insert_vtable_extraction(&vtable_place, &dyn_trait_place);
 
-        // Extract method pointer from vtable
+        // 6. Insert statement to extract method pointer from vtable
         self.insert_method_pointer_extraction(&method_ptr_place, &vtable_place, field_id);
 
-        // 6. Transform the original call to use the function pointer
+        // 7. Transform the original call to use the function pointer
         call.func = FnOperand::Move(method_ptr_place);
 
         Ok(Some(()))
