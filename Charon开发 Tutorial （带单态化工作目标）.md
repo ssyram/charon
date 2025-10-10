@@ -1498,8 +1498,9 @@ trait MyTrait<T> {
     fn process(&self, x: T) -> T;
 }
 
-impl MyTrait<i32> for i32 { }
-impl MyTrait<i32> for bool { }
+impl MyTrait<i32> for i32 { fn process(&self, x: i32) -> i32 { *self + x } }
+impl MyTrait<i32> for bool { fn process(&self, x: i32) -> i32 { if *self { x } else { 0 } } }
+fn main() { }
 ```
 
 **当前 Charon 输出（错误）**：
@@ -1528,6 +1529,17 @@ trait MyTrait::<bool, i32>
 **问题分析**：
 - Rust 语义中，trait **定义**只有一份，实现参数 Self 应该保留
 - trait **实现**（impl）才会针对具体类型单态化
+
+> 问题复现
+> 可以通过将上述 Rust 代码保存为 `test.rs` ，然后运行：
+> ```bash
+> ./bin/charon rustc --print-llbc --monomorphize -- path/to/test.rs > output.txt
+> ```
+> 其中：
+> - `--print-llbc`：打印 *人类可读* LLBC 到标准输出，通过 `> output.txt` 重定向到文件
+> - `--monomorphize`：启用单态化翻译，可以对比不加单态化的输出
+> 
+> 然后检查 `output.txt` 中的 trait 定义，将会发现上述错误输出。
 
 **期望 Charon 输出**：
 ```rust
