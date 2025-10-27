@@ -116,6 +116,7 @@ where
     storage_live(target_self@2)
     ret@0 := ()
     target_self@2 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_), *mut i32>(move (dyn_self@1))
+    ret@0 := ()
     return
 }
 

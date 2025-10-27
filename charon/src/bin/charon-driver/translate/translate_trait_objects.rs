@@ -965,7 +965,7 @@ impl ItemTransCtx<'_, '_> {
             locals: Vector::new(),
         };
         
-        let _ = locals.new_var(Some("ret".into()), Ty::mk_unit());
+        let ret = locals.new_var(Some("ret".into()), Ty::mk_unit());
         let dyn_self = locals.new_var(Some("dyn_self".into()), shim_receiver.clone());
         let target_self = locals.new_var(Some("target_self".into()), target_receiver.clone());
         
@@ -982,6 +982,8 @@ impl ItemTransCtx<'_, '_> {
                 ),
             ),
         ));
+        
+        block.statements.push(Statement { span: span, kind: StatementKind::Assign(ret, Rvalue::unit_value()), comments_before: vec![] });
 
         Ok(Body::Unstructured(GExprBody {
             span,
