@@ -679,8 +679,23 @@ impl ItemTransCtx<'_, '_> {
                     });
                     ConstantExprKind::Ref(global)
                 }
-                // TODO(dyn): builtin impls
-                _ => ConstantExprKind::Opaque("missing supertrait vtable".into()),
+                hax::ImplExprAtom::Builtin { trait_data, impl_exprs, types } => {
+                    // TODO(dyn): handle builtin impls
+                    let _ = (trait_data, impl_exprs, types);
+                    ConstantExprKind::Opaque("missing supertrait vtable".into())
+                }
+                hax::ImplExprAtom::Dyn => {
+                    ConstantExprKind::Opaque("missing supertrait vtable: dyn".into())
+                }
+                hax::ImplExprAtom::Error(err) => {
+                    ConstantExprKind::Opaque(format!("missing supertrait vtable: error \"{}\"", err).into())
+                }
+                hax::ImplExprAtom::LocalBound { .. } => {
+                    ConstantExprKind::Opaque("missing supertrait vtable: generic local bound".into())
+                }
+                hax::ImplExprAtom::SelfImpl { .. } => {
+                    ConstantExprKind::Opaque("missing supertrait vtable: self impl".into())
+                }
             };
             mk_field(kind);
         }
@@ -955,8 +970,11 @@ impl ItemTransCtx<'_, '_> {
             arg_count: 1,
             locals: Vector::new(),
         };
+        
+        let _ = locals.new_var(Some("ret".into()), Ty::mk_unit());
         let dyn_self = locals.new_var(Some("dyn_self".into()), shim_receiver.clone());
         let target_self = locals.new_var(Some("target_self".into()), target_receiver.clone());
+        
         block.statements.push(Statement::new(
             span,
             StatementKind::Assign(
