@@ -760,42 +760,45 @@ impl ItemTransCtx<'_, '_> {
             aggregate_fields.push(Operand::Const(Box::new(ConstantExpr { kind, ty })));
         };
 
-        // Build a reference to `std::ptr::drop_in_place<T>`.
-        // let drop_in_place: hax::ItemRef = {
-        //     // TODO: use the method instead
-        //     let s = self.hax_state_with_id();
-        //     let drop_in_place = self.tcx.lang_items().drop_in_place_fn().unwrap();
-        //     let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
-        //     let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
-        //     hax::ItemRef::translate(s, drop_in_place, generics)
+        let drop_shim =
+            self.translate_item(span, impl_def.this(), TransItemSourceKind::VTableDropShim)?;
+        // let drop_shim = FnPtr::new(FnPtrKind::Fun(drop_shim.id))
+        // // Build a reference to `std::ptr::drop_in_place<T>`.
+        // // let drop_in_place: hax::ItemRef = {
+        // //     // TODO: use the method instead
+        // //     let s = self.hax_state_with_id();
+        // //     let drop_in_place = self.tcx.lang_items().drop_in_place_fn().unwrap();
+        // //     let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
+        // //     let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
+        // //     hax::ItemRef::translate(s, drop_in_place, generics)
+        // // };
+        // // let fn_ptr = self
+        // //     .translate_fn_ptr(span, &drop_in_place, TransItemSourceKind::Fun)?
+        // //     .erase();
+        // let fn_ptr = {
+        //     // Build a reference to `impl Drop for T`.
+        //     let drop_trait = self.tcx.lang_items().drop_trait().unwrap();
+        //     let drop_impl_expr: hax::ImplExpr = {
+        //         let s = self.hax_state_with_id();
+        //         let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
+        //         let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
+        //         let drop_tref =
+        //             rustc_middle::ty::TraitRef::new_from_args(self.tcx, drop_trait, generics);
+        //         hax::solve_trait(s, rustc_middle::ty::Binder::dummy(drop_tref))
+        //     };
+        //     let drop_tref = self.translate_trait_impl_expr(span, &drop_impl_expr)?;
+        //     let method_id = self.register_item(
+        //         span,
+        //         drop_impl_expr.r#trait.hax_skip_binder_ref(),
+        //         TransItemSourceKind::DropInPlaceMethod(None),
+        //     );
+        //     let item_name = TraitItemName("drop_in_place".to_string());
+        //     FnPtr::new(
+        //         FnPtrKind::Trait(drop_tref, item_name, method_id),
+        //         GenericArgs::empty(),
+        //     )
         // };
-        // let fn_ptr = self
-        //     .translate_fn_ptr(span, &drop_in_place, TransItemSourceKind::Fun)?
-        //     .erase();
-        let fn_ptr = {
-            // Build a reference to `impl Drop for T`.
-            let drop_trait = self.tcx.lang_items().drop_trait().unwrap();
-            let drop_impl_expr: hax::ImplExpr = {
-                let s = self.hax_state_with_id();
-                let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
-                let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
-                let drop_tref =
-                    rustc_middle::ty::TraitRef::new_from_args(self.tcx, drop_trait, generics);
-                hax::solve_trait(s, rustc_middle::ty::Binder::dummy(drop_tref))
-            };
-            let drop_tref = self.translate_trait_impl_expr(span, &drop_impl_expr)?;
-            let method_id = self.register_item(
-                span,
-                drop_impl_expr.r#trait.hax_skip_binder_ref(),
-                TransItemSourceKind::DropInPlaceMethod(None),
-            );
-            let item_name = TraitItemName("drop_in_place".to_string());
-            FnPtr::new(
-                FnPtrKind::Trait(drop_tref, item_name, method_id),
-                GenericArgs::empty(),
-            )
-        };
-        mk_field(ConstantExprKind::FnPtr(fn_ptr));
+        mk_field(ConstantExprKind::FnPtr(drop_shim));
 
         for item in items {
             self.add_method_to_vtable_value(span, impl_def, item, &mut mk_field)?;
@@ -936,6 +939,94 @@ impl ItemTransCtx<'_, '_> {
         });
 
         Ok(Body::Unstructured(builder.build()))
+    }
+
+    fn translate_vtable_drop_shim_body(
+        &mut self,
+        span: Span,
+        shim_receiver: &Ty,
+        target_receiver: &Ty,
+    ) -> Result<Body, Error> {
+        let mut block = BlockData {
+            statements: vec![],
+            terminator: Terminator::new(span, TerminatorKind::Return),
+        };
+        let mut locals = Locals {
+            arg_count: 1,
+            locals: Vector::new(),
+        };
+        let dyn_self = locals.new_var(Some("dyn_self".into()), shim_receiver.clone());
+        let target_self = locals.new_var(Some("target_self".into()), target_receiver.clone());
+        block.statements.push(Statement::new(
+            span,
+            StatementKind::Assign(
+                target_self.clone(),
+                Rvalue::UnaryOp(
+                    UnOp::Cast(CastKind::Concretize(
+                        dyn_self.ty().clone(),
+                        target_self.ty().clone(),
+                    )),
+                    Operand::Move(dyn_self.clone()),
+                ),
+            ),
+        ));
+
+        Ok(Body::Unstructured(GExprBody {
+            span,
+            locals,
+            comments: vec![],
+            body: Vector::from([block]),
+        }))
+    }
+
+    pub(crate) fn translate_vtable_drop_shim(
+        mut self,
+        fun_id: FunDeclId,
+        item_meta: ItemMeta,
+        impl_def: &hax::FullDef,
+    ) -> Result<FunDecl, Error> {
+        let span = item_meta.span;
+        self.translate_def_generics(span, impl_def)?;
+
+        let hax::FullDefKind::TraitImpl {
+            dyn_self: Some(dyn_self),
+            trait_pred,
+            ..
+        } = impl_def.kind()
+        else {
+            raise_error!(
+                self,
+                span,
+                "Trying to generate a vtable drop shim for a non-trait impl"
+            );
+        };
+        let ref_dyn_self =
+            TyKind::RawPtr(self.translate_ty(span, dyn_self)?, RefKind::Mut).into_ty();
+
+        let ref_target_self = {
+            let impl_trait = self.translate_trait_ref(span, &trait_pred.trait_ref)?;
+            TyKind::RawPtr(impl_trait.generics.types[0].clone(), RefKind::Mut).into_ty()
+        };
+
+        // `*mut dyn Trait -> ()`
+        let signature = FunSig {
+            is_unsafe: false,
+            generics: self.the_only_binder().params.clone(),
+            inputs: vec![ref_dyn_self.clone()],
+            output: Ty::mk_unit(),
+        };
+
+        let body =
+            Ok(self.translate_vtable_drop_shim_body(span, &ref_dyn_self, &ref_target_self)?);
+
+        Ok(FunDecl {
+            def_id: fun_id,
+            item_meta,
+            signature,
+            src: ItemSource::VTableMethodShim,
+            is_global_initializer: None,
+            body,
+        })
     }
 
     pub(crate) fn translate_vtable_shim(
