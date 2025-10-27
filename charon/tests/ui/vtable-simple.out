@@ -109,11 +109,13 @@ where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Clone<T>,
 {
-    let dyn_self@0: *mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_); // return
-    let target_self@1: *mut i32; // arg #1
+    let ret@0: (); // return
+    let dyn_self@1: *mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_); // arg #1
+    let target_self@2: *mut i32; // local
 
-    dyn_self@0 := ()
-    target_self@1 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_), *mut i32>(move (dyn_self@0))
+    storage_live(target_self@2)
+    ret@0 := ()
+    target_self@2 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_), *mut i32>(move (dyn_self@1))
     return
 }
 

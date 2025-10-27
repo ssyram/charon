@@ -183,11 +183,13 @@ pub fn {impl Display for String}::fmt<'_0, '_1, '_2>(@1: &'_0 (String), @2: &'_1
 // Full name: alloc::string::{impl Display for String}::{vtable_drop_shim}
 fn {vtable_drop_shim}(@1: *mut (dyn exists<_dyn> [@TraitClause0_1]: Display<_dyn> + _dyn : '_))
 {
-    let dyn_self@0: *mut (dyn exists<_dyn> [@TraitClause0_1]: Display<_dyn> + _dyn : '_); // return
-    let target_self@1: *mut String; // arg #1
+    let ret@0: (); // return
+    let dyn_self@1: *mut (dyn exists<_dyn> [@TraitClause0_1]: Display<_dyn> + _dyn : '_); // arg #1
+    let target_self@2: *mut String; // local
 
-    dyn_self@0 := ()
-    target_self@1 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Display<_dyn> + _dyn : '_), *mut String>(move (dyn_self@0))
+    storage_live(target_self@2)
+    ret@0 := ()
+    target_self@2 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Display<_dyn> + _dyn : '_), *mut String>(move (dyn_self@1))
     return
 }
 
