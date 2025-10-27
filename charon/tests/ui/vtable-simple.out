@@ -103,8 +103,8 @@ where
     return
 }
 
-// Full name: test_crate::{impl Modifiable<T> for i32}
-fn {impl Modifiable<T> for i32}<T>(@1: *mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_))
+// Full name: test_crate::{impl Modifiable<T> for i32}::{vtable_drop_shim}
+fn {vtable_drop_shim}<T>(@1: *mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_))
 where
     [@TraitClause0]: Sized<T>,
     [@TraitClause1]: Clone<T>,
@@ -148,7 +148,7 @@ where
     size@1 := size_of<i32>
     storage_live(align@2)
     align@2 := align_of<i32>
-    ret@0 := test_crate::Modifiable::{vtable} { size: move (size@1), align: move (align@2), drop: const ({impl Modifiable<T> for i32}<T>[@TraitClause0, @TraitClause1]), method_modify: const ({vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
+    ret@0 := test_crate::Modifiable::{vtable} { size: move (size@1), align: move (align@2), drop: const ({vtable_drop_shim}<T>[@TraitClause0, @TraitClause1]), method_modify: const ({vtable_method}<'_, '_, T>[@TraitClause0, @TraitClause1]), super_trait_0: const (Opaque(missing supertrait vtable)) }
     return
 }
 
