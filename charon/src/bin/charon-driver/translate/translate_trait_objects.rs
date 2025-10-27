@@ -1,4 +1,5 @@
 use charon_lib::ast::ullbc_ast_utils::BodyBuilder;
+use hax::TraitPredicate;
 use itertools::Itertools;
 use std::mem;
 
@@ -679,7 +680,11 @@ impl ItemTransCtx<'_, '_> {
                     });
                     ConstantExprKind::Ref(global)
                 }
-                hax::ImplExprAtom::Builtin { trait_data, impl_exprs, types } => {
+                hax::ImplExprAtom::Builtin {
+                    trait_data,
+                    impl_exprs,
+                    types,
+                } => {
                     // TODO(dyn): handle builtin impls
                     let _ = (trait_data, impl_exprs, types);
                     ConstantExprKind::Opaque("missing supertrait vtable".into())
@@ -687,12 +692,12 @@ impl ItemTransCtx<'_, '_> {
                 hax::ImplExprAtom::Dyn => {
                     ConstantExprKind::Opaque("missing supertrait vtable: dyn".into())
                 }
-                hax::ImplExprAtom::Error(err) => {
-                    ConstantExprKind::Opaque(format!("missing supertrait vtable: error \"{}\"", err).into())
-                }
-                hax::ImplExprAtom::LocalBound { .. } => {
-                    ConstantExprKind::Opaque("missing supertrait vtable: generic local bound".into())
-                }
+                hax::ImplExprAtom::Error(err) => ConstantExprKind::Opaque(
+                    format!("missing supertrait vtable: error \"{}\"", err).into(),
+                ),
+                hax::ImplExprAtom::LocalBound { .. } => ConstantExprKind::Opaque(
+                    "missing supertrait vtable: generic local bound".into(),
+                ),
                 hax::ImplExprAtom::SelfImpl { .. } => {
                     ConstantExprKind::Opaque("missing supertrait vtable: self impl".into())
                 }
@@ -961,21 +966,90 @@ impl ItemTransCtx<'_, '_> {
         span: Span,
         shim_receiver: &Ty,
         target_receiver: &Ty,
+        trait_pred: &TraitPredicate,
     ) -> Result<Body, Error> {
-        let mut block = BlockData {
-            statements: vec![],
-            terminator: Terminator::new(span, TerminatorKind::Return),
-        };
+        // let mut block = BlockData {
+        //     statements: vec![],
+        //     terminator: Terminator::new(span, TerminatorKind::Return),
+        // };
         let mut locals = Locals {
             arg_count: 1,
             locals: Vector::new(),
         };
-        
+
         let ret = locals.new_var(Some("ret".into()), Ty::mk_unit());
         let dyn_self = locals.new_var(Some("dyn_self".into()), shim_receiver.clone());
         let target_self = locals.new_var(Some("target_self".into()), target_receiver.clone());
-        
-        block.statements.push(Statement::new(
+        let drop_ret_place = locals.new_var(Some("drop_ret".into()), Ty::mk_unit());
+
+        // Jinhua Wu: call drop_in_place
+        // Build a reference to `std::ptr::drop_in_place<T>`.
+        // let drop_in_place: hax::ItemRef = {
+        //     // TODO: use the method instead
+        //     let s = self.hax_state_with_id();
+        //     let drop_in_place = self.tcx.lang_items().drop_in_place_fn().unwrap();
+        //     let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
+        //     let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
+        //     hax::ItemRef::translate(s, drop_in_place, generics)
+        // };
+        // let fn_ptr = self
+        //     .translate_fn_ptr(span, &drop_in_place, TransItemSourceKind::Fun)?
+        //     .erase();
+        // Build a reference to `impl Drop for T`.
+        let drop_trait = self.tcx.lang_items().drop_trait().unwrap();
+        let drop_impl_expr: hax::ImplExpr = {
+            let s = self.hax_state_with_id();
+            let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
+            let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
+            let drop_tref =
+                rustc_middle::ty::TraitRef::new_from_args(self.tcx, drop_trait, generics);
+            hax::solve_trait(s, rustc_middle::ty::Binder::dummy(drop_tref))
+        };
+        let drop_tref = self.translate_trait_impl_expr(span, &drop_impl_expr)?;
+        let method_id = self.register_item(
+            span,
+            drop_impl_expr.r#trait.hax_skip_binder_ref(),
+            TransItemSourceKind::DropInPlaceMethod(None),
+        );
+        let item_name = TraitItemName("drop_in_place".to_string());
+        let fn_ptr = FnPtr::new(
+            FnPtrKind::Trait(drop_tref, item_name, method_id),
+            GenericArgs::empty(),
+        );
+
+        // call of drop_in_place
+        let call = Call {
+            func: FnOperand::Regular(fn_ptr),
+            args: Vec::from([Operand::Copy(target_self.clone())]),
+            dest: drop_ret_place,
+        };
+
+        // Create blocks
+        let mut blocks = Vector::new();
+
+        let mut ret_block = BlockData {
+            statements: vec![],
+            terminator: Terminator::new(span, TerminatorKind::Return),
+        };
+
+        let unwind_block = BlockData {
+            statements: vec![],
+            terminator: Terminator::new(span, TerminatorKind::UnwindResume),
+        };
+
+        let mut call_block = BlockData {
+            statements: vec![],
+            terminator: Terminator::new(
+                span,
+                TerminatorKind::Call {
+                    call,
+                    target: BlockId::new(1),    // ret_block
+                    on_unwind: BlockId::new(2), // unwind_block
+                },
+            ),
+        };
+
+        call_block.statements.push(Statement::new(
             span,
             StatementKind::Assign(
                 target_self.clone(),
@@ -988,14 +1062,22 @@ impl ItemTransCtx<'_, '_> {
                 ),
             ),
         ));
-        
-        block.statements.push(Statement { span: span, kind: StatementKind::Assign(ret, Rvalue::unit_value()), comments_before: vec![] });
+
+        ret_block.statements.push(Statement {
+            span: span,
+            kind: StatementKind::Assign(ret, Rvalue::unit_value()),
+            comments_before: vec![],
+        });
+
+        blocks.push(call_block); // BlockId(0) -- START_BLOCK_ID
+        blocks.push(ret_block); // BlockId(1)
+        blocks.push(unwind_block); // BlockId(2)
 
         Ok(Body::Unstructured(GExprBody {
             span,
             locals,
             comments: vec![],
-            body: Vector::from([block]),
+            body: blocks,
         }))
     }
 
@@ -1036,8 +1118,12 @@ impl ItemTransCtx<'_, '_> {
             output: Ty::mk_unit(),
         };
 
-        let body =
-            Ok(self.translate_vtable_drop_shim_body(span, &ref_dyn_self, &ref_target_self)?);
+        let body = Ok(self.translate_vtable_drop_shim_body(
+            span,
+            &ref_dyn_self,
+            &ref_target_self,
+            trait_pred,
+        )?);
 
         Ok(FunDecl {
             def_id: fun_id,

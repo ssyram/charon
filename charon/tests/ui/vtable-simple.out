@@ -46,6 +46,24 @@ pub trait Destruct<Self>
     vtable: core::marker::Destruct::{vtable}
 }
 
+// Full name: core::ops::drop::Drop
+#[lang_item("drop")]
+pub trait Drop<Self>
+{
+    parent_clause0 : [@TraitClause0]: MetaSized<Self>
+    fn drop<'_0_1> = drop<'_0_1, Self>[Self]
+    fn drop_in_place = drop_in_place<Self>
+    vtable: core::ops::drop::Drop::{vtable}
+}
+
+// Full name: core::ops::drop::Drop::drop_in_place
+fn drop_in_place<Self>(@1: *mut Self)
+
+// Full name: core::ops::drop::Drop::drop
+pub fn drop<'_0, Self>(@1: &'_0 mut (Self))
+where
+    [@TraitClause0]: Drop<Self>,
+
 fn UNIT_METADATA()
 {
     let @0: (); // return
@@ -108,10 +126,13 @@ where
     let ret@0: (); // return
     let dyn_self@1: *mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_); // arg #1
     let target_self@2: *mut i32; // local
+    let drop_ret@3: (); // local
 
     storage_live(target_self@2)
+    storage_live(drop_ret@3)
     ret@0 := ()
     target_self@2 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_), *mut i32>(move (dyn_self@1))
+    drop_ret@3 := Drop<i32>::drop_in_place(copy (target_self@2))
     ret@0 := ()
     return
 }
