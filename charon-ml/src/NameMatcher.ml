@@ -1037,12 +1037,8 @@ and ty_to_pattern_aux (ctx : 'fun_body ctx) (c : to_pat_config)
   | TError _ -> EVar None
   | TRawPtr (ty, RMut) -> ERawPtr (Mut, ty_to_pattern_aux ctx c m ty)
   | TRawPtr (ty, RShared) -> ERawPtr (Not, ty_to_pattern_aux ctx c m ty)
-  | _ ->
-      let fmt_env = ctx_to_fmt_env ctx in
-      raise
-        (Failure
-           ("Can't convert type to pattern: "
-           ^ PrintTypes.ty_to_string fmt_env ty))
+  (* TEMP SOLUTION: to bypass the problem *)
+  | _ -> EVar None
 
 and trait_ref_item_with_generics_to_pattern (ctx : 'fun_body ctx)
     (c : to_pat_config) (m : constraints) (trait_ref : T.trait_ref)
