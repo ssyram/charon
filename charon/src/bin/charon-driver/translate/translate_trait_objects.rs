@@ -968,33 +968,24 @@ impl ItemTransCtx<'_, '_> {
         target_receiver: &Ty,
         trait_pred: &TraitPredicate,
     ) -> Result<Body, Error> {
-        // let mut block = BlockData {
-        //     statements: vec![],
-        //     terminator: Terminator::new(span, TerminatorKind::Return),
-        // };
-        let mut locals = Locals {
-            arg_count: 1,
-            locals: Vector::new(),
-        };
+        let mut builder = BodyBuilder::new(span, 1);
 
-        let ret = locals.new_var(Some("ret".into()), Ty::mk_unit());
-        let dyn_self = locals.new_var(Some("dyn_self".into()), shim_receiver.clone());
-        let target_self = locals.new_var(Some("target_self".into()), target_receiver.clone());
-        let drop_ret_place = locals.new_var(Some("drop_ret".into()), Ty::mk_unit());
+        builder.new_var(Some("ret".into()), Ty::mk_unit());
+        let dyn_self = builder.new_var(Some("dyn_self".into()), shim_receiver.clone());
+        let target_self = builder.new_var(Some("target_self".into()), target_receiver.clone());
+        let drop_ret_place = builder.new_var(Some("drop_ret".into()), Ty::mk_unit());
 
-        // Jinhua Wu: call drop_in_place
-        // Build a reference to `std::ptr::drop_in_place<T>`.
-        // let drop_in_place: hax::ItemRef = {
-        //     // TODO: use the method instead
-        //     let s = self.hax_state_with_id();
-        //     let drop_in_place = self.tcx.lang_items().drop_in_place_fn().unwrap();
-        //     let rustc_trait_args = trait_pred.trait_ref.rustc_args(s);
-        //     let generics = self.tcx.mk_args(&rustc_trait_args[..1]); // keep only the `Self` type
-        //     hax::ItemRef::translate(s, drop_in_place, generics)
-        // };
-        // let fn_ptr = self
-        //     .translate_fn_ptr(span, &drop_in_place, TransItemSourceKind::Fun)?
-        //     .erase();
+        // Perform the core concretization cast.
+        let rval = Rvalue::UnaryOp(
+            UnOp::Cast(CastKind::Concretize(
+                dyn_self.ty().clone(),
+                target_self.ty().clone(),
+            )),
+            Operand::Move(dyn_self.clone()),
+        );
+        builder.push_statement(StatementKind::Assign(target_self.clone(), rval));
+
+        // TODO: write a new function for it?
         // Build a reference to `impl Drop for T`.
         let drop_trait = self.tcx.lang_items().drop_trait().unwrap();
         let drop_impl_expr: hax::ImplExpr = {
@@ -1017,68 +1008,14 @@ impl ItemTransCtx<'_, '_> {
             GenericArgs::empty(),
         );
 
-        // call of drop_in_place
-        let call = Call {
+        // call drop_in_place
+        builder.call(Call {
             func: FnOperand::Regular(fn_ptr),
             args: Vec::from([Operand::Copy(target_self.clone())]),
             dest: drop_ret_place,
-        };
-
-        // Create blocks
-        let mut blocks = Vector::new();
-
-        let mut ret_block = BlockData {
-            statements: vec![],
-            terminator: Terminator::new(span, TerminatorKind::Return),
-        };
-
-        let unwind_block = BlockData {
-            statements: vec![],
-            terminator: Terminator::new(span, TerminatorKind::UnwindResume),
-        };
-
-        let mut call_block = BlockData {
-            statements: vec![],
-            terminator: Terminator::new(
-                span,
-                TerminatorKind::Call {
-                    call,
-                    target: BlockId::new(1),    // ret_block
-                    on_unwind: BlockId::new(2), // unwind_block
-                },
-            ),
-        };
-
-        call_block.statements.push(Statement::new(
-            span,
-            StatementKind::Assign(
-                target_self.clone(),
-                Rvalue::UnaryOp(
-                    UnOp::Cast(CastKind::Concretize(
-                        dyn_self.ty().clone(),
-                        target_self.ty().clone(),
-                    )),
-                    Operand::Move(dyn_self.clone()),
-                ),
-            ),
-        ));
-
-        ret_block.statements.push(Statement {
-            span: span,
-            kind: StatementKind::Assign(ret, Rvalue::unit_value()),
-            comments_before: vec![],
         });
 
-        blocks.push(call_block); // BlockId(0) -- START_BLOCK_ID
-        blocks.push(ret_block); // BlockId(1)
-        blocks.push(unwind_block); // BlockId(2)
-
-        Ok(Body::Unstructured(GExprBody {
-            span,
-            locals,
-            comments: vec![],
-            body: blocks,
-        }))
+        Ok(Body::Unstructured(builder.build()))
     }
 
     pub(crate) fn translate_vtable_drop_shim(

@@ -128,12 +128,11 @@ where
     let target_self@2: *mut i32; // local
     let drop_ret@3: (); // local
 
+    ret@0 := ()
     storage_live(target_self@2)
     storage_live(drop_ret@3)
-    ret@0 := ()
     target_self@2 := concretize<*mut (dyn exists<_dyn> [@TraitClause0_1]: Modifiable<_dyn, T> + _dyn : '_), *mut i32>(move (dyn_self@1))
     drop_ret@3 := Drop<i32>::drop_in_place(copy (target_self@2))
-    ret@0 := ()
     return
 }
 
