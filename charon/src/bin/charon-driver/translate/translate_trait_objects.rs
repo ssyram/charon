@@ -1011,7 +1011,7 @@ impl ItemTransCtx<'_, '_> {
         // call drop_in_place
         builder.call(Call {
             func: FnOperand::Regular(fn_ptr),
-            args: Vec::from([Operand::Copy(target_self.clone())]),
+            args: Vec::from([Operand::Move(target_self.clone())]),
             dest: drop_ret_place,
         });
 
