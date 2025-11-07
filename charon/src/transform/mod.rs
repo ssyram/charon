@@ -22,6 +22,7 @@ pub mod add_missing_info {
 
 /// Passes that effect some kind of normalization on the crate.
 pub mod normalize {
+    pub mod desugar_drops;
     pub mod expand_associated_types;
     pub mod filter_unreachable_blocks;
     pub mod partial_monomorphization;
@@ -115,6 +116,8 @@ pub static INITIAL_CLEANUP_PASSES: &[Pass] = &[
     NonBody(&normalize::expand_associated_types::Transform),
     // `--remove-adt-clauses`: Remove all trait clauses from type declarations.
     NonBody(&simplify_output::remove_adt_clauses::Transform),
+    // Transform Drops into Calls to drop_in_place.
+    UnstructuredBody(&normalize::desugar_drops::Transform),
 ];
 
 /// Body cleanup passes on the ullbc.
