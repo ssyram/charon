@@ -95,7 +95,7 @@ pub enum TerminatorKind {
     },
     /// Drop the value at the given place.
     ///
-    /// This calls `<T as Drop>::drop_in_place(&raw mut place)` and marks the place as
+    /// This calls `<T as Destruct>::drop_in_place(&raw mut place)` and marks the place as
     /// moved-out-of. The `drop_in_place` method is added by Charon, it contains the same code as
     /// the `core::ptr::drop_in_place<T>` builtin).
     Drop {

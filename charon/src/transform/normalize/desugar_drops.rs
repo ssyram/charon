@@ -37,7 +37,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
                 comments_before: Vec::new(),
             });
 
-            let item_name = TraitItemName("drop_in_place".to_string());
+            let item_name = TraitItemName("drop_in_place".into());
 
             // Get the drop_in_place method id. TODO: write a helper function for this.
             let TraitRefKind::TraitImpl(impl_ref) = &tref.kind else {
@@ -49,7 +49,7 @@ impl<'a> UllbcStatementTransformCtx<'a> {
                 // );
                 return Ok(());
             };
-            let Some(item) = self.ctx.translated.get_item(impl_ref.id) else {      
+            let Some(item) = self.ctx.translated.get_item(impl_ref.id) else {
                 // TODO: consider that impl_ref is opaque: see hide-drop.rs
                 raise_error!(
                     self.ctx,
