@@ -103,11 +103,30 @@ impl<'a> UllbcStatementTransformCtx<'a> {
                         }
                     }
                 }
+                TraitRefKind::Clause(id) => {
+                    // Call the trait method
+                    let fn_ptr = FnPtr::new(
+                        FnPtrKind::Trait(tref.clone(), item_name, krate::FunDeclId::new(0)),
+                        GenericArgs::empty(),
+                    );
+
+                    let call = Call {
+                        func: FnOperand::Regular(fn_ptr),
+                        args: Vec::from([Operand::Move(drop_arg)]),
+                        dest: drop_ret,
+                    };
+
+                    term.kind = TerminatorKind::Call {
+                        call,
+                        target: target.clone(),
+                        on_unwind: on_unwind.clone(),
+                    }
+                }
                 _ => {
                     raise_error!(
                         self.ctx,
                         self.span,
-                        "Expected TraitImpl or BuiltinOrAuto kind in Drop terminator, but encounter {:?}",
+                        "Expected TraitImpl, BuiltinOrAuto or Clause in Drop terminator, but encounter {:?}",
                         tref.kind
                     );
                 }
