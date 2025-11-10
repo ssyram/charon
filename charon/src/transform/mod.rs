@@ -40,7 +40,6 @@ pub mod resugar {
 
 /// Passes that make the output simpler/easier to consume.
 pub mod simplify_output {
-    pub mod filter_trivial_drops;
     pub mod hide_allocator_param;
     pub mod hide_marker_traits;
     pub mod index_intermediate_assigns;
@@ -119,8 +118,6 @@ pub static INITIAL_CLEANUP_PASSES: &[Pass] = &[
 pub static ULLBC_PASSES: &[Pass] = &[
     // Inline promoted consts into their parent bodies.
     UnstructuredBody(&simplify_output::inline_promoted_consts::Transform),
-    // Remove drop statements that are noops.
-    UnstructuredBody(&simplify_output::filter_trivial_drops::Transform),
     // # Micro-pass: merge single-origin gotos into their parent. This drastically reduces the
     // graph size of the CFG.
     // This must be done early as some resugaring passes depend on it.

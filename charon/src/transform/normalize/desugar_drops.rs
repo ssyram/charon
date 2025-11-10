@@ -39,58 +39,80 @@ impl<'a> UllbcStatementTransformCtx<'a> {
 
             let item_name = TraitItemName("drop_in_place".into());
 
-            // Get the drop_in_place method id. TODO: write a helper function for this.
-            let TraitRefKind::TraitImpl(impl_ref) = &tref.kind else {
-                // TODO: we just skip it for now
-                // raise_error!(
-                //     self.ctx,
-                //     self.span,
-                //     "Expected TraitImpl kind in Drop terminator."
-                // );
-                return Ok(());
-            };
-            let Some(item) = self.ctx.translated.get_item(impl_ref.id) else {
-                // TODO: consider that impl_ref is opaque: see hide-drop.rs
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Could not find TraitImpl for Drop trait."
-                );
-            };
-            let ItemRef::TraitImpl(trait_impl) = item else {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Expected TraitImpl item for the trait item in Drop."
-                );
-            };
-            let Some(item_binder) = trait_impl.methods().find(|&x| x.0 == item_name) else {
-                raise_error!(
-                    self.ctx,
-                    self.span,
-                    "Could not find drop_in_place method in Drop trait impl."
-                );
-            };
-            let method_id = item_binder.1.skip_binder.id;
+            match &tref.kind {
+                TraitRefKind::TraitImpl(impl_ref) => {
+                    let Some(item) = self.ctx.translated.get_item(impl_ref.id) else {
+                        // TODO: consider that impl_ref is opaque: see hide-drop.rs
+                        raise_error!(
+                            self.ctx,
+                            self.span,
+                            "Could not find TraitImpl for Drop trait."
+                        );
+                    };
+                    let ItemRef::TraitImpl(trait_impl) = item else {
+                        raise_error!(
+                            self.ctx,
+                            self.span,
+                            "Expected TraitImpl item for the trait item in Drop."
+                        );
+                    };
+                    let Some(item_binder) = trait_impl.methods().find(|&x| x.0 == item_name) else {
+                        raise_error!(
+                            self.ctx,
+                            self.span,
+                            "Could not find drop_in_place method in Drop trait impl."
+                        );
+                    };
+                    let method_id = item_binder.1.skip_binder.id;
 
-            let fn_ptr = FnPtr::new(
-                FnPtrKind::Trait(tref.clone(), item_name, method_id),
-                GenericArgs::empty(),
-            );
+                    let fn_ptr = FnPtr::new(
+                        FnPtrKind::Trait(tref.clone(), item_name, method_id),
+                        GenericArgs::empty(),
+                    );
 
-            let call = Call {
-                func: FnOperand::Regular(fn_ptr),
-                args: Vec::from([Operand::Move(drop_arg)]),
-                dest: drop_ret,
-            };
+                    let call = Call {
+                        func: FnOperand::Regular(fn_ptr),
+                        args: Vec::from([Operand::Move(drop_arg)]),
+                        dest: drop_ret,
+                    };
 
-            term.kind = TerminatorKind::Call {
-                call,
-                target: target.clone(),
-                on_unwind: on_unwind.clone(),
+                    term.kind = TerminatorKind::Call {
+                        call,
+                        target: target.clone(),
+                        on_unwind: on_unwind.clone(),
+                    }
+                }
+                TraitRefKind::BuiltinOrAuto { builtin_data, .. } => {
+                    match builtin_data {
+                        BuiltinImplData::NoopDestruct => {
+                            // Remove drop statements that are noops.
+                            term.kind = TerminatorKind::Goto {
+                                target: target.clone(),
+                            }
+                        }
+                        BuiltinImplData::UntrackedDestruct => {
+                            // unimplemented
+                        }
+                        _ => {
+                            raise_error!(
+                                self.ctx,
+                                self.span,
+                                // TODO
+                                "desugar_drops: Expected NoopDestruct or UntrackedDestruct kind in BuiltinOrAuto."
+                            );
+                        }
+                    }
+                }
+                _ => {
+                    raise_error!(
+                        self.ctx,
+                        self.span,
+                        "Expected TraitImpl or BuiltinOrAuto kind in Drop terminator, but encounter {:?}",
+                        tref.kind
+                    );
+                }
             }
         }
-
         Ok(())
     }
 }
