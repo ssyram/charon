@@ -16,7 +16,6 @@ pub trait Sized<Self>
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
     fn drop_in_place = core::marker::Destruct::drop_in_place<Self>
     vtable: core::marker::Destruct::{vtable}
 }
@@ -93,7 +92,7 @@ where
     @0 := @TraitClause1::call_mut<'_>(move (@2), move (@3))
     storage_dead(@3)
     storage_dead(@2)
-    drop[{built_in impl Destruct for missing(@TypeBound(1, 0))}] f@1
+    drop[{built_in impl Destruct for impl FnMut(u8) -> u8}] f@1
     return
 }
 
@@ -136,7 +135,6 @@ fn {impl Destruct for closure<'_0>}::drop_in_place<'_0>(@1: *mut closure<'_0>)
 
 // Full name: test_crate::main::closure::{impl Destruct for closure<'_0>}
 impl<'_0> Destruct for closure<'_0> {
-    parent_clause0 = {built_in impl MetaSized for closure<missing('_Bound(1, 0))>}
     fn drop_in_place = {impl Destruct for closure<'_0>}::drop_in_place<'_0>
     non-dyn-compatible
 }
@@ -158,7 +156,7 @@ fn {impl FnOnce<(u8)> for closure<'_0>}::call_once<'_0>(@1: closure<'_0>, @2: (u
 
 // Full name: test_crate::main::{impl FnOnce<(u8)> for closure<'_0>}
 impl<'_0> FnOnce<(u8)> for closure<'_0> {
-    parent_clause0 = {built_in impl MetaSized for closure<missing('_Bound(1, 0))>}
+    parent_clause0 = {built_in impl MetaSized for closure<'_0>}
     parent_clause1 = {built_in impl Sized for (u8)}
     parent_clause2 = {built_in impl Tuple for (u8)}
     parent_clause3 = {built_in impl Sized for u8}
@@ -169,7 +167,7 @@ impl<'_0> FnOnce<(u8)> for closure<'_0> {
 
 // Full name: test_crate::main::{impl FnMut<(u8)> for closure<'_0>}
 impl<'_0> FnMut<(u8)> for closure<'_0> {
-    parent_clause0 = {built_in impl MetaSized for closure<missing('_Bound(1, 0))>}
+    parent_clause0 = {built_in impl MetaSized for closure<'_0>}
     parent_clause1 = {impl FnOnce<(u8)> for closure<'_0>}<'_0>
     parent_clause2 = {built_in impl Sized for (u8)}
     parent_clause3 = {built_in impl Tuple for (u8)}

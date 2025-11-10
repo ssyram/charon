@@ -16,7 +16,6 @@ pub trait Sized<Self>
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
     fn drop_in_place = core::marker::Destruct::drop_in_place<Self>
     vtable: core::marker::Destruct::{vtable}
 }
@@ -68,7 +67,6 @@ where
     [@TraitClause0]: MetaSized<T>,
     [@TraitClause1]: Sized<A>,
 {
-    parent_clause0 = {built_in impl MetaSized for alloc::boxed::Box<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0)), missing(@TraitClauseBound(1, 1))]}
     fn drop_in_place = {impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}::drop_in_place<T, A>[@TraitClause0, @TraitClause1]
     non-dyn-compatible
 }
@@ -133,7 +131,7 @@ pub enum List<T>
 where
     [@TraitClause0]: Sized<T>,
 {
-  Cons(T, alloc::boxed::Box<List<T>[@TraitClause0]>[{built_in impl MetaSized for List<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}, {built_in impl Sized for Global}]),
+  Cons(T, alloc::boxed::Box<List<T>[@TraitClause0]>[{built_in impl MetaSized for List<T>[@TraitClause0]}, {built_in impl Sized for Global}]),
   Nil,
 }
 
@@ -147,7 +145,6 @@ impl<T> Destruct for List<T>[@TraitClause0]
 where
     [@TraitClause0]: Sized<T>,
 {
-    parent_clause0 = {built_in impl MetaSized for List<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}
     fn drop_in_place = {impl Destruct for List<T>[@TraitClause0]}::drop_in_place<T>[@TraitClause0]
     non-dyn-compatible
 }
@@ -262,7 +259,6 @@ impl<T> Destruct for IdType<T>[@TraitClause0]
 where
     [@TraitClause0]: Sized<T>,
 {
-    parent_clause0 = {built_in impl MetaSized for IdType<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}
     fn drop_in_place = {impl Destruct for IdType<T>[@TraitClause0]}::drop_in_place<T>[@TraitClause0]
     non-dyn-compatible
 }
@@ -292,9 +288,9 @@ where
     storage_live(@2)
     @2 := move (x@1)
     @0 := IdType { 0: move (@2) }
-    drop[{built_in impl Destruct for missing(@TypeBound(1, 0))}] @2
+    drop[{built_in impl Destruct for T}] @2
     storage_dead(@2)
-    drop[{built_in impl Destruct for missing(@TypeBound(1, 0))}] x@1
+    drop[{built_in impl Destruct for T}] x@1
     return
 }
 
@@ -555,7 +551,7 @@ where
     let @0: (T, List<T>[@TraitClause0]); // return
     let l@1: List<T>[@TraitClause0]; // arg #1
     let hd@2: T; // local
-    let tl@3: alloc::boxed::Box<List<T>[@TraitClause0]>[{built_in impl MetaSized for List<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}, {built_in impl Sized for Global}]; // local
+    let tl@3: alloc::boxed::Box<List<T>[@TraitClause0]>[{built_in impl MetaSized for List<T>[@TraitClause0]}, {built_in impl Sized for Global}]; // local
     let @4: T; // anonymous local
     let @5: List<T>[@TraitClause0]; // anonymous local
 
@@ -563,7 +559,7 @@ where
         List::Cons => {
         },
         _ => {
-            panic(core::panicking::panic_explicit)
+            panic(core::panicking::panic)
         },
     }
     storage_live(hd@2)
@@ -577,11 +573,11 @@ where
     @0 := (move (@4), move (@5))
     drop[{impl Destruct for List<T>[@TraitClause0]}<T>[@TraitClause0]] @5
     storage_dead(@5)
-    drop[{built_in impl Destruct for missing(@TypeBound(1, 0))}] @4
+    drop[{built_in impl Destruct for T}] @4
     storage_dead(@4)
-    drop[{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<List<T>[@TraitClause0], Global>[{built_in impl MetaSized for List<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}, {built_in impl Sized for Global}]] tl@3
+    drop[{impl Destruct for alloc::boxed::Box<T>[@TraitClause0, @TraitClause1]}<List<T>[@TraitClause0], Global>[{built_in impl MetaSized for List<T>[@TraitClause0]}, {built_in impl Sized for Global}]] tl@3
     storage_dead(tl@3)
-    drop[{built_in impl Destruct for missing(@TypeBound(1, 0))}] hd@2
+    drop[{built_in impl Destruct for T}] hd@2
     storage_dead(hd@2)
     drop[{impl Destruct for List<T>[@TraitClause0]}<T>[@TraitClause0]] l@1
     return
@@ -602,7 +598,7 @@ where
     [@TraitClause0]: Sized<T>,
 {
   Leaf(T),
-  Node(T, NodeElem<T>[@TraitClause0], alloc::boxed::Box<Tree<T>[@TraitClause0]>[{built_in impl MetaSized for Tree<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}, {built_in impl Sized for Global}]),
+  Node(T, NodeElem<T>[@TraitClause0], alloc::boxed::Box<Tree<T>[@TraitClause0]>[{built_in impl MetaSized for Tree<T>[@TraitClause0]}, {built_in impl Sized for Global}]),
 }
 
 // Full name: test_crate::NodeElem
@@ -610,7 +606,7 @@ pub enum NodeElem<T>
 where
     [@TraitClause0]: Sized<T>,
 {
-  Cons(alloc::boxed::Box<Tree<T>[@TraitClause0]>[{built_in impl MetaSized for Tree<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}, {built_in impl Sized for Global}], alloc::boxed::Box<NodeElem<T>[@TraitClause0]>[{built_in impl MetaSized for NodeElem<missing(@TypeBound(1, 0))>[missing(@TraitClauseBound(1, 0))]}, {built_in impl Sized for Global}]),
+  Cons(alloc::boxed::Box<Tree<T>[@TraitClause0]>[{built_in impl MetaSized for Tree<T>[@TraitClause0]}, {built_in impl Sized for Global}], alloc::boxed::Box<NodeElem<T>[@TraitClause0]>[{built_in impl MetaSized for NodeElem<T>[@TraitClause0]}, {built_in impl Sized for Global}]),
   Nil,
 }
 

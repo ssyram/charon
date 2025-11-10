@@ -173,7 +173,7 @@ pub trait DiscriminantKind<Self>
 }
 
 // Full name: core::intrinsics::discriminant_value
-pub fn discriminant_value<'_0, T>(@1: &'_0 (T)) -> {built_in impl DiscriminantKind for missing(@TypeBound(1, 0))}::Discriminant
+pub fn discriminant_value<'_0, T>(@1: &'_0 (T)) -> {built_in impl DiscriminantKind for T}::Discriminant
 where
     [@TraitClause0]: Sized<T>,
 
@@ -189,7 +189,6 @@ pub trait StructuralPartialEq<Self>
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
     fn drop_in_place = drop_in_place<Self>
     vtable: core::marker::Destruct::{vtable}
 }

@@ -46,7 +46,6 @@ where
 #[lang_item("destruct")]
 pub trait Destruct<Self>
 {
-    parent_clause0 : [@TraitClause0]: MetaSized<Self>
     fn drop_in_place = drop_in_place<Self>
     vtable: core::marker::Destruct::{vtable}
 }
@@ -305,7 +304,7 @@ where
 
     @0 := ()
     @0 := ()
-    drop[{built_in impl Destruct for missing(@TypeBound(1, 0))}] @1
+    drop[{built_in impl Destruct for T}] @1
     return
 }
 
