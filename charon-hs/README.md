@@ -4,7 +4,8 @@ This directory contains auto-generated Haskell bindings for Charon's LLBC (Low-L
 
 ## Overview
 
-The Haskell types and Aeson `FromJSON` instances in `src/generated/` are automatically generated from the Rust type definitions in `charon/src/ast/`. This allows you to deserialize the `.llbc` JSON files produced by Charon into Haskell data structures.
+The Haskell types and Aeson `FromJSON` instances in `src/generated/` are automatically generated from the Rust type definitions in `charon/src/ast/`. This allows you to deserialize the `.llbc` JSON files produced by Charon into Haskell data structures for static analysis, verification, or transformation.
+
 
 ## Generated Modules
 
