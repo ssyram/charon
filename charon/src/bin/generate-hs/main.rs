@@ -186,20 +186,23 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                 .collect_vec();
             match tref.id {
                 TypeId::Adt(id) => {
-                    let mut base_ty = if let Some(tdecl) = ctx.crate_data.type_decls.get(id) {
+                    let base_ty = if let Some(tdecl) = ctx.crate_data.type_decls.get(id) {
                         type_name_to_haskell_ident(&tdecl.item_meta)
                     } else {
                         format!("MissingType{id}")
                     };
+                    // Convert Rust types to Haskell equivalents
                     if base_ty == "Vec" {
-                        base_ty = "[]".to_string();
                         return format!("[{}]", args[0]);
                     }
-                    if base_ty == "Ustr" {
+                    if base_ty == "Ustr" || base_ty == "String_" {
                         return "Text".to_string();
                     }
                     if base_ty == "Vector" {
                         return format!("[{}]", args[0]);
+                    }
+                    if base_ty == "Option" {
+                        return format!("Maybe {}", args[0]);
                     }
                     if args.is_empty() {
                         base_ty
@@ -268,7 +271,9 @@ fn build_type(_ctx: &GenerateCtx, decl: &TypeDecl, body: &str) -> String {
     } else {
         format!("{comment}\n")
     };
-    format!("{comment_part}data {ty_name}{generics_str} = {body}")
+    // Add deriving clause for Show, Eq, Ord
+    let deriving = "\n  deriving (Show, Eq, Ord)";
+    format!("{comment_part}data {ty_name}{generics_str} = {body}{deriving}")
 }
 
 /// Generate a Haskell type declaration that mirrors `decl`.
@@ -712,6 +717,7 @@ fn generate_hs(
         "TraitTypeConstraintId",
         "Ty",
         "Vector",
+        "FileId",  // Manually defined in template
     ];
 
     let mut processed_tys: HashSet<TypeDeclId> = dont_generate_ty

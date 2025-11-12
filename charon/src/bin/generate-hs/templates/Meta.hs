@@ -16,5 +16,6 @@ import Data.Text (Text)
 import qualified Data.HashMap.Strict as H
 
 type PathBuf = Text
+type FileId = Text
 
 {- __REPLACE0__ -}

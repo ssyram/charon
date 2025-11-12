@@ -1,0 +1,146 @@
+{-|
+WARNING: this file is partially auto-generated. Do not edit `Generated_LlbcOfJson.hs`
+by hand. Edit `templates/LlbcOfJson.hs` instead, or improve the code
+generation tool to avoid the need for hand-writing things.
+-}
+
+module Generated_LlbcOfJson where
+
+import Data.Aeson
+import Data.Text (Text)
+import Data.Maybe (catMaybes)
+import qualified Data.HashMap.Strict as H
+import Generated_Meta
+import Generated_Values
+import Generated_Types
+import Generated_Expressions
+import Generated_GAst
+import Generated_LlbcAst
+
+instance FromJSON Block where
+  parseJSON = withObject "Block" $ \o -> do
+  span <- o .: "span"
+    statements <- o .: "statements"
+  pure Block { span, statements }
+
+
+instance FromJSON Statement where
+  parseJSON = withObject "Statement" $ \o -> do
+  span <- o .: "span"
+    statementId <- o .: "id"
+    kind <- o .: "kind"
+    commentsBefore <- o .: "comments_before"
+  pure Statement { span, statementId, kind, commentsBefore }
+
+
+instance FromJSON StatementId where
+  parseJSON = withObject "StatementId" $ \o -> do
+  raw <- o .: "_raw"
+  pure StatementId { raw }
+
+
+instance FromJSON StatementKind where
+  parseJSON v = case v of
+  Object o | H.lookup "Assign" o /= Nothing -> do
+  arr <- o .: "Assign"
+  withArray "Assign" (\v -> do
+    v0 <- parseJSON =<< arr .! 0
+        v1 <- parseJSON =<< arr .! 1
+    pure (Assign v0 v1)) arr
+
+    Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
+  arr <- o .: "SetDiscriminant"
+  withArray "SetDiscriminant" (\v -> do
+    v0 <- parseJSON =<< arr .! 0
+        v1 <- parseJSON =<< arr .! 1
+    pure (SetDiscriminant v0 v1)) arr
+
+    Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
+  v <- o .: "CopyNonOverlapping"
+  CopyNonOverlapping <$> parseJSON v
+
+    Object o | H.lookup "StorageLive" o /= Nothing -> do
+  v <- o .: "StorageLive"
+  StorageLive <$> parseJSON v
+
+    Object o | H.lookup "StorageDead" o /= Nothing -> do
+  v <- o .: "StorageDead"
+  StorageDead <$> parseJSON v
+
+    Object o | H.lookup "Deinit" o /= Nothing -> do
+  v <- o .: "Deinit"
+  Deinit <$> parseJSON v
+
+    Object o | H.lookup "Drop" o /= Nothing -> do
+  arr <- o .: "Drop"
+  withArray "Drop" (\v -> do
+    v0 <- parseJSON =<< arr .! 0
+        v1 <- parseJSON =<< arr .! 1
+    pure (Drop v0 v1)) arr
+
+    Object o | H.lookup "Assert" o /= Nothing -> do
+  v <- o .: "Assert"
+  Assert <$> parseJSON v
+
+    Object o | H.lookup "Call" o /= Nothing -> do
+  v <- o .: "Call"
+  Call <$> parseJSON v
+
+    Object o | H.lookup "Abort" o /= Nothing -> do
+  v <- o .: "Abort"
+  Abort <$> parseJSON v
+
+    String "Return" -> pure Return
+    Object o | H.lookup "Break" o /= Nothing -> do
+  v <- o .: "Break"
+  Break <$> parseJSON v
+
+    Object o | H.lookup "Continue" o /= Nothing -> do
+  v <- o .: "Continue"
+  Continue <$> parseJSON v
+
+    String "Nop" -> pure Nop
+    Object o | H.lookup "Switch" o /= Nothing -> do
+  v <- o .: "Switch"
+  Switch <$> parseJSON v
+
+    Object o | H.lookup "Loop" o /= Nothing -> do
+  v <- o .: "Loop"
+  Loop <$> parseJSON v
+
+    Object o | H.lookup "Error" o /= Nothing -> do
+  v <- o .: "Error"
+  Error <$> parseJSON v
+
+  _ -> fail "Unknown variant"
+
+
+instance FromJSON Switch where
+  parseJSON v = case v of
+  Object o | H.lookup "If" o /= Nothing -> do
+  arr <- o .: "If"
+  withArray "If" (\v -> do
+    v0 <- parseJSON =<< arr .! 0
+        v1 <- parseJSON =<< arr .! 1
+        v2 <- parseJSON =<< arr .! 2
+    pure (If v0 v1 v2)) arr
+
+    Object o | H.lookup "SwitchInt" o /= Nothing -> do
+  arr <- o .: "SwitchInt"
+  withArray "SwitchInt" (\v -> do
+    v0 <- parseJSON =<< arr .! 0
+        v1 <- parseJSON =<< arr .! 1
+        v2 <- parseJSON =<< arr .! 2
+        v3 <- parseJSON =<< arr .! 3
+    pure (SwitchInt v0 v1 v2 v3)) arr
+
+    Object o | H.lookup "Match" o /= Nothing -> do
+  arr <- o .: "Match"
+  withArray "Match" (\v -> do
+    v0 <- parseJSON =<< arr .! 0
+        v1 <- parseJSON =<< arr .! 1
+        v2 <- parseJSON =<< arr .! 2
+    pure (Match v0 v1 v2)) arr
+
+  _ -> fail "Unknown variant"
+
