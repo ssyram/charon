@@ -34,6 +34,23 @@ make generate-hs
 make generate-hs-keep-llbc
 ```
 
+## Building and Testing
+
+To build and test the Haskell bindings:
+
+```bash
+cd charon-hs
+
+# Build the library
+cabal build
+
+# Run tests
+cabal test
+
+# Run tests with verbose output
+cabal test --test-show-details=direct
+```
+
 ## Usage Example
 
 ```haskell
@@ -61,6 +78,18 @@ The generated code requires:
 - `aeson` - JSON parsing
 - `text` - Text types
 - `unordered-containers` - HashMap for JSON objects
+
+## Testing
+
+The test suite validates that:
+1. Generated `FromJSON` instances correctly parse JSON
+2. Basic types can be deserialized from JSON strings
+3. The generation is idempotent (running `make generate-hs` produces identical output)
+
+Run tests with:
+```bash
+cabal test
+```
 
 ## Note
 
