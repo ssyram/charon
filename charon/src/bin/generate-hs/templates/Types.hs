@@ -12,4 +12,7 @@ import qualified Data.HashMap.Strict as H
 import Generated_Meta
 import Generated_Values
 
+-- Manually defined type aliases
+type TraitTypeConstraintId = Int
+
 {- __REPLACE0__ -}

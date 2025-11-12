@@ -19,24 +19,24 @@ import Generated_LlbcAst
 
 instance FromJSON Block where
   parseJSON = withObject "Block" $ \o -> do
-  span <- o .: "span"
-    statements <- o .: "statements"
-  pure Block { span, statements }
+  blockSpan <- o .: "span"
+    blockStatements <- o .: "statements"
+  pure Block { blockSpan, blockStatements }
 
 
 instance FromJSON Statement where
   parseJSON = withObject "Statement" $ \o -> do
-  span <- o .: "span"
-    statementId <- o .: "id"
-    kind <- o .: "kind"
-    commentsBefore <- o .: "comments_before"
-  pure Statement { span, statementId, kind, commentsBefore }
+  statementSpan <- o .: "span"
+    statementStatementId <- o .: "id"
+    statementKind <- o .: "kind"
+    statementCommentsBefore <- o .: "comments_before"
+  pure Statement { statementSpan, statementStatementId, statementKind, statementCommentsBefore }
 
 
 instance FromJSON StatementId where
   parseJSON = withObject "StatementId" $ \o -> do
-  raw <- o .: "_raw"
-  pure StatementId { raw }
+  statementidRaw <- o .: "_raw"
+  pure StatementId { statementidRaw }
 
 
 instance FromJSON StatementKind where

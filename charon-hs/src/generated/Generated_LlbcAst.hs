@@ -16,24 +16,24 @@ import Generated_Expressions
 import Generated_GAst
 
 data Block = Block
-  { span :: Span
-  , statements :: [Statement]
+  { blockSpan :: Span
+  , blockStatements :: [Statement]
   }
   deriving (Show, Eq, Ord)
 
 data Statement = Statement
-  { span :: Span
+  { statementSpan :: Span
   ,   -- | Integer uniquely identifying this statement among the statmeents in the current body. To
   -- | simplify things we generate globally-fresh ids when creating a new `Statement`.
-  statementId :: StatementId
-  , kind :: StatementKind
+  statementStatementId :: StatementId
+  , statementKind :: StatementKind
   ,   -- | Comments that precede this statement.
-  commentsBefore :: [String]
+  statementCommentsBefore :: [String]
   }
   deriving (Show, Eq, Ord)
 
 data StatementId = StatementId
-  { raw :: Int
+  { statementidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
@@ -58,6 +58,6 @@ data StatementKind = Assign Place Rvalue
   deriving (Show, Eq, Ord)
 
 data Switch = If Operand Block Block
-  | SwitchInt Operand LiteralType [([Literal], Block)] Block
-  | Match Place [([VariantId], Block)] Maybe Block
+  | SwitchInt Operand LiteralType ([([Literal], Block)]) Block
+  | Match Place ([([VariantId], Block)]) (Maybe Block)
   deriving (Show, Eq, Ord)

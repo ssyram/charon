@@ -69,19 +69,19 @@ instance FromJSON AlignmentModifier where
 
 instance FromJSON Assertion where
   parseJSON = withObject "Assertion" $ \o -> do
-  cond <- o .: "cond"
-    expected <- o .: "expected"
-    onFailure <- o .: "on_failure"
-  pure Assertion { cond, expected, onFailure }
+  assertionCond <- o .: "cond"
+    assertionExpected <- o .: "expected"
+    assertionOnFailure <- o .: "on_failure"
+  pure Assertion { assertionCond, assertionExpected, assertionOnFailure }
 
 
 instance FromJSON AttrInfo where
   parseJSON = withObject "AttrInfo" $ \o -> do
-  attributes <- o .: "attributes"
-    inline <- o .: "inline"
-    rename <- o .: "rename"
-    public <- o .: "public"
-  pure AttrInfo { attributes, inline, rename, public }
+  attrinfoAttributes <- o .: "attributes"
+    attrinfoInline <- o .: "inline"
+    attrinfoRename <- o .: "rename"
+    attrinfoPublic <- o .: "public"
+  pure AttrInfo { attrinfoAttributes, attrinfoInline, attrinfoRename, attrinfoPublic }
 
 
 instance FromJSON Attribute where
@@ -159,9 +159,9 @@ instance FromJSON Binop where
 
 instance (FromJSON a0) => FromJSON Binder a0 where
   parseJSON = withObject "Binder" $ \o -> do
-  binderParams <- o .: "params"
-    binderValue <- o .: "skip_binder"
-  pure Binder { binderParams, binderValue }
+  binderBinderParams <- o .: "params"
+    binderBinderValue <- o .: "skip_binder"
+  pure Binder { binderBinderParams, binderBinderValue }
 
 
 instance FromJSON BinderKind where
@@ -236,10 +236,10 @@ instance FromJSON BuiltinImplData where
 
 instance FromJSON BuiltinIndexOp where
   parseJSON = withObject "BuiltinIndexOp" $ \o -> do
-  isArray <- o .: "is_array"
-    mutability <- o .: "mutability"
-    isRange <- o .: "is_range"
-  pure BuiltinIndexOp { isArray, mutability, isRange }
+  builtinindexopIsArray <- o .: "is_array"
+    builtinindexopMutability <- o .: "mutability"
+    builtinindexopIsRange <- o .: "is_range"
+  pure BuiltinIndexOp { builtinindexopIsArray, builtinindexopMutability, builtinindexopIsRange }
 
 
 instance FromJSON BuiltinTy where
@@ -253,10 +253,10 @@ instance FromJSON BuiltinTy where
 
 instance FromJSON Call where
   parseJSON = withObject "Call" $ \o -> do
-  func <- o .: "func"
-    args <- o .: "args"
-    dest <- o .: "dest"
-  pure Call { func, args, dest }
+  callFunc <- o .: "func"
+    callArgs <- o .: "args"
+    callDest <- o .: "dest"
+  pure Call { callFunc, callArgs, callDest }
 
 
 instance FromJSON CastKind where
@@ -309,57 +309,57 @@ instance FromJSON CastKind where
 
 instance FromJSON CliOptions where
   parseJSON = withObject "CliOptions" $ \o -> do
-  ullbc <- o .: "ullbc"
-    lib <- o .: "lib"
-    bin <- o .: "bin"
-    mirPromoted <- o .: "mir_promoted"
-    mirOptimized <- o .: "mir_optimized"
-    mir <- o .: "mir"
-    inputFile <- o .: "input_file"
-    readLlbc <- o .: "read_llbc"
-    destDir <- o .: "dest_dir"
-    destFile <- o .: "dest_file"
-    usePolonius <- o .: "use_polonius"
-    skipBorrowck <- o .: "skip_borrowck"
-    monomorphize <- o .: "monomorphize"
-    monomorphizeMut <- o .: "monomorphize_mut"
-    extractOpaqueBodies <- o .: "extract_opaque_bodies"
-    translateAllMethods <- o .: "translate_all_methods"
-    included <- o .: "include"
-    opaque <- o .: "opaque"
-    exclude <- o .: "exclude"
-    removeAssociatedTypes <- o .: "remove_associated_types"
-    hideMarkerTraits <- o .: "hide_marker_traits"
-    removeAdtClauses <- o .: "remove_adt_clauses"
-    hideAllocator <- o .: "hide_allocator"
-    removeUnusedSelfClauses <- o .: "remove_unused_self_clauses"
-    addDropBounds <- o .: "add_drop_bounds"
-    startFrom <- o .: "start_from"
-    noCargo <- o .: "no_cargo"
-    rustcArgs <- o .: "rustc_args"
-    cargoArgs <- o .: "cargo_args"
-    abortOnError <- o .: "abort_on_error"
-    errorOnWarnings <- o .: "error_on_warnings"
-    noSerialize <- o .: "no_serialize"
-    printOriginalUllbc <- o .: "print_original_ullbc"
-    printUllbc <- o .: "print_ullbc"
-    printBuiltLlbc <- o .: "print_built_llbc"
-    printLlbc <- o .: "print_llbc"
-    noMergeGotoChains <- o .: "no_merge_goto_chains"
-    noOpsToFunctionCalls <- o .: "no_ops_to_function_calls"
-    rawBoxes <- o .: "raw_boxes"
-    preset <- o .: "preset"
-  pure CliOptions { ullbc, lib, bin, mirPromoted, mirOptimized, mir, inputFile, readLlbc, destDir, destFile, usePolonius, skipBorrowck, monomorphize, monomorphizeMut, extractOpaqueBodies, translateAllMethods, included, opaque, exclude, removeAssociatedTypes, hideMarkerTraits, removeAdtClauses, hideAllocator, removeUnusedSelfClauses, addDropBounds, startFrom, noCargo, rustcArgs, cargoArgs, abortOnError, errorOnWarnings, noSerialize, printOriginalUllbc, printUllbc, printBuiltLlbc, printLlbc, noMergeGotoChains, noOpsToFunctionCalls, rawBoxes, preset }
+  clioptionsUllbc <- o .: "ullbc"
+    clioptionsLib <- o .: "lib"
+    clioptionsBin <- o .: "bin"
+    clioptionsMirPromoted <- o .: "mir_promoted"
+    clioptionsMirOptimized <- o .: "mir_optimized"
+    clioptionsMir <- o .: "mir"
+    clioptionsInputFile <- o .: "input_file"
+    clioptionsReadLlbc <- o .: "read_llbc"
+    clioptionsDestDir <- o .: "dest_dir"
+    clioptionsDestFile <- o .: "dest_file"
+    clioptionsUsePolonius <- o .: "use_polonius"
+    clioptionsSkipBorrowck <- o .: "skip_borrowck"
+    clioptionsMonomorphize <- o .: "monomorphize"
+    clioptionsMonomorphizeMut <- o .: "monomorphize_mut"
+    clioptionsExtractOpaqueBodies <- o .: "extract_opaque_bodies"
+    clioptionsTranslateAllMethods <- o .: "translate_all_methods"
+    clioptionsIncluded <- o .: "include"
+    clioptionsOpaque <- o .: "opaque"
+    clioptionsExclude <- o .: "exclude"
+    clioptionsRemoveAssociatedTypes <- o .: "remove_associated_types"
+    clioptionsHideMarkerTraits <- o .: "hide_marker_traits"
+    clioptionsRemoveAdtClauses <- o .: "remove_adt_clauses"
+    clioptionsHideAllocator <- o .: "hide_allocator"
+    clioptionsRemoveUnusedSelfClauses <- o .: "remove_unused_self_clauses"
+    clioptionsAddDropBounds <- o .: "add_drop_bounds"
+    clioptionsStartFrom <- o .: "start_from"
+    clioptionsNoCargo <- o .: "no_cargo"
+    clioptionsRustcArgs <- o .: "rustc_args"
+    clioptionsCargoArgs <- o .: "cargo_args"
+    clioptionsAbortOnError <- o .: "abort_on_error"
+    clioptionsErrorOnWarnings <- o .: "error_on_warnings"
+    clioptionsNoSerialize <- o .: "no_serialize"
+    clioptionsPrintOriginalUllbc <- o .: "print_original_ullbc"
+    clioptionsPrintUllbc <- o .: "print_ullbc"
+    clioptionsPrintBuiltLlbc <- o .: "print_built_llbc"
+    clioptionsPrintLlbc <- o .: "print_llbc"
+    clioptionsNoMergeGotoChains <- o .: "no_merge_goto_chains"
+    clioptionsNoOpsToFunctionCalls <- o .: "no_ops_to_function_calls"
+    clioptionsRawBoxes <- o .: "raw_boxes"
+    clioptionsPreset <- o .: "preset"
+  pure CliOptions { clioptionsUllbc, clioptionsLib, clioptionsBin, clioptionsMirPromoted, clioptionsMirOptimized, clioptionsMir, clioptionsInputFile, clioptionsReadLlbc, clioptionsDestDir, clioptionsDestFile, clioptionsUsePolonius, clioptionsSkipBorrowck, clioptionsMonomorphize, clioptionsMonomorphizeMut, clioptionsExtractOpaqueBodies, clioptionsTranslateAllMethods, clioptionsIncluded, clioptionsOpaque, clioptionsExclude, clioptionsRemoveAssociatedTypes, clioptionsHideMarkerTraits, clioptionsRemoveAdtClauses, clioptionsHideAllocator, clioptionsRemoveUnusedSelfClauses, clioptionsAddDropBounds, clioptionsStartFrom, clioptionsNoCargo, clioptionsRustcArgs, clioptionsCargoArgs, clioptionsAbortOnError, clioptionsErrorOnWarnings, clioptionsNoSerialize, clioptionsPrintOriginalUllbc, clioptionsPrintUllbc, clioptionsPrintBuiltLlbc, clioptionsPrintLlbc, clioptionsNoMergeGotoChains, clioptionsNoOpsToFunctionCalls, clioptionsRawBoxes, clioptionsPreset }
 
 
 instance FromJSON ClosureInfo where
   parseJSON = withObject "ClosureInfo" $ \o -> do
-  kind <- o .: "kind"
-    fnOnceImpl <- o .: "fn_once_impl"
-    fnMutImpl <- o .: "fn_mut_impl"
-    fnImpl <- o .: "fn_impl"
-    signature <- o .: "signature"
-  pure ClosureInfo { kind, fnOnceImpl, fnMutImpl, fnImpl, signature }
+  closureinfoKind <- o .: "kind"
+    closureinfoFnOnceImpl <- o .: "fn_once_impl"
+    closureinfoFnMutImpl <- o .: "fn_mut_impl"
+    closureinfoFnImpl <- o .: "fn_impl"
+    closureinfoSignature <- o .: "signature"
+  pure ClosureInfo { closureinfoKind, closureinfoFnOnceImpl, closureinfoFnMutImpl, closureinfoFnImpl, closureinfoSignature }
 
 
 instance FromJSON ClosureKind where
@@ -389,23 +389,23 @@ instance FromJSON ConstGeneric where
 
 instance FromJSON ConstGenericParam where
   parseJSON = withObject "ConstGenericParam" $ \o -> do
-  index <- o .: "index"
-    name <- o .: "name"
-    ty <- o .: "ty"
-  pure ConstGenericParam { index, name, ty }
+  constgenericparamIndex <- o .: "index"
+    constgenericparamName <- o .: "name"
+    constgenericparamTy <- o .: "ty"
+  pure ConstGenericParam { constgenericparamIndex, constgenericparamName, constgenericparamTy }
 
 
 instance FromJSON ConstGenericVarId where
   parseJSON = withObject "ConstGenericVarId" $ \o -> do
-  raw <- o .: "_raw"
-  pure ConstGenericVarId { raw }
+  constgenericvaridRaw <- o .: "_raw"
+  pure ConstGenericVarId { constgenericvaridRaw }
 
 
 instance FromJSON ConstantExpr where
   parseJSON = withObject "ConstantExpr" $ \o -> do
-  kind <- o .: "kind"
-    ty <- o .: "ty"
-  pure ConstantExpr { kind, ty }
+  constantexprKind <- o .: "kind"
+    constantexprTy <- o .: "ty"
+  pure ConstantExpr { constantexprKind, constantexprTy }
 
 
 instance FromJSON ConstantExprKind where
@@ -442,16 +442,16 @@ instance FromJSON ConstantExprKind where
 
 instance FromJSON CopyNonOverlapping where
   parseJSON = withObject "CopyNonOverlapping" $ \o -> do
-  src <- o .: "src"
-    dst <- o .: "dst"
-    count <- o .: "count"
-  pure CopyNonOverlapping { src, dst, count }
+  copynonoverlappingSrc <- o .: "src"
+    copynonoverlappingDst <- o .: "dst"
+    copynonoverlappingCount <- o .: "count"
+  pure CopyNonOverlapping { copynonoverlappingSrc, copynonoverlappingDst, copynonoverlappingCount }
 
 
 instance FromJSON DeBruijnId where
   parseJSON = withObject "DeBruijnId" $ \o -> do
-  index <- o .: "index"
-  pure DeBruijnId { index }
+  debruijnidIndex <- o .: "index"
+  pure DeBruijnId { debruijnidIndex }
 
 
 instance (FromJSON a0) => FromJSON DeBruijnVar a0 where
@@ -501,37 +501,37 @@ instance FromJSON DeclarationGroup where
 
 instance FromJSON Disambiguator where
   parseJSON = withObject "Disambiguator" $ \o -> do
-  raw <- o .: "_raw"
-  pure Disambiguator { raw }
+  disambiguatorRaw <- o .: "_raw"
+  pure Disambiguator { disambiguatorRaw }
 
 
 instance FromJSON DiscriminantLayout where
   parseJSON = withObject "DiscriminantLayout" $ \o -> do
-  offset <- o .: "offset"
-    tagTy <- o .: "tag_ty"
-    encoding <- o .: "encoding"
-  pure DiscriminantLayout { offset, tagTy, encoding }
+  discriminantlayoutOffset <- o .: "offset"
+    discriminantlayoutTagTy <- o .: "tag_ty"
+    discriminantlayoutEncoding <- o .: "encoding"
+  pure DiscriminantLayout { discriminantlayoutOffset, discriminantlayoutTagTy, discriminantlayoutEncoding }
 
 
 instance FromJSON DynPredicate where
   parseJSON = withObject "DynPredicate" $ \o -> do
-  binder <- o .: "binder"
-  pure DynPredicate { binder }
+  dynpredicateBinder <- o .: "binder"
+  pure DynPredicate { dynpredicateBinder }
 
 
 instance FromJSON Field where
   parseJSON = withObject "Field" $ \o -> do
-  span <- o .: "span"
-    attrInfo <- o .: "attr_info"
-    fieldName <- o .: "name"
-    fieldTy <- o .: "ty"
-  pure Field { span, attrInfo, fieldName, fieldTy }
+  fieldSpan <- o .: "span"
+    fieldAttrInfo <- o .: "attr_info"
+    fieldFieldName <- o .: "name"
+    fieldFieldTy <- o .: "ty"
+  pure Field { fieldSpan, fieldAttrInfo, fieldFieldName, fieldFieldTy }
 
 
 instance FromJSON FieldId where
   parseJSON = withObject "FieldId" $ \o -> do
-  raw <- o .: "_raw"
-  pure FieldId { raw }
+  fieldidRaw <- o .: "_raw"
+  pure FieldId { fieldidRaw }
 
 
 instance FromJSON FieldProjKind where
@@ -552,10 +552,10 @@ instance FromJSON FieldProjKind where
 
 instance FromJSON File where
   parseJSON = withObject "File" $ \o -> do
-  name <- o .: "name"
-    crateName <- o .: "crate_name"
-    contents <- o .: "contents"
-  pure File { name, crateName, contents }
+  fileName <- o .: "name"
+    fileCrateName <- o .: "crate_name"
+    fileContents <- o .: "contents"
+  pure File { fileName, fileCrateName, fileContents }
 
 
 instance FromJSON FileId where
@@ -586,9 +586,9 @@ instance FromJSON FloatType where
 
 instance FromJSON FloatValue where
   parseJSON = withObject "FloatValue" $ \o -> do
-  floatValue <- o .: "value"
-    floatTy <- o .: "ty"
-  pure FloatValue { floatValue, floatTy }
+  floatvalueFloatValue <- o .: "value"
+    floatvalueFloatTy <- o .: "ty"
+  pure FloatValue { floatvalueFloatValue, floatvalueFloatTy }
 
 
 instance FromJSON FnOperand where
@@ -606,9 +606,9 @@ instance FromJSON FnOperand where
 
 instance FromJSON FnPtr where
   parseJSON = withObject "FnPtr" $ \o -> do
-  kind <- o .: "kind"
-    generics <- o .: "generics"
-  pure FnPtr { kind, generics }
+  fnptrKind <- o .: "kind"
+    fnptrGenerics <- o .: "generics"
+  pure FnPtr { fnptrKind, fnptrGenerics }
 
 
 instance FromJSON FnPtrKind where
@@ -630,15 +630,15 @@ instance FromJSON FnPtrKind where
 
 instance FromJSON FunDeclId where
   parseJSON = withObject "FunDeclId" $ \o -> do
-  raw <- o .: "_raw"
-  pure FunDeclId { raw }
+  fundeclidRaw <- o .: "_raw"
+  pure FunDeclId { fundeclidRaw }
 
 
 instance FromJSON FunDeclRef where
   parseJSON = withObject "FunDeclRef" $ \o -> do
-  id <- o .: "id"
-    generics <- o .: "generics"
-  pure FunDeclRef { id, generics }
+  fundeclrefId <- o .: "id"
+    fundeclrefGenerics <- o .: "generics"
+  pure FunDeclRef { fundeclrefId, fundeclrefGenerics }
 
 
 instance FromJSON FunId where
@@ -656,11 +656,11 @@ instance FromJSON FunId where
 
 instance FromJSON FunSig where
   parseJSON = withObject "FunSig" $ \o -> do
-  isUnsafe <- o .: "is_unsafe"
-    generics <- o .: "generics"
-    inputs <- o .: "inputs"
-    output <- o .: "output"
-  pure FunSig { isUnsafe, generics, inputs, output }
+  funsigIsUnsafe <- o .: "is_unsafe"
+    funsigGenerics <- o .: "generics"
+    funsigInputs <- o .: "inputs"
+    funsigOutput <- o .: "output"
+  pure FunSig { funsigIsUnsafe, funsigGenerics, funsigInputs, funsigOutput }
 
 
 instance (FromJSON a0) => FromJSON GDeclarationGroup a0 where
@@ -678,56 +678,56 @@ instance (FromJSON a0) => FromJSON GDeclarationGroup a0 where
 
 instance (FromJSON a0) => FromJSON GexprBody a0 where
   parseJSON = withObject "GexprBody" $ \o -> do
-  span <- o .: "span"
-    locals <- o .: "locals"
-    body <- o .: "body"
-  pure GexprBody { span, locals, body }
+  gexprbodySpan <- o .: "span"
+    gexprbodyLocals <- o .: "locals"
+    gexprbodyBody <- o .: "body"
+  pure GexprBody { gexprbodySpan, gexprbodyLocals, gexprbodyBody }
 
 
 instance FromJSON GenericArgs where
   parseJSON = withObject "GenericArgs" $ \o -> do
-  regions <- o .: "regions"
-    types <- o .: "types"
-    constGenerics <- o .: "const_generics"
-    traitRefs <- o .: "trait_refs"
-  pure GenericArgs { regions, types, constGenerics, traitRefs }
+  genericargsRegions <- o .: "regions"
+    genericargsTypes <- o .: "types"
+    genericargsConstGenerics <- o .: "const_generics"
+    genericargsTraitRefs <- o .: "trait_refs"
+  pure GenericArgs { genericargsRegions, genericargsTypes, genericargsConstGenerics, genericargsTraitRefs }
 
 
 instance FromJSON GenericParams where
   parseJSON = withObject "GenericParams" $ \o -> do
-  regions <- o .: "regions"
-    types <- o .: "types"
-    constGenerics <- o .: "const_generics"
-    traitClauses <- o .: "trait_clauses"
-    regionsOutlive <- o .: "regions_outlive"
-    typesOutlive <- o .: "types_outlive"
-    traitTypeConstraints <- o .: "trait_type_constraints"
-  pure GenericParams { regions, types, constGenerics, traitClauses, regionsOutlive, typesOutlive, traitTypeConstraints }
+  genericparamsRegions <- o .: "regions"
+    genericparamsTypes <- o .: "types"
+    genericparamsConstGenerics <- o .: "const_generics"
+    genericparamsTraitClauses <- o .: "trait_clauses"
+    genericparamsRegionsOutlive <- o .: "regions_outlive"
+    genericparamsTypesOutlive <- o .: "types_outlive"
+    genericparamsTraitTypeConstraints <- o .: "trait_type_constraints"
+  pure GenericParams { genericparamsRegions, genericparamsTypes, genericparamsConstGenerics, genericparamsTraitClauses, genericparamsRegionsOutlive, genericparamsTypesOutlive, genericparamsTraitTypeConstraints }
 
 
 instance FromJSON GlobalDecl where
   parseJSON = withObject "GlobalDecl" $ \o -> do
-  defId <- o .: "def_id"
-    itemMeta <- o .: "item_meta"
-    generics <- o .: "generics"
-    ty <- o .: "ty"
-    src <- o .: "src"
-    globalKind <- o .: "global_kind"
-    init <- o .: "init"
-  pure GlobalDecl { defId, itemMeta, generics, ty, src, globalKind, init }
+  globaldeclDefId <- o .: "def_id"
+    globaldeclItemMeta <- o .: "item_meta"
+    globaldeclGenerics <- o .: "generics"
+    globaldeclTy <- o .: "ty"
+    globaldeclSrc <- o .: "src"
+    globaldeclGlobalKind <- o .: "global_kind"
+    globaldeclInit <- o .: "init"
+  pure GlobalDecl { globaldeclDefId, globaldeclItemMeta, globaldeclGenerics, globaldeclTy, globaldeclSrc, globaldeclGlobalKind, globaldeclInit }
 
 
 instance FromJSON GlobalDeclId where
   parseJSON = withObject "GlobalDeclId" $ \o -> do
-  raw <- o .: "_raw"
-  pure GlobalDeclId { raw }
+  globaldeclidRaw <- o .: "_raw"
+  pure GlobalDeclId { globaldeclidRaw }
 
 
 instance FromJSON GlobalDeclRef where
   parseJSON = withObject "GlobalDeclRef" $ \o -> do
-  id <- o .: "id"
-    generics <- o .: "generics"
-  pure GlobalDeclRef { id, generics }
+  globaldeclrefId <- o .: "id"
+    globaldeclrefGenerics <- o .: "generics"
+  pure GlobalDeclRef { globaldeclrefId, globaldeclrefGenerics }
 
 
 instance FromJSON GlobalKind where
@@ -810,13 +810,13 @@ instance FromJSON ItemId where
 
 instance FromJSON ItemMeta where
   parseJSON = withObject "ItemMeta" $ \o -> do
-  name <- o .: "name"
-    span <- o .: "span"
-    sourceText <- o .: "source_text"
-    attrInfo <- o .: "attr_info"
-    isLocal <- o .: "is_local"
-    langItem <- o .: "lang_item"
-  pure ItemMeta { name, span, sourceText, attrInfo, isLocal, langItem }
+  itemmetaName <- o .: "name"
+    itemmetaSpan <- o .: "span"
+    itemmetaSourceText <- o .: "source_text"
+    itemmetaAttrInfo <- o .: "attr_info"
+    itemmetaIsLocal <- o .: "is_local"
+    itemmetaLangItem <- o .: "lang_item"
+  pure ItemMeta { itemmetaName, itemmetaSpan, itemmetaSourceText, itemmetaAttrInfo, itemmetaIsLocal, itemmetaLangItem }
 
 
 instance FromJSON ItemSource where
@@ -857,12 +857,12 @@ instance FromJSON ItemSource where
 
 instance FromJSON Layout where
   parseJSON = withObject "Layout" $ \o -> do
-  size <- o .: "size"
-    align <- o .: "align"
-    discriminantLayout <- o .: "discriminant_layout"
-    uninhabited <- o .: "uninhabited"
-    variantLayouts <- o .: "variant_layouts"
-  pure Layout { size, align, discriminantLayout, uninhabited, variantLayouts }
+  layoutSize <- o .: "size"
+    layoutAlign <- o .: "align"
+    layoutDiscriminantLayout <- o .: "discriminant_layout"
+    layoutUninhabited <- o .: "uninhabited"
+    layoutVariantLayouts <- o .: "variant_layouts"
+  pure Layout { layoutSize, layoutAlign, layoutDiscriminantLayout, layoutUninhabited, layoutVariantLayouts }
 
 
 instance FromJSON Literal where
@@ -915,30 +915,30 @@ instance FromJSON LiteralType where
 
 instance FromJSON Loc where
   parseJSON = withObject "Loc" $ \o -> do
-  line <- o .: "line"
-    col <- o .: "col"
-  pure Loc { line, col }
+  locLine <- o .: "line"
+    locCol <- o .: "col"
+  pure Loc { locLine, locCol }
 
 
 instance FromJSON Local where
   parseJSON = withObject "Local" $ \o -> do
-  index <- o .: "index"
-    name <- o .: "name"
-    localTy <- o .: "ty"
-  pure Local { index, name, localTy }
+  localIndex <- o .: "index"
+    localName <- o .: "name"
+    localLocalTy <- o .: "ty"
+  pure Local { localIndex, localName, localLocalTy }
 
 
 instance FromJSON LocalId where
   parseJSON = withObject "LocalId" $ \o -> do
-  raw <- o .: "_raw"
-  pure LocalId { raw }
+  localidRaw <- o .: "_raw"
+  pure LocalId { localidRaw }
 
 
 instance FromJSON Locals where
   parseJSON = withObject "Locals" $ \o -> do
-  argCount <- o .: "arg_count"
-    locals <- o .: "locals"
-  pure Locals { argCount, locals }
+  localsArgCount <- o .: "arg_count"
+    localsLocals <- o .: "locals"
+  pure Locals { localsArgCount, localsLocals }
 
 
 instance FromJSON MirLevel where
@@ -959,8 +959,8 @@ instance FromJSON MonomorphizeMut where
 
 instance FromJSON Name where
   parseJSON = withObject "Name" $ \o -> do
-  name <- o .: "name"
-  pure Name { name }
+  nameName <- o .: "name"
+  pure Name { nameName }
 
 
 instance FromJSON Nullop where
@@ -1029,9 +1029,9 @@ instance FromJSON PathElem where
 
 instance FromJSON Place where
   parseJSON = withObject "Place" $ \o -> do
-  kind <- o .: "kind"
-    ty <- o .: "ty"
-  pure Place { kind, ty }
+  placeKind <- o .: "kind"
+    placeTy <- o .: "ty"
+  pure Place { placeKind, placeTy }
 
 
 instance FromJSON PlaceKind where
@@ -1110,9 +1110,9 @@ instance FromJSON PtrMetadata where
 
 instance FromJSON RawAttribute where
   parseJSON = withObject "RawAttribute" $ \o -> do
-  path <- o .: "path"
-    args <- o .: "args"
-  pure RawAttribute { path, args }
+  rawattributePath <- o .: "path"
+    rawattributeArgs <- o .: "args"
+  pure RawAttribute { rawattributePath, rawattributeArgs }
 
 
 instance FromJSON RefKind where
@@ -1135,22 +1135,22 @@ instance FromJSON Region where
 
 instance (FromJSON a0) => FromJSON RegionBinder a0 where
   parseJSON = withObject "RegionBinder" $ \o -> do
-  binderRegions <- o .: "regions"
-    binderValue <- o .: "skip_binder"
-  pure RegionBinder { binderRegions, binderValue }
+  regionbinderBinderRegions <- o .: "regions"
+    regionbinderBinderValue <- o .: "skip_binder"
+  pure RegionBinder { regionbinderBinderRegions, regionbinderBinderValue }
 
 
 instance FromJSON RegionId where
   parseJSON = withObject "RegionId" $ \o -> do
-  raw <- o .: "_raw"
-  pure RegionId { raw }
+  regionidRaw <- o .: "_raw"
+  pure RegionId { regionidRaw }
 
 
 instance FromJSON RegionParam where
   parseJSON = withObject "RegionParam" $ \o -> do
-  index <- o .: "index"
-    name <- o .: "name"
-  pure RegionParam { index, name }
+  regionparamIndex <- o .: "index"
+    regionparamName <- o .: "name"
+  pure RegionParam { regionparamIndex, regionparamName }
 
 
 instance FromJSON ReprAlgorithm where
@@ -1162,11 +1162,11 @@ instance FromJSON ReprAlgorithm where
 
 instance FromJSON ReprOptions where
   parseJSON = withObject "ReprOptions" $ \o -> do
-  reprAlgo <- o .: "repr_algo"
-    alignModif <- o .: "align_modif"
-    transparent <- o .: "transparent"
-    explicitDiscrType <- o .: "explicit_discr_type"
-  pure ReprOptions { reprAlgo, alignModif, transparent, explicitDiscrType }
+  reproptionsReprAlgo <- o .: "repr_algo"
+    reproptionsAlignModif <- o .: "align_modif"
+    reproptionsTransparent <- o .: "transparent"
+    reproptionsExplicitDiscrType <- o .: "explicit_discr_type"
+  pure ReprOptions { reproptionsReprAlgo, reproptionsAlignModif, reproptionsTransparent, reproptionsExplicitDiscrType }
 
 
 instance FromJSON Rvalue where
@@ -1271,17 +1271,17 @@ instance FromJSON ScalarValue where
 
 instance FromJSON Span where
   parseJSON = withObject "Span" $ \o -> do
-  data_ <- o .: "data"
-    generatedFromSpan <- o .: "generated_from_span"
-  pure Span { data_, generatedFromSpan }
+  spanData <- o .: "data"
+    spanGeneratedFromSpan <- o .: "generated_from_span"
+  pure Span { spanData, spanGeneratedFromSpan }
 
 
 instance FromJSON SpanData where
   parseJSON = withObject "SpanData" $ \o -> do
-  file <- o .: "file_id"
-    begLoc <- o .: "beg"
-    endLoc <- o .: "end"
-  pure SpanData { file, begLoc, endLoc }
+  spandataFile <- o .: "file_id"
+    spandataBegLoc <- o .: "beg"
+    spandataEndLoc <- o .: "end"
+  pure SpanData { spandataFile, spandataBegLoc, spandataEndLoc }
 
 
 instance FromJSON TagEncoding where
@@ -1296,90 +1296,90 @@ instance FromJSON TagEncoding where
 
 instance FromJSON TargetInfo where
   parseJSON = withObject "TargetInfo" $ \o -> do
-  targetPointerSize <- o .: "target_pointer_size"
-    isLittleEndian <- o .: "is_little_endian"
-  pure TargetInfo { targetPointerSize, isLittleEndian }
+  targetinfoTargetPointerSize <- o .: "target_pointer_size"
+    targetinfoIsLittleEndian <- o .: "is_little_endian"
+  pure TargetInfo { targetinfoTargetPointerSize, targetinfoIsLittleEndian }
 
 
 instance FromJSON TraitAssocConst where
   parseJSON = withObject "TraitAssocConst" $ \o -> do
-  name <- o .: "name"
-    ty <- o .: "ty"
-    default <- o .: "default"
-  pure TraitAssocConst { name, ty, default }
+  traitassocconstName <- o .: "name"
+    traitassocconstTy <- o .: "ty"
+    traitassocconstDefault <- o .: "default"
+  pure TraitAssocConst { traitassocconstName, traitassocconstTy, traitassocconstDefault }
 
 
 instance FromJSON TraitAssocTy where
   parseJSON = withObject "TraitAssocTy" $ \o -> do
-  name <- o .: "name"
-    default <- o .: "default"
-    impliedClauses <- o .: "implied_clauses"
-  pure TraitAssocTy { name, default, impliedClauses }
+  traitassoctyName <- o .: "name"
+    traitassoctyDefault <- o .: "default"
+    traitassoctyImpliedClauses <- o .: "implied_clauses"
+  pure TraitAssocTy { traitassoctyName, traitassoctyDefault, traitassoctyImpliedClauses }
 
 
 instance FromJSON TraitAssocTyImpl where
   parseJSON = withObject "TraitAssocTyImpl" $ \o -> do
-  value <- o .: "value"
-  pure TraitAssocTyImpl { value }
+  traitassoctyimplValue <- o .: "value"
+  pure TraitAssocTyImpl { traitassoctyimplValue }
 
 
 instance FromJSON TraitClauseId where
   parseJSON = withObject "TraitClauseId" $ \o -> do
-  raw <- o .: "_raw"
-  pure TraitClauseId { raw }
+  traitclauseidRaw <- o .: "_raw"
+  pure TraitClauseId { traitclauseidRaw }
 
 
 instance FromJSON TraitDecl where
   parseJSON = withObject "TraitDecl" $ \o -> do
-  defId <- o .: "def_id"
-    itemMeta <- o .: "item_meta"
-    generics <- o .: "generics"
-    impliedClauses <- o .: "implied_clauses"
-    consts <- o .: "consts"
-    types <- o .: "types"
-    methods <- o .: "methods"
-    vtable <- o .: "vtable"
-  pure TraitDecl { defId, itemMeta, generics, impliedClauses, consts, types, methods, vtable }
+  traitdeclDefId <- o .: "def_id"
+    traitdeclItemMeta <- o .: "item_meta"
+    traitdeclGenerics <- o .: "generics"
+    traitdeclImpliedClauses <- o .: "implied_clauses"
+    traitdeclConsts <- o .: "consts"
+    traitdeclTypes <- o .: "types"
+    traitdeclMethods <- o .: "methods"
+    traitdeclVtable <- o .: "vtable"
+  pure TraitDecl { traitdeclDefId, traitdeclItemMeta, traitdeclGenerics, traitdeclImpliedClauses, traitdeclConsts, traitdeclTypes, traitdeclMethods, traitdeclVtable }
 
 
 instance FromJSON TraitDeclId where
   parseJSON = withObject "TraitDeclId" $ \o -> do
-  raw <- o .: "_raw"
-  pure TraitDeclId { raw }
+  traitdeclidRaw <- o .: "_raw"
+  pure TraitDeclId { traitdeclidRaw }
 
 
 instance FromJSON TraitDeclRef where
   parseJSON = withObject "TraitDeclRef" $ \o -> do
-  id <- o .: "id"
-    generics <- o .: "generics"
-  pure TraitDeclRef { id, generics }
+  traitdeclrefId <- o .: "id"
+    traitdeclrefGenerics <- o .: "generics"
+  pure TraitDeclRef { traitdeclrefId, traitdeclrefGenerics }
 
 
 instance FromJSON TraitImpl where
   parseJSON = withObject "TraitImpl" $ \o -> do
-  defId <- o .: "def_id"
-    itemMeta <- o .: "item_meta"
-    implTrait <- o .: "impl_trait"
-    generics <- o .: "generics"
-    impliedTraitRefs <- o .: "implied_trait_refs"
-    consts <- o .: "consts"
-    types <- o .: "types"
-    methods <- o .: "methods"
-    vtable <- o .: "vtable"
-  pure TraitImpl { defId, itemMeta, implTrait, generics, impliedTraitRefs, consts, types, methods, vtable }
+  traitimplDefId <- o .: "def_id"
+    traitimplItemMeta <- o .: "item_meta"
+    traitimplImplTrait <- o .: "impl_trait"
+    traitimplGenerics <- o .: "generics"
+    traitimplImpliedTraitRefs <- o .: "implied_trait_refs"
+    traitimplConsts <- o .: "consts"
+    traitimplTypes <- o .: "types"
+    traitimplMethods <- o .: "methods"
+    traitimplVtable <- o .: "vtable"
+  pure TraitImpl { traitimplDefId, traitimplItemMeta, traitimplImplTrait, traitimplGenerics, traitimplImpliedTraitRefs, traitimplConsts, traitimplTypes, traitimplMethods, traitimplVtable }
 
 
 instance FromJSON TraitImplId where
   parseJSON = withObject "TraitImplId" $ \o -> do
-  raw <- o .: "_raw"
-  pure TraitImplId { raw }
+  traitimplidRaw <- o .: "_raw"
+  pure TraitImplId { traitimplidRaw }
 
 
 instance FromJSON TraitImplRef where
   parseJSON = withObject "TraitImplRef" $ \o -> do
-  id <- o .: "id"
-    generics <- o .: "generics"
-  pure TraitImplRef { id, generics }
+  traitimplrefId <- o .: "id"
+    traitimplrefGenerics <- o .: "generics"
+  pure TraitImplRef { traitimplrefId, traitimplrefGenerics }
 
 
 instance FromJSON TraitItemName where
@@ -1390,24 +1390,24 @@ instance FromJSON TraitItemName where
 
 instance FromJSON TraitMethod where
   parseJSON = withObject "TraitMethod" $ \o -> do
-  name <- o .: "name"
-    item <- o .: "item"
-  pure TraitMethod { name, item }
+  traitmethodName <- o .: "name"
+    traitmethodItem <- o .: "item"
+  pure TraitMethod { traitmethodName, traitmethodItem }
 
 
 instance FromJSON TraitParam where
   parseJSON = withObject "TraitParam" $ \o -> do
-  clauseId <- o .: "clause_id"
-    span <- o .: "span"
-    trait <- o .: "trait_"
-  pure TraitParam { clauseId, span, trait }
+  traitparamClauseId <- o .: "clause_id"
+    traitparamSpan <- o .: "span"
+    traitparamTrait <- o .: "trait_"
+  pure TraitParam { traitparamClauseId, traitparamSpan, traitparamTrait }
 
 
 instance FromJSON TraitRef where
   parseJSON = withObject "TraitRef" $ \o -> do
-  kind <- o .: "kind"
-    traitDeclRef <- o .: "trait_decl_ref"
-  pure TraitRef { kind, traitDeclRef }
+  traitrefKind <- o .: "kind"
+    traitrefTraitDeclRef <- o .: "trait_decl_ref"
+  pure TraitRef { traitrefKind, traitrefTraitDeclRef }
 
 
 instance FromJSON TraitRefKind where
@@ -1454,16 +1454,16 @@ instance FromJSON TraitRefKind where
 
 instance FromJSON TraitTypeConstraint where
   parseJSON = withObject "TraitTypeConstraint" $ \o -> do
-  traitRef <- o .: "trait_ref"
-    typeName <- o .: "type_name"
-    ty <- o .: "ty"
-  pure TraitTypeConstraint { traitRef, typeName, ty }
+  traittypeconstraintTraitRef <- o .: "trait_ref"
+    traittypeconstraintTypeName <- o .: "type_name"
+    traittypeconstraintTy <- o .: "ty"
+  pure TraitTypeConstraint { traittypeconstraintTraitRef, traittypeconstraintTypeName, traittypeconstraintTy }
 
 
 instance FromJSON TraitTypeConstraintId where
   parseJSON = withObject "TraitTypeConstraintId" $ \o -> do
-  raw <- o .: "_raw"
-  pure TraitTypeConstraintId { raw }
+  traittypeconstraintidRaw <- o .: "_raw"
+  pure TraitTypeConstraintId { traittypeconstraintidRaw }
 
 
 instance FromJSON Ty where
@@ -1528,21 +1528,21 @@ instance FromJSON Ty where
 
 instance FromJSON TypeDecl where
   parseJSON = withObject "TypeDecl" $ \o -> do
-  defId <- o .: "def_id"
-    itemMeta <- o .: "item_meta"
-    generics <- o .: "generics"
-    src <- o .: "src"
-    kind <- o .: "kind"
-    layout <- o .: "layout"
-    ptrMetadata <- o .: "ptr_metadata"
-    repr <- o .: "repr"
-  pure TypeDecl { defId, itemMeta, generics, src, kind, layout, ptrMetadata, repr }
+  typedeclDefId <- o .: "def_id"
+    typedeclItemMeta <- o .: "item_meta"
+    typedeclGenerics <- o .: "generics"
+    typedeclSrc <- o .: "src"
+    typedeclKind <- o .: "kind"
+    typedeclLayout <- o .: "layout"
+    typedeclPtrMetadata <- o .: "ptr_metadata"
+    typedeclRepr <- o .: "repr"
+  pure TypeDecl { typedeclDefId, typedeclItemMeta, typedeclGenerics, typedeclSrc, typedeclKind, typedeclLayout, typedeclPtrMetadata, typedeclRepr }
 
 
 instance FromJSON TypeDeclId where
   parseJSON = withObject "TypeDeclId" $ \o -> do
-  raw <- o .: "_raw"
-  pure TypeDeclId { raw }
+  typedeclidRaw <- o .: "_raw"
+  pure TypeDeclId { typedeclidRaw }
 
 
 instance FromJSON TypeDeclKind where
@@ -1573,9 +1573,9 @@ instance FromJSON TypeDeclKind where
 
 instance FromJSON TypeDeclRef where
   parseJSON = withObject "TypeDeclRef" $ \o -> do
-  id <- o .: "id"
-    generics <- o .: "generics"
-  pure TypeDeclRef { id, generics }
+  typedeclrefId <- o .: "id"
+    typedeclrefGenerics <- o .: "generics"
+  pure TypeDeclRef { typedeclrefId, typedeclrefGenerics }
 
 
 instance FromJSON TypeId where
@@ -1594,15 +1594,15 @@ instance FromJSON TypeId where
 
 instance FromJSON TypeParam where
   parseJSON = withObject "TypeParam" $ \o -> do
-  index <- o .: "index"
-    name <- o .: "name"
-  pure TypeParam { index, name }
+  typeparamIndex <- o .: "index"
+    typeparamName <- o .: "name"
+  pure TypeParam { typeparamIndex, typeparamName }
 
 
 instance FromJSON TypeVarId where
   parseJSON = withObject "TypeVarId" $ \o -> do
-  raw <- o .: "_raw"
-  pure TypeVarId { raw }
+  typevaridRaw <- o .: "_raw"
+  pure TypeVarId { typevaridRaw }
 
 
 instance FromJSON UIntTy where
@@ -1646,26 +1646,26 @@ instance FromJSON UnsizingMetadata where
 
 instance FromJSON Variant where
   parseJSON = withObject "Variant" $ \o -> do
-  span <- o .: "span"
-    attrInfo <- o .: "attr_info"
-    variantName <- o .: "name"
-    fields <- o .: "fields"
-    discriminant <- o .: "discriminant"
-  pure Variant { span, attrInfo, variantName, fields, discriminant }
+  variantSpan <- o .: "span"
+    variantAttrInfo <- o .: "attr_info"
+    variantVariantName <- o .: "name"
+    variantFields <- o .: "fields"
+    variantDiscriminant <- o .: "discriminant"
+  pure Variant { variantSpan, variantAttrInfo, variantVariantName, variantFields, variantDiscriminant }
 
 
 instance FromJSON VariantId where
   parseJSON = withObject "VariantId" $ \o -> do
-  raw <- o .: "_raw"
-  pure VariantId { raw }
+  variantidRaw <- o .: "_raw"
+  pure VariantId { variantidRaw }
 
 
 instance FromJSON VariantLayout where
   parseJSON = withObject "VariantLayout" $ \o -> do
-  fieldOffsets <- o .: "field_offsets"
-    uninhabited <- o .: "uninhabited"
-    tag <- o .: "tag"
-  pure VariantLayout { fieldOffsets, uninhabited, tag }
+  variantlayoutFieldOffsets <- o .: "field_offsets"
+    variantlayoutUninhabited <- o .: "uninhabited"
+    variantlayoutTag <- o .: "tag"
+  pure VariantLayout { variantlayoutFieldOffsets, variantlayoutUninhabited, variantlayoutTag }
 
 
 instance (FromJSON a0, FromJSON a1) => FromJSON Vector a0 a1 where

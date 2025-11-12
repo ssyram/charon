@@ -16,23 +16,23 @@ import Generated_Expressions
 import Generated_GAst
 
 data Block = Block
-  { statements :: [Statement]
-  , terminator :: Terminator
+  { blockStatements :: [Statement]
+  , blockTerminator :: Terminator
   }
   deriving (Show, Eq, Ord)
 
 data BlockId = BlockId
-  { raw :: Int
+  { blockidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 type Blocks = [BlockId]
 
 data Statement = Statement
-  { span :: Span
-  , kind :: StatementKind
+  { statementSpan :: Span
+  , statementKind :: StatementKind
   ,   -- | Comments that precede this statement.
-  commentsBefore :: [String]
+  statementCommentsBefore :: [String]
   }
   deriving (Show, Eq, Ord)
 
@@ -49,14 +49,14 @@ data StatementKind = Assign Place Rvalue
   deriving (Show, Eq, Ord)
 
 data Switch = If BlockId BlockId
-  | SwitchInt LiteralType [(Literal, BlockId)] BlockId
+  | SwitchInt LiteralType ([(Literal, BlockId)]) BlockId
   deriving (Show, Eq, Ord)
 
 data Terminator = Terminator
-  { span :: Span
-  , kind :: TerminatorKind
+  { terminatorSpan :: Span
+  , terminatorKind :: TerminatorKind
   ,   -- | Comments that precede this terminator.
-  commentsBefore :: [String]
+  terminatorCommentsBefore :: [String]
   }
   deriving (Show, Eq, Ord)
 

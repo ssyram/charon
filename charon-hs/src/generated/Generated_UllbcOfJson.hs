@@ -19,15 +19,15 @@ import Generated_UllbcAst
 
 instance FromJSON Block where
   parseJSON = withObject "Block" $ \o -> do
-  statements <- o .: "statements"
-    terminator <- o .: "terminator"
-  pure Block { statements, terminator }
+  blockStatements <- o .: "statements"
+    blockTerminator <- o .: "terminator"
+  pure Block { blockStatements, blockTerminator }
 
 
 instance FromJSON BlockId where
   parseJSON = withObject "BlockId" $ \o -> do
-  raw <- o .: "_raw"
-  pure BlockId { raw }
+  blockidRaw <- o .: "_raw"
+  pure BlockId { blockidRaw }
 
 
 instance FromJSON Blocks where
@@ -36,10 +36,10 @@ instance FromJSON Blocks where
 
 instance FromJSON Statement where
   parseJSON = withObject "Statement" $ \o -> do
-  span <- o .: "span"
-    kind <- o .: "kind"
-    commentsBefore <- o .: "comments_before"
-  pure Statement { span, kind, commentsBefore }
+  statementSpan <- o .: "span"
+    statementKind <- o .: "kind"
+    statementCommentsBefore <- o .: "comments_before"
+  pure Statement { statementSpan, statementKind, statementCommentsBefore }
 
 
 instance FromJSON StatementKind where
@@ -111,10 +111,10 @@ instance FromJSON Switch where
 
 instance FromJSON Terminator where
   parseJSON = withObject "Terminator" $ \o -> do
-  span <- o .: "span"
-    kind <- o .: "kind"
-    commentsBefore <- o .: "comments_before"
-  pure Terminator { span, kind, commentsBefore }
+  terminatorSpan <- o .: "span"
+    terminatorKind <- o .: "kind"
+    terminatorCommentsBefore <- o .: "comments_before"
+  pure Terminator { terminatorSpan, terminatorKind, terminatorCommentsBefore }
 
 
 instance FromJSON TerminatorKind where

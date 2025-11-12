@@ -12,11 +12,14 @@ import qualified Data.HashMap.Strict as H
 import Generated_Meta
 import Generated_Values
 
+-- Manually defined type aliases
+type TraitTypeConstraintId = Int
+
 -- | (U)LLBC is a language with side-effects: a statement may abort in a way that isn't tracked by
 -- | control-flow. The two kinds of abort are:
 -- | - Panic (may unwind or not depending on compilation setting);
 -- | - Undefined behavior:
-data AbortKind = Panic Maybe Name
+data AbortKind = Panic (Maybe Name)
   | UndefinedBehavior
   | UnwindTerminate
   deriving (Show, Eq, Ord)
@@ -31,10 +34,10 @@ data AlignmentModifier = Align Int
 -- | parameters that aren't on the top-level item, e.g. `for<'a>` clauses (uses `RegionBinder` for
 -- | now), trait methods, GATs (TODO).
 data Binder a0 = Binder
-  { binderParams :: GenericParams
+  { binderBinderParams :: GenericParams
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
-  binderValue :: a0
+  binderBinderValue :: a0
   }
   deriving (Show, Eq, Ord)
 
@@ -78,14 +81,14 @@ data BuiltinImplData = BuiltinSized
 -- | One of 8 built-in indexing operations.
 data BuiltinIndexOp = BuiltinIndexOp
   {   -- | Whether this is a slice or array.
-  isArray :: Bool
+  builtinindexopIsArray :: Bool
   ,   -- | Whether we're indexing mutably or not. Determines the type ofreference of the input and
   -- | output.
-  mutability :: RefKind
+  builtinindexopMutability :: RefKind
   ,   -- | Whether we're indexing a single element or a subrange. If `true`, the function takes
   -- | two indices and the output is a slice; otherwise, the function take one index and the
   -- | output is a reference to a single element.
-  isRange :: Bool
+  builtinindexopIsRange :: Bool
   }
   deriving (Show, Eq, Ord)
 
@@ -107,15 +110,15 @@ data BuiltinTy = TBox
 
 -- | Additional information for closures.
 data ClosureInfo = ClosureInfo
-  { kind :: ClosureKind
+  { closureinfoKind :: ClosureKind
   ,   -- | The `FnOnce` implementation of this closure -- always exists.
-  fnOnceImpl :: (RegionBinder TraitImplRef)
+  closureinfoFnOnceImpl :: (RegionBinder TraitImplRef)
   ,   -- | The `FnMut` implementation of this closure, if any.
-  fnMutImpl :: Maybe (RegionBinder TraitImplRef)
+  closureinfoFnMutImpl :: Maybe (RegionBinder TraitImplRef)
   ,   -- | The `Fn` implementation of this closure, if any.
-  fnImpl :: Maybe (RegionBinder TraitImplRef)
+  closureinfoFnImpl :: Maybe (RegionBinder TraitImplRef)
   ,   -- | The signature of the function that this closure represents.
-  signature :: (RegionBinder ([Ty], Ty))
+  closureinfoSignature :: (RegionBinder ([Ty], Ty))
   }
   deriving (Show, Eq, Ord)
 
@@ -126,29 +129,29 @@ data ClosureKind = Fn
 
 -- | Const Generic Values. Either a primitive value, or a variable corresponding to a primitve value
 data ConstGeneric = CgGlobal GlobalDeclId
-  | CgVar (DeBruijnVar ConstGenericVarId)
+  | CgVar ((DeBruijnVar ConstGenericVarId))
   | CgValue Literal
   deriving (Show, Eq, Ord)
 
 -- | A const generic variable in a signature or binder.
 data ConstGenericParam = ConstGenericParam
   {   -- | Index identifying the variable among other variables bound at the same level.
-  index :: ConstGenericVarId
+  constgenericparamIndex :: ConstGenericVarId
   ,   -- | Const generic name
-  name :: String
+  constgenericparamName :: String
   ,   -- | Type of the const generic
-  ty :: LiteralType
+  constgenericparamTy :: LiteralType
   }
   deriving (Show, Eq, Ord)
 
 data ConstGenericVarId = ConstGenericVarId
-  { raw :: Int
+  { constgenericvaridRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | The index of a binder, counting from the innermost. See [`DeBruijnVar`] for details.
 data DeBruijnId = DeBruijnId
-  { index :: Int
+  { debruijnidIndex :: Int
   }
   deriving (Show, Eq, Ord)
 
@@ -190,7 +193,7 @@ data DeBruijnVar a0 = Bound DeBruijnId a0
   deriving (Show, Eq, Ord)
 
 data Disambiguator = Disambiguator
-  { raw :: Int
+  { disambiguatorRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
@@ -199,11 +202,11 @@ data Disambiguator = Disambiguator
 -- | as `tag` in memory.
 data DiscriminantLayout = DiscriminantLayout
   {   -- | The offset of the discriminant in bytes.
-  offset :: Int
+  discriminantlayoutOffset :: Int
   ,   -- | The representation type of the discriminant.
-  tagTy :: IntegerType
+  discriminantlayoutTagTy :: IntegerType
   ,   -- | How the tag is encoding in memory.
-  encoding :: TagEncoding
+  discriminantlayoutEncoding :: TagEncoding
   }
   deriving (Show, Eq, Ord)
 
@@ -215,26 +218,26 @@ data DynPredicate = DynPredicate
   -- | 
   -- | Only the first trait clause may have methods. We use the vtable of this trait in the `dyn
   -- | Trait` pointer metadata.
-  binder :: (Binder Ty)
+  dynpredicateBinder :: (Binder Ty)
   }
   deriving (Show, Eq, Ord)
 
 data Field = Field
-  { span :: Span
-  , attrInfo :: AttrInfo
-  , fieldName :: Maybe String
-  , fieldTy :: Ty
+  { fieldSpan :: Span
+  , fieldAttrInfo :: AttrInfo
+  , fieldFieldName :: Maybe String
+  , fieldFieldTy :: Ty
   }
   deriving (Show, Eq, Ord)
 
 data FieldId = FieldId
-  { raw :: Int
+  { fieldidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 data FnPtr = FnPtr
-  { kind :: FnPtrKind
-  , generics :: GenericArgs
+  { fnptrKind :: FnPtrKind
+  , fnptrGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -243,15 +246,15 @@ data FnPtrKind = FunId FunId
   deriving (Show, Eq, Ord)
 
 data FunDeclId = FunDeclId
-  { raw :: Int
+  { fundeclidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | Reference to a function declaration.
 data FunDeclRef = FunDeclRef
-  { id :: FunDeclId
+  { fundeclrefId :: FunDeclId
   ,   -- | Generic arguments passed to the function.
-  generics :: GenericArgs
+  fundeclrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -262,10 +265,10 @@ data FunId = FRegular FunDeclId
 
 -- | A set of generic arguments.
 data GenericArgs = GenericArgs
-  { regions :: [RegionId]
-  , types :: [TypeVarId]
-  , constGenerics :: [ConstGenericVarId]
-  , traitRefs :: [TraitClauseId]
+  { genericargsRegions :: [RegionId]
+  , genericargsTypes :: [TypeVarId]
+  , genericargsConstGenerics :: [ConstGenericVarId]
+  , genericargsTraitRefs :: [TraitClauseId]
   }
   deriving (Show, Eq, Ord)
 
@@ -277,28 +280,28 @@ data GenericArgs = GenericArgs
 -- | trait clauses, because those enforce constraints but do not need to
 -- | be filled with witnesses/instances.
 data GenericParams = GenericParams
-  { regions :: [RegionId]
-  , types :: [TypeVarId]
-  , constGenerics :: [ConstGenericVarId]
-  , traitClauses :: [TraitClauseId]
+  { genericparamsRegions :: [RegionId]
+  , genericparamsTypes :: [TypeVarId]
+  , genericparamsConstGenerics :: [ConstGenericVarId]
+  , genericparamsTraitClauses :: [TraitClauseId]
   ,   -- | The first region in the pair outlives the second region
-  regionsOutlive :: [(RegionBinder (OutlivesPred Region Region))]
+  genericparamsRegionsOutlive :: [(RegionBinder (OutlivesPred Region Region))]
   ,   -- | The type outlives the region
-  typesOutlive :: [(RegionBinder (OutlivesPred Ty Region))]
+  genericparamsTypesOutlive :: [(RegionBinder (OutlivesPred Ty Region))]
   ,   -- | Constraints over trait associated types
-  traitTypeConstraints :: [TraitTypeConstraintId]
+  genericparamsTraitTypeConstraints :: [TraitTypeConstraintId]
   }
   deriving (Show, Eq, Ord)
 
 data GlobalDeclId = GlobalDeclId
-  { raw :: Int
+  { globaldeclidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | Reference to a global declaration.
 data GlobalDeclRef = GlobalDeclRef
-  { id :: GlobalDeclId
-  , generics :: GenericArgs
+  { globaldeclrefId :: GlobalDeclId
+  , globaldeclrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -312,7 +315,7 @@ data GlobalDeclRef = GlobalDeclRef
 -- |   impl<T> PartialEq for List<T> { ...}
 -- |   ```
 -- | We distinguish the two.
-data ImplElem = ImplElemTy (Binder Ty)
+data ImplElem = ImplElemTy ((Binder Ty))
   | ImplElemTrait TraitImplId
   deriving (Show, Eq, Ord)
 
@@ -326,16 +329,16 @@ data ItemId = IdType TypeDeclId
 
 -- | Meta information about an item (function, trait decl, trait impl, type decl, global).
 data ItemMeta = ItemMeta
-  { name :: Name
-  , span :: Span
+  { itemmetaName :: Name
+  , itemmetaSpan :: Span
   ,   -- | The source code that corresponds to this item.
-  sourceText :: Maybe String
+  itemmetaSourceText :: Maybe String
   ,   -- | Attributes and visibility.
-  attrInfo :: AttrInfo
+  itemmetaAttrInfo :: AttrInfo
   ,   -- | `true` if the type decl is a local type decl, `false` if it comes from an external crate.
-  isLocal :: Bool
+  itemmetaIsLocal :: Bool
   ,   -- | If the item is built-in, record its internal builtin identifier.
-  langItem :: Maybe String
+  itemmetaLangItem :: Maybe String
   }
   deriving (Show, Eq, Ord)
 
@@ -376,18 +379,18 @@ data ItemSource = TopLevelItem
 -- | some of the layout parts are not available.
 data Layout = Layout
   {   -- | The size of the type in bytes.
-  size :: Maybe Int
+  layoutSize :: Maybe Int
   ,   -- | The alignment, in bytes.
-  align :: Maybe Int
+  layoutAlign :: Maybe Int
   ,   -- | The discriminant's layout, if any. Only relevant for types with multiple variants.
-  discriminantLayout :: Maybe DiscriminantLayout
+  layoutDiscriminantLayout :: Maybe DiscriminantLayout
   ,   -- | Whether the type is uninhabited, i.e. has any valid value at all.
   -- | Note that uninhabited types can have arbitrary layouts: `(u32, !)` has space for the `u32`
   -- | and `enum E2 { A, B(!), C(i32, !) }` may have space for a discriminant.
-  uninhabited :: Bool
+  layoutUninhabited :: Bool
   ,   -- | Map from `VariantId` to the corresponding field layouts. Structs are modeled as having
   -- | exactly one variant, unions as having no variant.
-  variantLayouts :: [VariantId]
+  layoutVariantLayouts :: [VariantId]
   }
   deriving (Show, Eq, Ord)
 
@@ -427,7 +430,7 @@ data Layout = Layout
 -- | 
 -- | Also note that the first path element in the name is always the crate name.
 data Name = Name
-  { name :: [PathElem]
+  { nameName :: [PathElem]
   }
   deriving (Show, Eq, Ord)
 
@@ -438,7 +441,7 @@ data OutlivesPred a0 a1 = OutlivesPred a0 a1
 -- | See the comments for [Name]
 data PathElem = PeIdent String Disambiguator
   | PeImpl ImplElem
-  | PeInstantiated (Binder GenericArgs)
+  | PeInstantiated ((Binder GenericArgs))
   deriving (Show, Eq, Ord)
 
 -- | The metadata stored in a pointer. That's the information stored in pointers alongside
@@ -454,7 +457,7 @@ data RefKind = RMut
   | RShared
   deriving (Show, Eq, Ord)
 
-data Region = RVar (DeBruijnVar RegionId)
+data Region = RVar ((DeBruijnVar RegionId))
   | RStatic
   | RErased
   deriving (Show, Eq, Ord)
@@ -463,24 +466,24 @@ data Region = RVar (DeBruijnVar RegionId)
 -- | issues in the derived ocaml visitors.
 -- | TODO: merge with `binder`
 data RegionBinder a0 = RegionBinder
-  { binderRegions :: [RegionId]
+  { regionbinderBinderRegions :: [RegionId]
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
-  binderValue :: a0
+  regionbinderBinderValue :: a0
   }
   deriving (Show, Eq, Ord)
 
 data RegionId = RegionId
-  { raw :: Int
+  { regionidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | A region variable in a signature or binder.
 data RegionParam = RegionParam
   {   -- | Index identifying the variable among other variables bound at the same level.
-  index :: RegionId
+  regionparamIndex :: RegionId
   ,   -- | Region name
-  name :: Maybe String
+  regionparamName :: Maybe String
   }
   deriving (Show, Eq, Ord)
 
@@ -497,10 +500,10 @@ data ReprAlgorithm = Rust
 -- | are encoded in [`Variant::discriminant`] and [`DiscriminantLayout`] instead.
 -- | This only stores whether the discriminant type was derived from an explicit annotation.
 data ReprOptions = ReprOptions
-  { reprAlgo :: ReprAlgorithm
-  , alignModif :: Maybe AlignmentModifier
-  , transparent :: Bool
-  , explicitDiscrType :: Bool
+  { reproptionsReprAlgo :: ReprAlgorithm
+  , reproptionsAlignModif :: Maybe AlignmentModifier
+  , reproptionsTransparent :: Bool
+  , reproptionsExplicitDiscrType :: Bool
   }
   deriving (Show, Eq, Ord)
 
@@ -511,17 +514,17 @@ data TagEncoding = Direct
 
 -- | The value of a trait associated type.
 data TraitAssocTyImpl = TraitAssocTyImpl
-  { value :: Ty
+  { traitassoctyimplValue :: Ty
   }
   deriving (Show, Eq, Ord)
 
 data TraitClauseId = TraitClauseId
-  { raw :: Int
+  { traitclauseidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 data TraitDeclId = TraitDeclId
-  { raw :: Int
+  { traitdeclidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
@@ -534,20 +537,20 @@ data TraitDeclId = TraitDeclId
 -- | 
 -- | The substitution is: `[String, bool]`.
 data TraitDeclRef = TraitDeclRef
-  { id :: TraitDeclId
-  , generics :: GenericArgs
+  { traitdeclrefId :: TraitDeclId
+  , traitdeclrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
 data TraitImplId = TraitImplId
-  { raw :: Int
+  { traitimplidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | A reference to a tait impl, using the provided arguments.
 data TraitImplRef = TraitImplRef
-  { id :: TraitImplId
-  , generics :: GenericArgs
+  { traitimplrefId :: TraitImplId
+  , traitimplrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -558,18 +561,18 @@ data TraitItemName = TraitItemName Text
 -- | variable binder, to which variables of the form `TraitRefKind::Clause` can refer to.
 data TraitParam = TraitParam
   {   -- | Index identifying the clause among other clauses bound at the same level.
-  clauseId :: TraitClauseId
-  , span :: Maybe Span
+  traitparamClauseId :: TraitClauseId
+  , traitparamSpan :: Maybe Span
   ,   -- | The trait that is implemented.
-  trait :: (RegionBinder TraitDeclRef)
+  traitparamTrait :: (RegionBinder TraitDeclRef)
   }
   deriving (Show, Eq, Ord)
 
 -- | A reference to a trait
 data TraitRef = TraitRef
-  { kind :: TraitRefKind
+  { traitrefKind :: TraitRefKind
   ,   -- | Not necessary, but useful
-  traitDeclRef :: (RegionBinder TraitDeclRef)
+  traitrefTraitDeclRef :: (RegionBinder TraitDeclRef)
   }
   deriving (Show, Eq, Ord)
 
@@ -581,11 +584,11 @@ data TraitRef = TraitRef
 -- | to a *trait instance*, which is why the [`TraitRefKind::Clause`] variant may seem redundant
 -- | with some of the other variants.
 data TraitRefKind = TraitImpl TraitImplRef
-  | Clause (DeBruijnVar TraitClauseId)
+  | Clause ((DeBruijnVar TraitClauseId))
   | ParentClause TraitRef TraitClauseId
   | ItemClause TraitRef TraitItemName TraitClauseId
   | Self
-  | BuiltinOrAuto BuiltinImplData [TraitClauseId] [(TraitItemName, TraitAssocTyImpl)]
+  | BuiltinOrAuto BuiltinImplData [TraitClauseId] ([(TraitItemName, TraitAssocTyImpl)])
   | Dyn
   | UnknownTrait String
   deriving (Show, Eq, Ord)
@@ -598,22 +601,22 @@ data TraitRefKind = TraitImpl TraitImplRef
 -- |         ^^^^^^^^^^
 -- | ```
 data TraitTypeConstraint = TraitTypeConstraint
-  { traitRef :: TraitRef
-  , typeName :: TraitItemName
-  , ty :: Ty
+  { traittypeconstraintTraitRef :: TraitRef
+  , traittypeconstraintTypeName :: TraitItemName
+  , traittypeconstraintTy :: Ty
   }
   deriving (Show, Eq, Ord)
 
 data Ty = TAdt TypeDeclRef
-  | TVar (DeBruijnVar TypeVarId)
+  | TVar ((DeBruijnVar TypeVarId))
   | TLiteral LiteralType
   | TNever
   | TRef Region Ty RefKind
   | TRawPtr Ty RefKind
   | TTraitType TraitRef TraitItemName
   | TDynTrait DynPredicate
-  | TFnPtr (RegionBinder ([Ty], Ty))
-  | TFnDef (RegionBinder FnPtr)
+  | TFnPtr ((RegionBinder ([Ty], Ty)))
+  | TFnDef ((RegionBinder FnPtr))
   | TPtrMetadata Ty
   | TError String
   deriving (Show, Eq, Ord)
@@ -632,27 +635,27 @@ data Ty = TAdt TypeDeclRef
 -- | A type can only be an ADT (structure or enumeration), as type aliases are
 -- | inlined in MIR.
 data TypeDecl = TypeDecl
-  { defId :: TypeDeclId
+  { typedeclDefId :: TypeDeclId
   ,   -- | Meta information associated with the item.
-  itemMeta :: ItemMeta
-  , generics :: GenericParams
+  typedeclItemMeta :: ItemMeta
+  , typedeclGenerics :: GenericParams
   ,   -- | The context of the type: distinguishes top-level items from closure-related items.
-  src :: ItemSource
+  typedeclSrc :: ItemSource
   ,   -- | The type kind: enum, struct, or opaque.
-  kind :: TypeDeclKind
+  typedeclKind :: TypeDeclKind
   ,   -- | The layout of the type. Information may be partial because of generics or dynamically-
   -- | sized types. If rustc cannot compute a layout, it is `None`.
-  layout :: Maybe Layout
+  typedeclLayout :: Maybe Layout
   ,   -- | The metadata associated with a pointer to the type.
-  ptrMetadata :: PtrMetadata
+  typedeclPtrMetadata :: PtrMetadata
   ,   -- | The representation options of this type declaration as annotated by the user.
   -- | Is `None` for foreign type declarations.
-  repr :: Maybe ReprOptions
+  typedeclRepr :: Maybe ReprOptions
   }
   deriving (Show, Eq, Ord)
 
 data TypeDeclId = TypeDeclId
-  { raw :: Int
+  { typedeclidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
@@ -666,8 +669,8 @@ data TypeDeclKind = Struct [FieldId]
 
 -- | Reference to a type declaration or builtin type.
 data TypeDeclRef = TypeDeclRef
-  { id :: TypeId
-  , generics :: GenericArgs
+  { typedeclrefId :: TypeId
+  , typedeclrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -682,31 +685,31 @@ data TypeId = TAdtId TypeDeclId
 -- | A type variable in a signature or binder.
 data TypeParam = TypeParam
   {   -- | Index identifying the variable among other variables bound at the same level.
-  index :: TypeVarId
+  typeparamIndex :: TypeVarId
   ,   -- | Variable name
-  name :: String
+  typeparamName :: String
   }
   deriving (Show, Eq, Ord)
 
 data TypeVarId = TypeVarId
-  { raw :: Int
+  { typevaridRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 data Variant = Variant
-  { span :: Span
-  , attrInfo :: AttrInfo
-  , variantName :: String
-  , fields :: [FieldId]
+  { variantSpan :: Span
+  , variantAttrInfo :: AttrInfo
+  , variantVariantName :: String
+  , variantFields :: [FieldId]
   ,   -- | The discriminant value outputted by `std::mem::discriminant` for this variant.
   -- | This can be different than the discriminant stored in memory (called `tag`).
   -- | That one is described by [`DiscriminantLayout`] and [`TagEncoding`].
-  discriminant :: Literal
+  variantDiscriminant :: Literal
   }
   deriving (Show, Eq, Ord)
 
 data VariantId = VariantId
-  { raw :: Int
+  { variantidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
@@ -715,10 +718,10 @@ data VariantId = VariantId
 -- | Maps fields to their offset within the layout.
 data VariantLayout = VariantLayout
   {   -- | The offset of each field.
-  fieldOffsets :: [FieldId]
+  variantlayoutFieldOffsets :: [FieldId]
   ,   -- | Whether the variant is uninhabited, i.e. has any valid possible value.
   -- | Note that uninhabited types can have arbitrary layouts.
-  uninhabited :: Bool
+  variantlayoutUninhabited :: Bool
   ,   -- | The memory representation of the discriminant corresponding to this
   -- | variant. It must be of the same type as the corresponding [`DiscriminantLayout::tag_ty`].
   -- | 
@@ -726,6 +729,6 @@ data VariantLayout = VariantLayout
   -- | - the untagged variant (cf. [`TagEncoding::Niche::untagged_variant`]) of a niched enum;
   -- | - the single variant of a struct;
   -- | - uninhabited.
-  tag :: Maybe ScalarValue
+  variantlayoutTag :: Maybe ScalarValue
   }
   deriving (Show, Eq, Ord)

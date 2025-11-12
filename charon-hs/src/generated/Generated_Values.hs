@@ -20,8 +20,8 @@ data FloatType = F16
 -- | the float value itself, we store its String representation. This allows
 -- | to derive the Eq and Ord traits, which are not implemented for floats
 data FloatValue = FloatValue
-  { floatValue :: String
-  , floatTy :: FloatType
+  { floatvalueFloatValue :: String
+  , floatvalueFloatTy :: FloatType
   }
   deriving (Show, Eq, Ord)
 

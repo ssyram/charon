@@ -33,7 +33,7 @@ import Generated_Types
 -- | initialization, `ls` is initialized to `⊥`, then this `⊥` is expanded to
 -- | `Cons (⊥, ⊥)` upon the first assignment, at which point we can initialize
 -- | the field 0, etc.).
-data AggregateKind = AggregatedAdt TypeDeclRef Maybe VariantId Maybe FieldId
+data AggregateKind = AggregatedAdt TypeDeclRef (Maybe VariantId) (Maybe FieldId)
   | AggregatedArray Ty ConstGeneric
   | AggregatedRawPtr Ty RefKind
   deriving (Show, Eq, Ord)
@@ -80,8 +80,8 @@ data CastKind = CastScalar LiteralType LiteralType
   deriving (Show, Eq, Ord)
 
 data ConstantExpr = ConstantExpr
-  { kind :: ConstantExprKind
-  , ty :: Ty
+  { constantexprKind :: ConstantExprKind
+  , constantexprTy :: Ty
   }
   deriving (Show, Eq, Ord)
 
@@ -114,25 +114,25 @@ data ConstantExpr = ConstantExpr
 -- | reading the constant `a.b` is translated to `{ _1 = const a; _2 = (_1.0) }`.
 data ConstantExprKind = CLiteral Literal
   | CTraitConst TraitRef TraitItemName
-  | CVar (DeBruijnVar ConstGenericVarId)
+  | CVar ((DeBruijnVar ConstGenericVarId))
   | CFnPtr FnPtr
   | CRawMemory [Int]
   | COpaque String
   deriving (Show, Eq, Ord)
 
-data FieldProjKind = ProjAdt TypeDeclId Maybe VariantId
+data FieldProjKind = ProjAdt TypeDeclId (Maybe VariantId)
   | ProjTuple Int
   deriving (Show, Eq, Ord)
 
 data LocalId = LocalId
-  { raw :: Int
+  { localidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | Nullary operation
 data Nullop = SizeOf
   | AlignOf
-  | OffsetOf [(Int, FieldId)]
+  | OffsetOf ([(Int, FieldId)])
   | UbChecks
   deriving (Show, Eq, Ord)
 
@@ -147,8 +147,8 @@ data OverflowMode = OPanic
   deriving (Show, Eq, Ord)
 
 data Place = Place
-  { kind :: PlaceKind
-  , ty :: Ty
+  { placeKind :: PlaceKind
+  , placeTy :: Ty
   }
   deriving (Show, Eq, Ord)
 
@@ -184,7 +184,7 @@ data Rvalue = Use Operand
   | NullaryOp Nullop Ty
   | Discriminant Place
   | Aggregate AggregateKind [Operand]
-  | Len Place Ty Maybe ConstGeneric
+  | Len Place Ty (Maybe ConstGeneric)
   | Repeat Operand Ty ConstGeneric
   | ShallowInitBox Operand Ty
   deriving (Show, Eq, Ord)

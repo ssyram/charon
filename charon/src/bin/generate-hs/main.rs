@@ -294,7 +294,15 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
             let field_types = fields
                 .iter()
                 .filter(|f| !f.is_opaque())
-                .map(|f| type_to_haskell_name(ctx, &f.ty))
+                .map(|f| {
+                    let ty_str = type_to_haskell_name(ctx, &f.ty);
+                    // Wrap complex types in parentheses
+                    if ty_str.contains(' ') || ty_str.starts_with('(') {
+                        format!("({ty_str})")
+                    } else {
+                        ty_str
+                    }
+                })
                 .join(" ");
             format!("{ty_name} {field_types}")
         }
@@ -305,9 +313,9 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
-                    let field_name = make_haskell_field_name(
-                        f.renamed_name().unwrap_or_else(|| f.name.as_deref().unwrap()),
-                    );
+                    let base_field_name = f.renamed_name().unwrap_or_else(|| f.name.as_deref().unwrap());
+                    // Prefix field name with type name to avoid conflicts in Haskell
+                    let field_name = make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name));
                     let field_ty = type_to_haskell_name(ctx, &f.ty);
                     let comment = extract_doc_comments(&f.attr_info);
                     let comment = build_doc_comment(comment, 1);
@@ -335,7 +343,15 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                         let field_types = variant
                             .fields
                             .iter()
-                            .map(|f| type_to_haskell_name(ctx, &f.ty))
+                            .map(|f| {
+                                let ty_str = type_to_haskell_name(ctx, &f.ty);
+                                // Wrap complex types in parentheses
+                                if ty_str.contains(' ') || ty_str.starts_with('(') {
+                                    format!("({ty_str})")
+                                } else {
+                                    ty_str
+                                }
+                            })
                             .join(" ");
                         format!("{variant_name} {field_types}")
                     } else {
@@ -343,7 +359,15 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                         let field_types = variant
                             .fields
                             .iter()
-                            .map(|f| type_to_haskell_name(ctx, &f.ty))
+                            .map(|f| {
+                                let ty_str = type_to_haskell_name(ctx, &f.ty);
+                                // Wrap complex types in parentheses
+                                if ty_str.contains(' ') || ty_str.starts_with('(') {
+                                    format!("({ty_str})")
+                                } else {
+                                    ty_str
+                                }
+                            })
                             .join(" ");
                         format!("{variant_name} {field_types}")
                     }
@@ -421,14 +445,15 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
         }
         TypeDeclKind::Struct(fields) => {
             // Record struct - parse as object
+            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
             let field_parsers = fields
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
                     let rust_name = f.name.as_ref().unwrap();
-                    let hs_name = make_haskell_field_name(
-                        f.renamed_name().unwrap_or(rust_name),
-                    );
+                    let base_field_name = f.renamed_name().unwrap_or(rust_name);
+                    // Prefix field name with type name to match the type definition
+                    let hs_name = make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name));
                     format!("{hs_name} <- o .: \"{rust_name}\"")
                 })
                 .join("\n    ");
@@ -436,9 +461,9 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
-                    make_haskell_field_name(
-                        f.renamed_name().unwrap_or_else(|| f.name.as_deref().unwrap()),
-                    )
+                    let base_field_name = f.renamed_name().unwrap_or_else(|| f.name.as_deref().unwrap());
+                    // Prefix field name with type name to match the type definition
+                    make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name))
                 })
                 .join(", ");
             format!(

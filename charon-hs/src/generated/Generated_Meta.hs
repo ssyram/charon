@@ -21,13 +21,13 @@ type FileId = Text
 -- | Information about the attributes and visibility of an item, field or variant..
 data AttrInfo = AttrInfo
   {   -- | Attributes (`#[...]`).
-  attributes :: [Attribute]
+  attrinfoAttributes :: [Attribute]
   ,   -- | Inline hints (on functions only).
-  inline :: Maybe InlineAttr
+  attrinfoInline :: Maybe InlineAttr
   ,   -- | The name computed from `charon::rename` and `charon::variants_prefix` attributes, if any.
   -- | This provides a custom name that can be used by consumers of llbc. E.g. Aeneas uses this to
   -- | rename definitions in the extracted code.
-  rename :: Maybe String
+  attrinfoRename :: Maybe String
   ,   -- | Whether this item is declared public. Impl blocks and closures don't have visibility
   -- | modifiers; we arbitrarily set this to `false` for them.
   -- | 
@@ -46,7 +46,7 @@ data AttrInfo = AttrInfo
   -- | Without the `pub use ...`, neither `X` nor `something` would be part of the crate's public
   -- | API (this is called "pub-in-priv" items). With or without the `pub use`, we set `public =
   -- | true`; computing item reachability is harder.
-  public :: Bool
+  attrinfoPublic :: Bool
   }
   deriving (Show, Eq, Ord)
 
@@ -61,12 +61,12 @@ data Attribute = AttrOpaque
 
 data File = File
   {   -- | The path to the file.
-  name :: FileName
+  fileName :: FileName
   ,   -- | Name of the crate this file comes from.
-  crateName :: String
+  fileCrateName :: String
   ,   -- | The contents of the source file, as seen by rustc at the time of translation.
   -- | Some files don't have contents.
-  contents :: Maybe String
+  fileContents :: Maybe String
   }
   deriving (Show, Eq, Ord)
 
@@ -83,18 +83,18 @@ data InlineAttr = Hint
 
 data Loc = Loc
   {   -- | The (1-based) line number.
-  line :: Int
+  locLine :: Int
   ,   -- | The (0-based) column offset.
-  col :: Int
+  locCol :: Int
   }
   deriving (Show, Eq, Ord)
 
 -- | A general attribute.
 data RawAttribute = RawAttribute
-  { path :: String
+  { rawattributePath :: String
   ,   -- | The arguments passed to the attribute, if any. We don't distinguish different delimiters or
   -- | the `path = lit` case.
-  args :: Maybe String
+  rawattributeArgs :: Maybe String
   }
   deriving (Show, Eq, Ord)
 
@@ -119,16 +119,16 @@ data Span = Span
   -- |     macro!(); // <-- `span` refers to this location
   -- | }
   -- | ```
-  data_ :: SpanData
+  spanData :: SpanData
   ,   -- | Where the code actually comes from, in case of macro expansion/inlining/etc.
-  generatedFromSpan :: Maybe SpanData
+  spanGeneratedFromSpan :: Maybe SpanData
   }
   deriving (Show, Eq, Ord)
 
 -- | Span information
 data SpanData = SpanData
-  { file :: FileId
-  , begLoc :: Loc
-  , endLoc :: Loc
+  { spandataFile :: FileId
+  , spandataBegLoc :: Loc
+  , spandataEndLoc :: Loc
   }
   deriving (Show, Eq, Ord)

@@ -22,133 +22,133 @@ import Generated_Expressions
 -- | because they're implicit in the semantics of our array accesses etc. Finally we introduce new asserts in
 -- | [crate::transform::resugar::reconstruct_asserts].
 data Assertion = Assertion
-  { cond :: Operand
+  { assertionCond :: Operand
   ,   -- | The value that the operand should evaluate to for the assert to succeed.
-  expected :: Bool
+  assertionExpected :: Bool
   ,   -- | What kind of abort happens on assert failure.
-  onFailure :: AbortKind
+  assertionOnFailure :: AbortKind
   }
   deriving (Show, Eq, Ord)
 
 data Call = Call
-  { func :: FnOperand
-  , args :: [Operand]
-  , dest :: Place
+  { callFunc :: FnOperand
+  , callArgs :: [Operand]
+  , callDest :: Place
   }
   deriving (Show, Eq, Ord)
 
 data CliOptions = CliOptions
   {   -- | Extract the unstructured LLBC (i.e., don't reconstruct the control-flow)
-  ullbc :: Bool
+  clioptionsUllbc :: Bool
   ,   -- | Compile the package's library
-  lib :: Bool
+  clioptionsLib :: Bool
   ,   -- | Compile the specified binary
-  bin :: Maybe String
+  clioptionsBin :: Maybe String
   ,   -- | Deprecated: use `--mir promoted` instead.
-  mirPromoted :: Bool
+  clioptionsMirPromoted :: Bool
   ,   -- | Deprecated: use `--mir optimized` instead.
-  mirOptimized :: Bool
+  clioptionsMirOptimized :: Bool
   ,   -- | The MIR stage to extract. This is only relevant for the current crate; for dpendencies only
   -- | MIR optimized is available.
-  mir :: Maybe MirLevel
+  clioptionsMir :: Maybe MirLevel
   ,   -- | The input file (the entry point of the crate to extract).
   -- | This is needed if you want to define a custom entry point (to only
   -- | extract part of a crate for instance).
-  inputFile :: Maybe PathBuf
+  clioptionsInputFile :: Maybe PathBuf
   ,   -- | Read an llbc file and pretty-print it. This is a terrible API, we should use subcommands.
-  readLlbc :: Maybe PathBuf
+  clioptionsReadLlbc :: Maybe PathBuf
   ,   -- | The destination directory. Files will be generated as `<dest_dir>/<crate_name>.{u}llbc`,
   -- | unless `dest_file` is set. `dest_dir` defaults to the current directory.
-  destDir :: Maybe PathBuf
+  clioptionsDestDir :: Maybe PathBuf
   ,   -- | The destination file. By default `<dest_dir>/<crate_name>.llbc`. If this is set we ignore
   -- | `dest_dir`.
-  destFile :: Maybe PathBuf
+  clioptionsDestFile :: Maybe PathBuf
   ,   -- | If activated, use Polonius' non-lexical lifetimes (NLL) analysis.
   -- | Otherwise, use the standard borrow checker.
-  usePolonius :: Bool
+  clioptionsUsePolonius :: Bool
   ,   -- | If activated, this skips borrow-checking of the crate.
-  skipBorrowck :: Bool
+  clioptionsSkipBorrowck :: Bool
   ,   -- | Monomorphize the items encountered when possible. Generic items found in the crate are
   -- | skipped. To only translate a particular call graph, use `--start-from`. Note: this doesn't
   -- | currently support `dyn Trait`.
-  monomorphize :: Bool
+  clioptionsMonomorphize :: Bool
   ,   -- | Partially monomorphize items to make it so that no item is ever monomorphized with a
   -- | mutable reference (or type containing one); said differently, so that the presence of
   -- | mutable references in a type is independent of its generics. This is used by Aeneas.
-  monomorphizeMut :: Maybe MonomorphizeMut
+  clioptionsMonomorphizeMut :: Maybe MonomorphizeMut
   ,   -- | Usually we skip the bodies of foreign methods and structs with private fields. When this
   -- | flag is on, we don't.
-  extractOpaqueBodies :: Bool
+  clioptionsExtractOpaqueBodies :: Bool
   ,   -- | Usually we skip the provided methods that aren't used. When this flag is on, we translate
   -- | them all.
-  translateAllMethods :: Bool
+  clioptionsTranslateAllMethods :: Bool
   ,   -- | Whitelist of items to translate. These use the name-matcher syntax.
-  included :: [String]
+  clioptionsIncluded :: [String]
   ,   -- | Blacklist of items to keep opaque. These use the name-matcher syntax.
-  opaque :: [String]
+  clioptionsOpaque :: [String]
   ,   -- | Blacklist of items to not translate at all. These use the name-matcher syntax.
-  exclude :: [String]
+  clioptionsExclude :: [String]
   ,   -- | List of traits for which we transform associated types to type parameters.
-  removeAssociatedTypes :: [String]
+  clioptionsRemoveAssociatedTypes :: [String]
   ,   -- | Whether to hide various marker traits such as `Sized`, `Sync`, `Send` and `Destruct`
   -- | anywhere they show up.
-  hideMarkerTraits :: Bool
+  clioptionsHideMarkerTraits :: Bool
   ,   -- | Remove trait clauses from type declarations. Must be combined with
   -- | `--remove-associated-types` for type declarations that use trait associated types in their
   -- | fields, otherwise this will result in errors.
-  removeAdtClauses :: Bool
+  clioptionsRemoveAdtClauses :: Bool
   ,   -- | Hide the `A` type parameter on standard library containers (`Box`, `Vec`, etc).
-  hideAllocator :: Bool
+  clioptionsHideAllocator :: Bool
   ,   -- | Trait method declarations take a `Self: Trait` clause as parameter, so that they can be
   -- | reused by multiple trait impls. This however causes trait definitions to be mutually
   -- | recursive with their method declarations. This flag removes `Self` clauses that aren't used
   -- | to break this mutual recursion.
-  removeUnusedSelfClauses :: Bool
+  clioptionsRemoveUnusedSelfClauses :: Bool
   ,   -- | Whether to add `Destruct` bounds everywhere to enable proper tracking of what code runs on
   -- | a given `drop` call.
-  addDropBounds :: Bool
+  clioptionsAddDropBounds :: Bool
   ,   -- | A list of item paths to use as starting points for the translation. We will translate these
   -- | items and any items they refer to, according to the opacity rules. When absent, we start
   -- | from the path `crate` (which translates the whole crate).
-  startFrom :: [String]
+  clioptionsStartFrom :: [String]
   ,   -- | Do not run cargo; instead, run the driver directly.
-  noCargo :: Bool
+  clioptionsNoCargo :: Bool
   ,   -- | Extra flags to pass to rustc.
-  rustcArgs :: [String]
+  clioptionsRustcArgs :: [String]
   ,   -- | Extra flags to pass to cargo. Incompatible with `--no-cargo`.
-  cargoArgs :: [String]
+  clioptionsCargoArgs :: [String]
   ,   -- | Panic on the first error. This is useful for debugging.
-  abortOnError :: Bool
+  clioptionsAbortOnError :: Bool
   ,   -- | Print the errors as warnings
-  errorOnWarnings :: Bool
-  , noSerialize :: Bool
-  , printOriginalUllbc :: Bool
-  , printUllbc :: Bool
-  , printBuiltLlbc :: Bool
-  , printLlbc :: Bool
-  , noMergeGotoChains :: Bool
-  , noOpsToFunctionCalls :: Bool
-  , rawBoxes :: Bool
+  clioptionsErrorOnWarnings :: Bool
+  , clioptionsNoSerialize :: Bool
+  , clioptionsPrintOriginalUllbc :: Bool
+  , clioptionsPrintUllbc :: Bool
+  , clioptionsPrintBuiltLlbc :: Bool
+  , clioptionsPrintLlbc :: Bool
+  , clioptionsNoMergeGotoChains :: Bool
+  , clioptionsNoOpsToFunctionCalls :: Bool
+  , clioptionsRawBoxes :: Bool
   ,   -- | Named builtin sets of options. Currently used only for dependent projects, eveentually
   -- | should be replaced with semantically-meaningful presets.
-  preset :: Maybe Preset
+  clioptionsPreset :: Maybe Preset
   }
   deriving (Show, Eq, Ord)
 
 data CopyNonOverlapping = CopyNonOverlapping
-  { src :: Operand
-  , dst :: Operand
-  , count :: Operand
+  { copynonoverlappingSrc :: Operand
+  , copynonoverlappingDst :: Operand
+  , copynonoverlappingCount :: Operand
   }
   deriving (Show, Eq, Ord)
 
 -- | A (group of) top-level declaration(s), properly reordered.
-data DeclarationGroup = TypeGroup (GDeclarationGroup TypeDeclId)
-  | FunGroup (GDeclarationGroup FunDeclId)
-  | GlobalGroup (GDeclarationGroup GlobalDeclId)
-  | TraitDeclGroup (GDeclarationGroup TraitDeclId)
-  | TraitImplGroup (GDeclarationGroup TraitImplId)
-  | MixedGroup (GDeclarationGroup ItemId)
+data DeclarationGroup = TypeGroup ((GDeclarationGroup TypeDeclId))
+  | FunGroup ((GDeclarationGroup FunDeclId))
+  | GlobalGroup ((GDeclarationGroup GlobalDeclId))
+  | TraitDeclGroup ((GDeclarationGroup TraitDeclId))
+  | TraitImplGroup ((GDeclarationGroup TraitImplId))
+  | MixedGroup ((GDeclarationGroup ItemId))
   deriving (Show, Eq, Ord)
 
 -- | A function operand is used in function calls.
@@ -161,10 +161,10 @@ data FnOperand = FnOpRegular FnPtr
 -- | A function signature.
 data FunSig = FunSig
   {   -- | Is the function unsafe or not
-  isUnsafe :: Bool
-  , generics :: GenericParams
-  , inputs :: [Ty]
-  , output :: Ty
+  funsigIsUnsafe :: Bool
+  , funsigGenerics :: GenericParams
+  , funsigInputs :: [Ty]
+  , funsigOutput :: Ty
   }
   deriving (Show, Eq, Ord)
 
@@ -178,27 +178,27 @@ data GDeclarationGroup a0 = NonRecGroup a0
 -- | TODO: arg_count should be stored in GFunDecl below. But then,
 -- |       the print is obfuscated and Aeneas may need some refactoring.
 data GexprBody a0 = GexprBody
-  { span :: Span
+  { gexprbodySpan :: Span
   ,   -- | The local variables.
-  locals :: Locals
-  , body :: a0
+  gexprbodyLocals :: Locals
+  , gexprbodyBody :: a0
   }
   deriving (Show, Eq, Ord)
 
 -- | A global variable definition (constant or static).
 data GlobalDecl = GlobalDecl
-  { defId :: GlobalDeclId
+  { globaldeclDefId :: GlobalDeclId
   ,   -- | The meta data associated with the declaration.
-  itemMeta :: ItemMeta
-  , generics :: GenericParams
-  , ty :: Ty
+  globaldeclItemMeta :: ItemMeta
+  , globaldeclGenerics :: GenericParams
+  , globaldeclTy :: Ty
   ,   -- | The context of the global: distinguishes top-level items from trait-associated items.
-  src :: ItemSource
+  globaldeclSrc :: ItemSource
   ,   -- | The kind of global (static or const).
-  globalKind :: GlobalKind
+  globaldeclGlobalKind :: GlobalKind
   ,   -- | The initializer function used to compute the initial value for this constant/static. It
   -- | uses the same generic parameters as the global.
-  init :: FunDeclId
+  globaldeclInit :: FunDeclId
   }
   deriving (Show, Eq, Ord)
 
@@ -210,25 +210,25 @@ data GlobalKind = Static
 -- | A variable
 data Local = Local
   {   -- | Unique index identifying the variable
-  index :: LocalId
+  localIndex :: LocalId
   ,   -- | Variable name - may be `None` if the variable was introduced by Rust
   -- | through desugaring.
-  name :: Maybe String
+  localName :: Maybe String
   ,   -- | The variable type
-  localTy :: Ty
+  localLocalTy :: Ty
   }
   deriving (Show, Eq, Ord)
 
 -- | The local variables of a body.
 data Locals = Locals
   {   -- | The number of local variables used for the input arguments.
-  argCount :: Int
+  localsArgCount :: Int
   ,   -- | The local variables.
   -- | We always have, in the following order:
   -- | - the local used for the return value (index 0)
   -- | - the `arg_count` input arguments
   -- | - the remaining locals, used for the intermediate computations
-  locals :: [LocalId]
+  localsLocals :: [LocalId]
   }
   deriving (Show, Eq, Ord)
 
@@ -255,18 +255,18 @@ data Preset = OldDefaults
 
 -- | An associated constant in a trait.
 data TraitAssocConst = TraitAssocConst
-  { name :: TraitItemName
-  , ty :: Ty
-  , default :: Maybe GlobalDeclRef
+  { traitassocconstName :: TraitItemName
+  , traitassocconstTy :: Ty
+  , traitassocconstDefault :: Maybe GlobalDeclRef
   }
   deriving (Show, Eq, Ord)
 
 -- | An associated type in a trait.
 data TraitAssocTy = TraitAssocTy
-  { name :: TraitItemName
-  , default :: Maybe Ty
+  { traitassoctyName :: TraitItemName
+  , traitassoctyDefault :: Maybe Ty
   ,   -- | List of trait clauses that apply to this type.
-  impliedClauses :: [TraitClauseId]
+  traitassoctyImpliedClauses :: [TraitClauseId]
   }
   deriving (Show, Eq, Ord)
 
@@ -303,9 +303,9 @@ data TraitAssocTy = TraitAssocTy
 -- | Of course, this forbids other useful use cases such as visitors implemented
 -- | by means of traits.
 data TraitDecl = TraitDecl
-  { defId :: TraitDeclId
-  , itemMeta :: ItemMeta
-  , generics :: GenericParams
+  { traitdeclDefId :: TraitDeclId
+  , traitdeclItemMeta :: ItemMeta
+  , traitdeclGenerics :: GenericParams
   ,   -- | The "parent" clauses: the supertraits.
   -- | 
   -- | Supertraits are actually regular where clauses, but we decided to have
@@ -318,13 +318,13 @@ data TraitDecl = TraitDecl
   -- | ```
   -- | TODO: actually, as of today, we consider that all trait clauses of
   -- | trait declarations are parent clauses.
-  impliedClauses :: [TraitClauseId]
+  traitdeclImpliedClauses :: [TraitClauseId]
   ,   -- | The associated constants declared in the trait.
-  consts :: [TraitAssocConst]
+  traitdeclConsts :: [TraitAssocConst]
   ,   -- | The associated types declared in the trait. The binder binds the generic parameters of the
   -- | type if it is a GAT (Generic Associated Type). For a plain associated type the binder binds
   -- | nothing.
-  types :: [(Binder TraitAssocTy)]
+  traitdeclTypes :: [(Binder TraitAssocTy)]
   ,   -- | The methods declared by the trait. The binder binds the generic parameters of the method.
   -- | 
   -- | ```rust
@@ -333,10 +333,10 @@ data TraitDecl = TraitDecl
   -- |   fn method<'a, U>(x: &'a U);
   -- | }
   -- | ```
-  methods :: [(Binder TraitMethod)]
+  traitdeclMethods :: [(Binder TraitMethod)]
   ,   -- | The virtual table struct for this trait, if it has one.
   -- | It is guaranteed that the trait has a vtable iff it is dyn-compatible.
-  vtable :: Maybe TypeDeclRef
+  traitdeclVtable :: Maybe TypeDeclRef
   }
   deriving (Show, Eq, Ord)
 
@@ -351,33 +351,33 @@ data TraitDecl = TraitDecl
 -- | }
 -- | ```
 data TraitImpl = TraitImpl
-  { defId :: TraitImplId
-  , itemMeta :: ItemMeta
+  { traitimplDefId :: TraitImplId
+  , traitimplItemMeta :: ItemMeta
   ,   -- | The information about the implemented trait.
   -- | Note that this contains the instantiation of the "parent"
   -- | clauses.
-  implTrait :: TraitDeclRef
-  , generics :: GenericParams
+  traitimplImplTrait :: TraitDeclRef
+  , traitimplGenerics :: GenericParams
   ,   -- | The trait references for the parent clauses (see [TraitDecl]).
-  impliedTraitRefs :: [TraitClauseId]
+  traitimplImpliedTraitRefs :: [TraitClauseId]
   ,   -- | The implemented associated constants.
-  consts :: [(TraitItemName, GlobalDeclRef)]
+  traitimplConsts :: [(TraitItemName, GlobalDeclRef)]
   ,   -- | The implemented associated types.
-  types :: [(TraitItemName, (Binder TraitAssocTyImpl))]
+  traitimplTypes :: [(TraitItemName, (Binder TraitAssocTyImpl))]
   ,   -- | The implemented methods
-  methods :: [(TraitItemName, (Binder FunDeclRef))]
+  traitimplMethods :: [(TraitItemName, (Binder FunDeclRef))]
   ,   -- | The virtual table instance for this trait implementation. This is `Some` iff the trait is
   -- | dyn-compatible.
-  vtable :: Maybe GlobalDeclRef
+  traitimplVtable :: Maybe GlobalDeclRef
   }
   deriving (Show, Eq, Ord)
 
 -- | A trait method.
 data TraitMethod = TraitMethod
-  { name :: TraitItemName
+  { traitmethodName :: TraitItemName
   ,   -- | Each method declaration is represented by a function item. That function contains the
   -- | signature of the method as well as information like attributes. It has a body iff the
   -- | method declaration has a default implementation; otherwise it has an `Opaque` body.
-  item :: FunDeclRef
+  traitmethodItem :: FunDeclRef
   }
   deriving (Show, Eq, Ord)
