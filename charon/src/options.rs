@@ -157,8 +157,8 @@ pub struct CliOpts {
     )]
     #[serde(default)]
     pub remove_associated_types: Vec<String>,
-    /// Whether to hide the `Sized`, `Sync`, `Send` and `Unpin` marker traits anywhere they show
-    /// up.
+    /// Whether to hide various marker traits such as `Sized`, `Sync`, `Send` and `Destruct`
+    /// anywhere they show up.
     #[clap(long = "hide-marker-traits")]
     #[serde(default)]
     pub hide_marker_traits: bool,
@@ -179,8 +179,8 @@ pub struct CliOpts {
     #[clap(long)]
     #[serde(default)]
     pub remove_unused_self_clauses: bool,
-    /// Whether to add `Drop` bounds everywhere to enable proper tracking of what code runs on a
-    /// given `drop` call.
+    /// Whether to add `Destruct` bounds everywhere to enable proper tracking of what code runs on
+    /// a given `drop` call.
     #[clap(long)]
     #[serde(default)]
     pub add_drop_bounds: bool,
@@ -270,12 +270,9 @@ pub struct CliOpts {
 
 /// The MIR stage to use. This is only relevant for the current crate: for dependencies, only mir
 /// optimized is available (or mir elaborated for consts).
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Serialize, Deserialize,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Serialize, Deserialize)]
 pub enum MirLevel {
     /// The MIR just after MIR lowering.
-    #[default]
     Built,
     /// The MIR after const promotion. This is the MIR used by the borrow-checker.
     Promoted,
@@ -451,8 +448,8 @@ pub struct TranslateOptions {
     /// If `Some(_)`, run the partial mutability monomorphization pass. The contained enum
     /// indicates whether to partially monomorphize types.
     pub monomorphize_mut: Option<MonomorphizeMut>,
-    /// Whether to hide the `Sized`, `Sync`, `Send` and `Unpin` marker traits anywhere they show
-    /// up.
+    /// Whether to hide various marker traits such as `Sized`, `Sync`, `Send` and `Destruct`
+    /// anywhere they show up.
     pub hide_marker_traits: bool,
     /// Remove trait clauses attached to type declarations.
     pub remove_adt_clauses: bool,
@@ -493,10 +490,8 @@ impl TranslateOptions {
 
         let mir_level = if options.mir_optimized {
             MirLevel::Optimized
-        } else if options.mir_promoted {
-            MirLevel::Promoted
         } else {
-            options.mir.unwrap_or_default()
+            options.mir.unwrap_or(MirLevel::Promoted)
         };
 
         let item_opacities = {

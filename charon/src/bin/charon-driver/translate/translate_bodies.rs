@@ -13,6 +13,7 @@ use std::panic;
 use super::translate_crate::*;
 use super::translate_ctx::*;
 use charon_lib::ast::ullbc_ast::StatementKind;
+use charon_lib::ast::ullbc_ast_utils::BodyBuilder;
 use charon_lib::ast::*;
 use charon_lib::formatter::FmtCtx;
 use charon_lib::formatter::IntoFormatter;
@@ -442,19 +443,6 @@ impl BodyTransCtx<'_, '_, '_> {
                     ptr_metadata: Operand::mk_const_unit(),
                 })
             }
-            hax::Rvalue::Len(place) => {
-                let place = self.translate_place(span, place)?;
-                let ty = place.ty().clone();
-                let tref = ty.as_adt().unwrap();
-                let cg = match tref.id {
-                    TypeId::Builtin(BuiltinTy::Array) => {
-                        Some(tref.generics.const_generics[0].clone())
-                    }
-                    TypeId::Builtin(BuiltinTy::Slice) => None,
-                    _ => unreachable!(),
-                };
-                Ok(Rvalue::Len(place, ty, cg))
-            }
             hax::Rvalue::Cast(cast_kind, hax_operand, tgt_ty) => {
                 trace!("Rvalue::Cast: {:?}", rvalue);
                 // Translate the target type
@@ -509,6 +497,8 @@ impl BodyTransCtx<'_, '_, '_> {
                         ..,
                     ) => CastKind::FnPtr(src_ty, tgt_ty),
                     hax::CastKind::Transmute => CastKind::Transmute(src_ty, tgt_ty),
+                    // TODO
+                    hax::CastKind::Subtype => CastKind::Transmute(src_ty, tgt_ty),
                     hax::CastKind::PointerCoercion(hax::PointerCoercion::Unsize(meta), ..) => {
                         let meta = match meta {
                             hax::UnsizingMetadata::Length(len) => {
@@ -556,8 +546,6 @@ impl BodyTransCtx<'_, '_, '_> {
                 trace!("NullOp: {:?}", nullop);
                 let ty = self.translate_ty(span, ty)?;
                 let op = match nullop {
-                    hax::NullOp::SizeOf => NullOp::SizeOf,
-                    hax::NullOp::AlignOf => NullOp::AlignOf,
                     hax::NullOp::OffsetOf(fields) => NullOp::OffsetOf(
                         fields
                             .iter()
@@ -665,10 +653,14 @@ impl BodyTransCtx<'_, '_, '_> {
                         let variant_id = match kind {
                             AdtKind::Struct | AdtKind::Union => None,
                             AdtKind::Enum => Some(translate_variant_id(*variant_idx)),
+                            // The rest are fake adt kinds that won't reach here.
+                            _ => unreachable!(),
                         };
                         let field_id = match kind {
                             AdtKind::Struct | AdtKind::Enum => None,
                             AdtKind::Union => Some(translate_field_id(field_index.unwrap())),
+                            // The rest are fake adt kinds that won't reach here.
+                            _ => unreachable!(),
                         };
 
                         let akind = AggregateKind::Adt(tref, variant_id, field_id);
@@ -758,10 +750,6 @@ impl BodyTransCtx<'_, '_, '_> {
             hax::StatementKind::StorageDead(local) => {
                 let var_id = self.translate_local(local).unwrap();
                 Some(StatementKind::StorageDead(var_id))
-            }
-            hax::StatementKind::Deinit(place) => {
-                let t_place = self.translate_place(span, place)?;
-                Some(StatementKind::Deinit(t_place))
             }
             // This asserts the operand true on pain of UB. We treat it like a normal assertion.
             hax::StatementKind::Intrinsic(hax::NonDivergingIntrinsic::Assume(op)) => {
@@ -1028,10 +1016,9 @@ impl BodyTransCtx<'_, '_, '_> {
             hax::FunOperand::Static(item) => {
                 trace!("func: {:?}", item.def_id);
                 let fun_def = self.hax_def(item)?;
-                let name = self.t_ctx.translate_name(&TransItemSource::polymorphic(
-                    &item.def_id,
-                    TransItemSourceKind::Fun,
-                ))?;
+                let item_src =
+                    TransItemSource::from_item(item, TransItemSourceKind::Fun, self.monomorphize());
+                let name = self.t_ctx.translate_name(&item_src)?;
                 let panic_lang_items = &["panic", "panic_fmt", "begin_panic"];
                 let panic_names = &[&["core", "panicking", "assert_failed"], EXPLICIT_PANIC_NAME];
 
@@ -1163,35 +1150,60 @@ impl BodyTransCtx<'_, '_, '_> {
         }
     }
 
+    /// Translate the MIR body of this definition if it has one. Catches any error and returns
+    /// `Body::Error` instead
+    pub fn translate_def_body(self, span: Span, def: &hax::FullDef) -> Body {
+        match self.translate_def_body_inner(span, def) {
+            Ok(body) => body,
+            Err(e) => Body::Error(e),
+        }
+    }
     /// Translate the MIR body of this definition if it has one.
-    pub fn translate_def_body(
-        &mut self,
-        span: Span,
-        def: &hax::FullDef,
-    ) -> Result<Result<Body, Opaque>, Error> {
+    fn translate_def_body_inner(mut self, span: Span, def: &hax::FullDef) -> Result<Body, Error> {
         // Retrieve the body
-        let Some(body) = self.get_mir(def.this(), span)? else {
-            return Ok(Err(Opaque));
-        };
-        self.translate_body(span, &body, &def.source_text)
+        if let Some(body) = self.get_mir(def.this(), span)? {
+            Ok(self.translate_body(span, &body, &def.source_text))
+        } else {
+            if let hax::FullDefKind::Const { value, .. }
+            | hax::FullDefKind::AssocConst { value, .. } = def.kind()
+                && let Some(value) = value
+            {
+                // For globals we can generate a body by evaluating the global.
+                // TODO: we lost the MIR of some consts on a rustc update. A trait assoc const
+                // default value no longer has a cross-crate MIR so it's unclear how to retreive
+                // the value. See the `trait-default-const-cross-crate` test.
+                let c = self.translate_constant_expr_to_constant_expr(span, &value)?;
+                let mut bb = BodyBuilder::new(span, 0);
+                let ret = bb.new_var(None, c.ty.clone());
+                bb.push_statement(StatementKind::Assign(
+                    ret,
+                    Rvalue::Use(Operand::Const(Box::new(c))),
+                ));
+                Ok(Body::Unstructured(bb.build()))
+            } else {
+                Ok(Body::Missing)
+            }
+        }
     }
 
-    /// Translate a function body.
+    /// Translate a function body. Catches errors and returns `Body::Error` instead.
     pub fn translate_body(
-        &mut self,
+        mut self,
         span: Span,
         body: &hax::MirBody<hax::mir_kinds::Unknown>,
         source_text: &Option<String>,
-    ) -> Result<Result<Body, Opaque>, Error> {
+    ) -> Body {
         // Stopgap measure because there are still many panics in charon and hax.
-        let mut this = panic::AssertUnwindSafe(&mut *self);
+        let mut this = panic::AssertUnwindSafe(&mut self);
         let res = panic::catch_unwind(move || this.translate_body_aux(body, source_text));
         match res {
-            Ok(Ok(body)) => Ok(body),
+            Ok(Ok(body)) => body,
             // Translation error
-            Ok(Err(e)) => Err(e),
+            Ok(Err(e)) => Body::Error(e),
+            // Panic
             Err(_) => {
-                raise_error!(self, span, "Thread panicked when extracting body.");
+                let e = register_error!(self, span, "Thread panicked when extracting body.");
+                Body::Error(e)
             }
         }
     }
@@ -1200,7 +1212,7 @@ impl BodyTransCtx<'_, '_, '_> {
         &mut self,
         body: &hax::MirBody<hax::mir_kinds::Unknown>,
         source_text: &Option<String>,
-    ) -> Result<Result<Body, Opaque>, Error> {
+    ) -> Result<Body, Error> {
         // Compute the span information
         let span = self.translate_span_from_hax(&body.span);
 
@@ -1225,12 +1237,12 @@ impl BodyTransCtx<'_, '_, '_> {
         }
 
         // Create the body
-        Ok(Ok(Body::Unstructured(ExprBody {
+        Ok(Body::Unstructured(ExprBody {
             span,
             locals: mem::take(&mut self.locals),
             body: mem::take(&mut self.blocks),
             comments: self.translate_body_comments(source_text, span),
-        })))
+        }))
     }
 }
 
