@@ -782,7 +782,7 @@ impl ItemTransCtx<'_, '_> {
         let drop_shim =
             self.translate_item(span, impl_def.this(), TransItemSourceKind::VTableDropShim)?;
         mk_field(ConstantExprKind::FnPtr(drop_shim));
-        
+
         // // let fn_ptr = self
         // //     .translate_fn_ptr(span, &drop_in_place, TransItemSourceKind::Fun)?
         // //     .erase();
