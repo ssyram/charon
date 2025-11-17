@@ -47,17 +47,15 @@ instance FromJSON StatementId where
 instance FromJSON StatementKind where
   parseJSON v = case v of
     Object o | H.lookup "Assign" o /= Nothing -> do
-      arr <- o .: "Assign"
       withArray "Assign" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (Assign v0 v1)) arr
+        pure (Assign v0 v1)) =<< o .: "Assign"
     Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
-      arr <- o .: "SetDiscriminant"
       withArray "SetDiscriminant" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (SetDiscriminant v0 v1)) arr
+        pure (SetDiscriminant v0 v1)) =<< o .: "SetDiscriminant"
     Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
       v <- o .: "CopyNonOverlapping"
       CopyNonOverlapping <$> parseJSON v
@@ -71,11 +69,10 @@ instance FromJSON StatementKind where
       v <- o .: "Deinit"
       Deinit <$> parseJSON v
     Object o | H.lookup "Drop" o /= Nothing -> do
-      arr <- o .: "Drop"
       withArray "Drop" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (Drop v0 v1)) arr
+        pure (Drop v0 v1)) =<< o .: "Drop"
     Object o | H.lookup "Assert" o /= Nothing -> do
       v <- o .: "Assert"
       Assert <$> parseJSON v
@@ -108,26 +105,23 @@ instance FromJSON StatementKind where
 instance FromJSON Switch where
   parseJSON v = case v of
     Object o | H.lookup "If" o /= Nothing -> do
-      arr <- o .: "If"
       withArray "If" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
         v2 <- parseJSON =<< v V.! 2
-        pure (If v0 v1 v2)) arr
+        pure (If v0 v1 v2)) =<< o .: "If"
     Object o | H.lookup "SwitchInt" o /= Nothing -> do
-      arr <- o .: "SwitchInt"
       withArray "SwitchInt" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
         v2 <- parseJSON =<< v V.! 2
         v3 <- parseJSON =<< v V.! 3
-        pure (SwitchInt v0 v1 v2 v3)) arr
+        pure (SwitchInt v0 v1 v2 v3)) =<< o .: "SwitchInt"
     Object o | H.lookup "Match" o /= Nothing -> do
-      arr <- o .: "Match"
       withArray "Match" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
         v2 <- parseJSON =<< v V.! 2
-        pure (Match v0 v1 v2)) arr
+        pure (Match v0 v1 v2)) =<< o .: "Match"
     _ -> fail "Unknown variant"
 

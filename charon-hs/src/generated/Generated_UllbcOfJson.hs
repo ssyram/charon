@@ -51,17 +51,15 @@ instance FromJSON Statement where
 instance FromJSON StatementKind where
   parseJSON v = case v of
     Object o | H.lookup "Assign" o /= Nothing -> do
-      arr <- o .: "Assign"
       withArray "Assign" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (Assign v0 v1)) arr
+        pure (Assign v0 v1)) =<< o .: "Assign"
     Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
-      arr <- o .: "SetDiscriminant"
       withArray "SetDiscriminant" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (SetDiscriminant v0 v1)) arr
+        pure (SetDiscriminant v0 v1)) =<< o .: "SetDiscriminant"
     Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
       v <- o .: "CopyNonOverlapping"
       CopyNonOverlapping <$> parseJSON v
@@ -75,11 +73,10 @@ instance FromJSON StatementKind where
       v <- o .: "Deinit"
       Deinit <$> parseJSON v
     Object o | H.lookup "Drop" o /= Nothing -> do
-      arr <- o .: "Drop"
       withArray "Drop" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (Drop v0 v1)) arr
+        pure (Drop v0 v1)) =<< o .: "Drop"
     Object o | H.lookup "Assert" o /= Nothing -> do
       v <- o .: "Assert"
       Assert <$> parseJSON v
@@ -90,18 +87,16 @@ instance FromJSON StatementKind where
 instance FromJSON Switch where
   parseJSON v = case v of
     Object o | H.lookup "If" o /= Nothing -> do
-      arr <- o .: "If"
       withArray "If" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (If v0 v1)) arr
+        pure (If v0 v1)) =<< o .: "If"
     Object o | H.lookup "SwitchInt" o /= Nothing -> do
-      arr <- o .: "SwitchInt"
       withArray "SwitchInt" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
         v2 <- parseJSON =<< v V.! 2
-        pure (SwitchInt v0 v1 v2)) arr
+        pure (SwitchInt v0 v1 v2)) =<< o .: "SwitchInt"
     _ -> fail "Unknown variant"
 
 
@@ -119,18 +114,16 @@ instance FromJSON TerminatorKind where
       v <- o .: "Goto"
       Goto <$> parseJSON v
     Object o | H.lookup "Switch" o /= Nothing -> do
-      arr <- o .: "Switch"
       withArray "Switch" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
-        pure (Switch v0 v1)) arr
+        pure (Switch v0 v1)) =<< o .: "Switch"
     Object o | H.lookup "Call" o /= Nothing -> do
-      arr <- o .: "Call"
       withArray "Call" (\v -> do
         v0 <- parseJSON =<< v V.! 0
         v1 <- parseJSON =<< v V.! 1
         v2 <- parseJSON =<< v V.! 2
-        pure (Call v0 v1 v2)) arr
+        pure (Call v0 v1 v2)) =<< o .: "Call"
     Object o | H.lookup "Abort" o /= Nothing -> do
       v <- o .: "Abort"
       Abort <$> parseJSON v

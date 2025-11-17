@@ -407,7 +407,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
     let ty_with_params = if generics.is_empty() {
         ty_name.clone()
     } else {
-        format!("{} {}", ty_name, generics.join(" "))
+        format!("({} {})", ty_name, generics.join(" "))
     };
 
     let parse_impl = match &decl.kind {
@@ -510,13 +510,12 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                             
                             let mut lines = vec![
                                 format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
-                                format!("  arr <- o .: \"{rust_name}\""),
-                                format!("  withArray \"{variant_name}\" (\\v -> do"),
                             ];
+                            lines.push(format!("  withArray \"{variant_name}\" (\\v -> do"));
                             for parser in field_parsers {
                                 lines.push(format!("    {parser}"));
                             }
-                            lines.push(format!("    pure ({variant_name} {field_vars})) arr"));
+                            lines.push(format!("    pure ({variant_name} {field_vars})) =<< o .: \"{rust_name}\""));
                             lines.join("\n      ")
                         }
                     }
