@@ -1,4 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_GAstOfJson.hs`
 by hand. Edit `templates/GAstOfJson.hs` instead, or improve the code
@@ -10,11 +13,13 @@ module Generated_GAstOfJson where
 import Data.Aeson
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
-import qualified Data.HashMap.Strict as H
-import Generated_Meta
+import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
+import Generated_Meta hiding (Local)
 import Generated_Values
-import Generated_Types
-import Generated_Expressions
+import Generated_Types hiding (TraitImpl, TraitMethod)
+import qualified Generated_Types as T
+import Generated_Expressions hiding (Field)
 import Generated_GAst
 
 -- Vector is manually defined here since it's excluded from generation
@@ -35,21 +40,21 @@ instance FromJSON AggregateKind where
     Object o | H.lookup "Adt" o /= Nothing -> do
       arr <- o .: "Adt"
       withArray "AggregatedAdt" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (AggregatedAdt v0 v1 v2)) arr
     Object o | H.lookup "Array" o /= Nothing -> do
       arr <- o .: "Array"
       withArray "AggregatedArray" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (AggregatedArray v0 v1)) arr
     Object o | H.lookup "RawPtr" o /= Nothing -> do
       arr <- o .: "RawPtr"
       withArray "AggregatedRawPtr" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (AggregatedRawPtr v0 v1)) arr
     _ -> fail "Unknown variant"
 
@@ -155,14 +160,14 @@ instance FromJSON BinderKind where
     Object o | H.lookup "TraitType" o /= Nothing -> do
       arr <- o .: "TraitType"
       withArray "BkTraitType" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (BkTraitType v0 v1)) arr
     Object o | H.lookup "TraitMethod" o /= Nothing -> do
       arr <- o .: "TraitMethod"
       withArray "BkTraitMethod" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (BkTraitMethod v0 v1)) arr
     String "InherentImplBlock" -> pure BkInherentImplBlock
     String "Dyn" -> pure BkDyn
@@ -246,39 +251,39 @@ instance FromJSON CastKind where
     Object o | H.lookup "Scalar" o /= Nothing -> do
       arr <- o .: "Scalar"
       withArray "CastScalar" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (CastScalar v0 v1)) arr
     Object o | H.lookup "RawPtr" o /= Nothing -> do
       arr <- o .: "RawPtr"
       withArray "CastRawPtr" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (CastRawPtr v0 v1)) arr
     Object o | H.lookup "FnPtr" o /= Nothing -> do
       arr <- o .: "FnPtr"
       withArray "CastFnPtr" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (CastFnPtr v0 v1)) arr
     Object o | H.lookup "Unsize" o /= Nothing -> do
       arr <- o .: "Unsize"
       withArray "CastUnsize" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (CastUnsize v0 v1 v2)) arr
     Object o | H.lookup "Transmute" o /= Nothing -> do
       arr <- o .: "Transmute"
       withArray "CastTransmute" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (CastTransmute v0 v1)) arr
     Object o | H.lookup "Concretize" o /= Nothing -> do
       arr <- o .: "Concretize"
       withArray "CastConcretize" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (CastConcretize v0 v1)) arr
     _ -> fail "Unknown variant"
 
@@ -389,8 +394,8 @@ instance FromJSON ConstantExprKind where
     Object o | H.lookup "TraitConst" o /= Nothing -> do
       arr <- o .: "TraitConst"
       withArray "CTraitConst" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (CTraitConst v0 v1)) arr
     Object o | H.lookup "Var" o /= Nothing -> do
       v <- o .: "Var"
@@ -426,8 +431,8 @@ instance (FromJSON a0) => FromJSON DeBruijnVar a0 where
     Object o | H.lookup "Bound" o /= Nothing -> do
       arr <- o .: "Bound"
       withArray "Bound" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (Bound v0 v1)) arr
     Object o | H.lookup "Free" o /= Nothing -> do
       v <- o .: "Free"
@@ -498,8 +503,8 @@ instance FromJSON FieldProjKind where
     Object o | H.lookup "Adt" o /= Nothing -> do
       arr <- o .: "Adt"
       withArray "ProjAdt" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (ProjAdt v0 v1)) arr
     Object o | H.lookup "Tuple" o /= Nothing -> do
       v <- o .: "Tuple"
@@ -572,9 +577,9 @@ instance FromJSON FnPtrKind where
     Object o | H.lookup "Trait" o /= Nothing -> do
       arr <- o .: "Trait"
       withArray "TraitMethod" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (TraitMethod v0 v1 v2)) arr
     _ -> fail "Unknown variant"
 
@@ -766,17 +771,17 @@ instance FromJSON ItemSource where
     Object o | H.lookup "TraitDecl" o /= Nothing -> do
       arr <- o .: "TraitDecl"
       withArray "TraitDeclItem" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (TraitDeclItem v0 v1 v2)) arr
     Object o | H.lookup "TraitImpl" o /= Nothing -> do
       arr <- o .: "TraitImpl"
       withArray "TraitImplItem" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
-        v3 <- parseJSON =<< arr .! 3
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
+        v3 <- parseJSON =<< v V.! 3
         pure (TraitImplItem v0 v1 v2 v3)) arr
     Object o | H.lookup "VTableTy" o /= Nothing -> do
       v <- o .: "VTableTy"
@@ -914,8 +919,8 @@ instance FromJSON Operand where
 
 instance (FromJSON a0, FromJSON a1) => FromJSON OutlivesPred a0 a1 where
   parseJSON = withArray "OutlivesPred" $ \v -> do
-    v0 <- parseJSON =<< v .! 0
-    v1 <- parseJSON =<< v .! 1
+    v0 <- parseJSON =<< v V.! 0
+    v1 <- parseJSON =<< v V.! 1
     pure (OutlivesPred v0 v1)
 
 
@@ -932,8 +937,8 @@ instance FromJSON PathElem where
     Object o | H.lookup "Ident" o /= Nothing -> do
       arr <- o .: "Ident"
       withArray "PeIdent" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (PeIdent v0 v1)) arr
     Object o | H.lookup "Impl" o /= Nothing -> do
       v <- o .: "Impl"
@@ -959,8 +964,8 @@ instance FromJSON PlaceKind where
     Object o | H.lookup "Projection" o /= Nothing -> do
       arr <- o .: "Projection"
       withArray "PlaceProjection" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (PlaceProjection v0 v1)) arr
     Object o | H.lookup "Global" o /= Nothing -> do
       v <- o .: "Global"
@@ -984,22 +989,22 @@ instance FromJSON ProjectionElem where
     Object o | H.lookup "Field" o /= Nothing -> do
       arr <- o .: "Field"
       withArray "Field" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (Field v0 v1)) arr
     String "PtrMetadata" -> pure PtrMetadata
     Object o | H.lookup "Index" o /= Nothing -> do
       arr <- o .: "Index"
       withArray "ProjIndex" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (ProjIndex v0 v1)) arr
     Object o | H.lookup "Subslice" o /= Nothing -> do
       arr <- o .: "Subslice"
       withArray "Subslice" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (Subslice v0 v1 v2)) arr
     _ -> fail "Unknown variant"
 
@@ -1085,35 +1090,35 @@ instance FromJSON Rvalue where
     Object o | H.lookup "Ref" o /= Nothing -> do
       arr <- o .: "Ref"
       withArray "RvRef" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (RvRef v0 v1 v2)) arr
     Object o | H.lookup "RawPtr" o /= Nothing -> do
       arr <- o .: "RawPtr"
       withArray "RawPtr" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (RawPtr v0 v1 v2)) arr
     Object o | H.lookup "BinaryOp" o /= Nothing -> do
       arr <- o .: "BinaryOp"
       withArray "BinaryOp" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (BinaryOp v0 v1 v2)) arr
     Object o | H.lookup "UnaryOp" o /= Nothing -> do
       arr <- o .: "UnaryOp"
       withArray "UnaryOp" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (UnaryOp v0 v1)) arr
     Object o | H.lookup "NullaryOp" o /= Nothing -> do
       arr <- o .: "NullaryOp"
       withArray "NullaryOp" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (NullaryOp v0 v1)) arr
     Object o | H.lookup "Discriminant" o /= Nothing -> do
       v <- o .: "Discriminant"
@@ -1121,28 +1126,28 @@ instance FromJSON Rvalue where
     Object o | H.lookup "Aggregate" o /= Nothing -> do
       arr <- o .: "Aggregate"
       withArray "Aggregate" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (Aggregate v0 v1)) arr
     Object o | H.lookup "Len" o /= Nothing -> do
       arr <- o .: "Len"
       withArray "Len" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (Len v0 v1 v2)) arr
     Object o | H.lookup "Repeat" o /= Nothing -> do
       arr <- o .: "Repeat"
       withArray "Repeat" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (Repeat v0 v1 v2)) arr
     Object o | H.lookup "ShallowInitBox" o /= Nothing -> do
       arr <- o .: "ShallowInitBox"
       withArray "ShallowInitBox" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (ShallowInitBox v0 v1)) arr
     _ -> fail "Unknown variant"
 
@@ -1152,14 +1157,14 @@ instance FromJSON ScalarValue where
     Object o | H.lookup "Unsigned" o /= Nothing -> do
       arr <- o .: "Unsigned"
       withArray "UnsignedScalar" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (UnsignedScalar v0 v1)) arr
     Object o | H.lookup "Signed" o /= Nothing -> do
       arr <- o .: "Signed"
       withArray "SignedScalar" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (SignedScalar v0 v1)) arr
     _ -> fail "Unknown variant"
 
@@ -1278,7 +1283,7 @@ instance FromJSON TraitImplRef where
 
 instance FromJSON TraitItemName where
   parseJSON = withArray "TraitItemName" $ \v -> do
-    v0 <- parseJSON =<< v .! 0
+    v0 <- parseJSON =<< v V.! 0
     pure (TraitItemName v0)
 
 
@@ -1315,23 +1320,23 @@ instance FromJSON TraitRefKind where
     Object o | H.lookup "ParentClause" o /= Nothing -> do
       arr <- o .: "ParentClause"
       withArray "ParentClause" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (ParentClause v0 v1)) arr
     Object o | H.lookup "ItemClause" o /= Nothing -> do
       arr <- o .: "ItemClause"
       withArray "ItemClause" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (ItemClause v0 v1 v2)) arr
     String "SelfId" -> pure Self
     Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
       arr <- o .: "BuiltinOrAuto"
       withArray "BuiltinOrAuto" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (BuiltinOrAuto v0 v1 v2)) arr
     String "Dyn" -> pure Dyn
     Object o | H.lookup "Unknown" o /= Nothing -> do
@@ -1369,21 +1374,21 @@ instance FromJSON Ty where
     Object o | H.lookup "Ref" o /= Nothing -> do
       arr <- o .: "Ref"
       withArray "TRef" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
-        v2 <- parseJSON =<< arr .! 2
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
+        v2 <- parseJSON =<< v V.! 2
         pure (TRef v0 v1 v2)) arr
     Object o | H.lookup "RawPtr" o /= Nothing -> do
       arr <- o .: "RawPtr"
       withArray "TRawPtr" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (TRawPtr v0 v1)) arr
     Object o | H.lookup "TraitType" o /= Nothing -> do
       arr <- o .: "TraitType"
       withArray "TTraitType" (\v -> do
-        v0 <- parseJSON =<< arr .! 0
-        v1 <- parseJSON =<< arr .! 1
+        v0 <- parseJSON =<< v V.! 0
+        v1 <- parseJSON =<< v V.! 1
         pure (TTraitType v0 v1)) arr
     Object o | H.lookup "DynTrait" o /= Nothing -> do
       v <- o .: "DynTrait"

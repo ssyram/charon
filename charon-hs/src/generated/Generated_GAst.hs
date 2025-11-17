@@ -14,6 +14,13 @@ import Generated_Values
 import Generated_Types
 import Generated_Expressions
 
+-- Manually defined types
+data TargetInfo = TargetInfo
+  { targetinfoTargetPointerSize :: Int
+  , targetinfoIsLittleEndian :: Bool
+  }
+  deriving (Show, Eq, Ord)
+
 -- | Check the value of an operand and abort if the value is not expected. This is introduced to
 -- | avoid a lot of small branches.
 -- | 

@@ -36,6 +36,7 @@ library:
     - aeson >= 2.0
     - text >= 1.2
     - unordered-containers >= 0.2
+    - vector >= 0.12
 
 tests:
   charon-hs-test:

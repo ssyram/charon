@@ -425,7 +425,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .iter()
                 .enumerate()
                 .filter(|(_, f)| !f.is_opaque())
-                .map(|(i, _)| format!("    v{i} <- parseJSON =<< v .! {i}"))
+                .map(|(i, _)| format!("    v{i} <- parseJSON =<< v V.! {i}"))
                 .join("\n");
             let field_vars = fields
                 .iter()
@@ -498,7 +498,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 .iter()
                                 .enumerate()
                                 .filter(|(_, f)| !f.is_opaque())
-                                .map(|(i, _)| format!("v{i} <- parseJSON =<< arr .! {i}"))
+                                .map(|(i, _)| format!("v{i} <- parseJSON =<< v V.! {i}"))
                                 .collect_vec();
                             let field_vars = variant
                                 .fields

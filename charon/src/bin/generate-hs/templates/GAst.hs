@@ -14,4 +14,11 @@ import Generated_Values
 import Generated_Types
 import Generated_Expressions
 
+-- Manually defined types
+data TargetInfo = TargetInfo
+  { targetinfoTargetPointerSize :: Int
+  , targetinfoIsLittleEndian :: Bool
+  }
+  deriving (Show, Eq, Ord)
+
 {- __REPLACE0__ -}

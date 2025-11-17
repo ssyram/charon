@@ -1,4 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_LlbcOfJson.hs`
 by hand. Edit `templates/LlbcOfJson.hs` instead, or improve the code
@@ -7,15 +10,16 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_LlbcOfJson where
 
-import Data.Aeson
+import Data.Aeson hiding (Error)
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
-import qualified Data.HashMap.Strict as H
+import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
 import Generated_Meta
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
-import Generated_GAst
+import Generated_GAst hiding (CopyNonOverlapping, Call)
 import Generated_LlbcAst
 
 {- __REPLACE0__ -}

@@ -12,7 +12,9 @@ import qualified Data.HashMap.Strict as H
 import Generated_Meta
 import Generated_Values
 
--- Manually defined type aliases
-type TraitTypeConstraintId = Int
+-- Manually defined type aliases and newtypes
+-- TraitTypeConstraintId is a newtype wrapper around Int
+newtype TraitTypeConstraintId = TraitTypeConstraintId { traittypeconstraintidRaw :: Int }
+  deriving (Show, Eq, Ord)
 
 {- __REPLACE0__ -}
