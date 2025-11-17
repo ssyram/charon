@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_LlbcOfJson.hs`
 by hand. Edit `templates/LlbcOfJson.hs` instead, or improve the code
@@ -19,128 +20,110 @@ import Generated_LlbcAst
 
 instance FromJSON Block where
   parseJSON = withObject "Block" $ \o -> do
-  blockSpan <- o .: "span"
+    blockSpan <- o .: "span"
     blockStatements <- o .: "statements"
-  pure Block { blockSpan, blockStatements }
+    pure Block { blockSpan, blockStatements }
 
 
 instance FromJSON Statement where
   parseJSON = withObject "Statement" $ \o -> do
-  statementSpan <- o .: "span"
+    statementSpan <- o .: "span"
     statementStatementId <- o .: "id"
     statementKind <- o .: "kind"
     statementCommentsBefore <- o .: "comments_before"
-  pure Statement { statementSpan, statementStatementId, statementKind, statementCommentsBefore }
+    pure Statement { statementSpan, statementStatementId, statementKind, statementCommentsBefore }
 
 
 instance FromJSON StatementId where
   parseJSON = withObject "StatementId" $ \o -> do
-  statementidRaw <- o .: "_raw"
-  pure StatementId { statementidRaw }
+    statementidRaw <- o .: "_raw"
+    pure StatementId { statementidRaw }
 
 
 instance FromJSON StatementKind where
   parseJSON v = case v of
-  Object o | H.lookup "Assign" o /= Nothing -> do
-  arr <- o .: "Assign"
-  withArray "Assign" (\v -> do
-    v0 <- parseJSON =<< arr .! 0
+    Object o | H.lookup "Assign" o /= Nothing -> do
+      arr <- o .: "Assign"
+      withArray "Assign" (\v -> do
+        v0 <- parseJSON =<< arr .! 0
         v1 <- parseJSON =<< arr .! 1
-    pure (Assign v0 v1)) arr
-
+        pure (Assign v0 v1)) arr
     Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
-  arr <- o .: "SetDiscriminant"
-  withArray "SetDiscriminant" (\v -> do
-    v0 <- parseJSON =<< arr .! 0
+      arr <- o .: "SetDiscriminant"
+      withArray "SetDiscriminant" (\v -> do
+        v0 <- parseJSON =<< arr .! 0
         v1 <- parseJSON =<< arr .! 1
-    pure (SetDiscriminant v0 v1)) arr
-
+        pure (SetDiscriminant v0 v1)) arr
     Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
-  v <- o .: "CopyNonOverlapping"
-  CopyNonOverlapping <$> parseJSON v
-
+      v <- o .: "CopyNonOverlapping"
+      CopyNonOverlapping <$> parseJSON v
     Object o | H.lookup "StorageLive" o /= Nothing -> do
-  v <- o .: "StorageLive"
-  StorageLive <$> parseJSON v
-
+      v <- o .: "StorageLive"
+      StorageLive <$> parseJSON v
     Object o | H.lookup "StorageDead" o /= Nothing -> do
-  v <- o .: "StorageDead"
-  StorageDead <$> parseJSON v
-
+      v <- o .: "StorageDead"
+      StorageDead <$> parseJSON v
     Object o | H.lookup "Deinit" o /= Nothing -> do
-  v <- o .: "Deinit"
-  Deinit <$> parseJSON v
-
+      v <- o .: "Deinit"
+      Deinit <$> parseJSON v
     Object o | H.lookup "Drop" o /= Nothing -> do
-  arr <- o .: "Drop"
-  withArray "Drop" (\v -> do
-    v0 <- parseJSON =<< arr .! 0
+      arr <- o .: "Drop"
+      withArray "Drop" (\v -> do
+        v0 <- parseJSON =<< arr .! 0
         v1 <- parseJSON =<< arr .! 1
-    pure (Drop v0 v1)) arr
-
+        pure (Drop v0 v1)) arr
     Object o | H.lookup "Assert" o /= Nothing -> do
-  v <- o .: "Assert"
-  Assert <$> parseJSON v
-
+      v <- o .: "Assert"
+      Assert <$> parseJSON v
     Object o | H.lookup "Call" o /= Nothing -> do
-  v <- o .: "Call"
-  Call <$> parseJSON v
-
+      v <- o .: "Call"
+      Call <$> parseJSON v
     Object o | H.lookup "Abort" o /= Nothing -> do
-  v <- o .: "Abort"
-  Abort <$> parseJSON v
-
+      v <- o .: "Abort"
+      Abort <$> parseJSON v
     String "Return" -> pure Return
     Object o | H.lookup "Break" o /= Nothing -> do
-  v <- o .: "Break"
-  Break <$> parseJSON v
-
+      v <- o .: "Break"
+      Break <$> parseJSON v
     Object o | H.lookup "Continue" o /= Nothing -> do
-  v <- o .: "Continue"
-  Continue <$> parseJSON v
-
+      v <- o .: "Continue"
+      Continue <$> parseJSON v
     String "Nop" -> pure Nop
     Object o | H.lookup "Switch" o /= Nothing -> do
-  v <- o .: "Switch"
-  Switch <$> parseJSON v
-
+      v <- o .: "Switch"
+      Switch <$> parseJSON v
     Object o | H.lookup "Loop" o /= Nothing -> do
-  v <- o .: "Loop"
-  Loop <$> parseJSON v
-
+      v <- o .: "Loop"
+      Loop <$> parseJSON v
     Object o | H.lookup "Error" o /= Nothing -> do
-  v <- o .: "Error"
-  Error <$> parseJSON v
-
-  _ -> fail "Unknown variant"
+      v <- o .: "Error"
+      Error <$> parseJSON v
+    _ -> fail "Unknown variant"
 
 
 instance FromJSON Switch where
   parseJSON v = case v of
-  Object o | H.lookup "If" o /= Nothing -> do
-  arr <- o .: "If"
-  withArray "If" (\v -> do
-    v0 <- parseJSON =<< arr .! 0
+    Object o | H.lookup "If" o /= Nothing -> do
+      arr <- o .: "If"
+      withArray "If" (\v -> do
+        v0 <- parseJSON =<< arr .! 0
         v1 <- parseJSON =<< arr .! 1
         v2 <- parseJSON =<< arr .! 2
-    pure (If v0 v1 v2)) arr
-
+        pure (If v0 v1 v2)) arr
     Object o | H.lookup "SwitchInt" o /= Nothing -> do
-  arr <- o .: "SwitchInt"
-  withArray "SwitchInt" (\v -> do
-    v0 <- parseJSON =<< arr .! 0
+      arr <- o .: "SwitchInt"
+      withArray "SwitchInt" (\v -> do
+        v0 <- parseJSON =<< arr .! 0
         v1 <- parseJSON =<< arr .! 1
         v2 <- parseJSON =<< arr .! 2
         v3 <- parseJSON =<< arr .! 3
-    pure (SwitchInt v0 v1 v2 v3)) arr
-
+        pure (SwitchInt v0 v1 v2 v3)) arr
     Object o | H.lookup "Match" o /= Nothing -> do
-  arr <- o .: "Match"
-  withArray "Match" (\v -> do
-    v0 <- parseJSON =<< arr .! 0
+      arr <- o .: "Match"
+      withArray "Match" (\v -> do
+        v0 <- parseJSON =<< arr .! 0
         v1 <- parseJSON =<< arr .! 1
         v2 <- parseJSON =<< arr .! 2
-    pure (Match v0 v1 v2)) arr
-
-  _ -> fail "Unknown variant"
+        pure (Match v0 v1 v2)) arr
+    _ -> fail "Unknown variant"
 

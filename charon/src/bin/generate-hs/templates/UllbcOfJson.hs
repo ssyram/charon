@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_UllbcOfJson.hs`
 by hand. Edit `templates/UllbcOfJson.hs` instead, or improve the code

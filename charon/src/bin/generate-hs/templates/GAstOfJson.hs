@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_GAstOfJson.hs`
 by hand. Edit `templates/GAstOfJson.hs` instead, or improve the code
@@ -15,5 +16,8 @@ import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import Generated_GAst
+
+-- Vector is manually defined here since it's excluded from generation
+type Vector a b = [(a, b)]
 
 {- __REPLACE0__ -}

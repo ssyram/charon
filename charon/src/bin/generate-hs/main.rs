@@ -420,12 +420,13 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
         }
         TypeDeclKind::Struct(fields) if fields.iter().all(|f| f.name.is_none()) => {
             // Tuple struct - parse as array
+            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
             let field_parsers = fields
                 .iter()
                 .enumerate()
                 .filter(|(_, f)| !f.is_opaque())
-                .map(|(i, _)| format!("v{i} <- parseJSON =<< v .! {i}"))
-                .join("\n    ");
+                .map(|(i, _)| format!("    v{i} <- parseJSON =<< v .! {i}"))
+                .join("\n");
             let field_vars = fields
                 .iter()
                 .enumerate()
@@ -433,11 +434,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .map(|(i, _)| format!("v{i}"))
                 .join(" ");
             format!(
-                indoc! {r#"
-                    parseJSON = withArray "{ty_name}" $ \v -> do
-                      {field_parsers}
-                      pure ({ty_name} {field_vars})
-                "#},
+                "parseJSON = withArray \"{ty_name}\" $ \\v -> do\n{field_parsers}\n    pure ({ty_name} {field_vars})",
                 ty_name = ty_name,
                 field_parsers = field_parsers,
                 field_vars = field_vars
@@ -454,9 +451,9 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                     let base_field_name = f.renamed_name().unwrap_or(rust_name);
                     // Prefix field name with type name to match the type definition
                     let hs_name = make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name));
-                    format!("{hs_name} <- o .: \"{rust_name}\"")
+                    format!("    {hs_name} <- o .: \"{rust_name}\"")
                 })
-                .join("\n    ");
+                .join("\n");
             let field_list = fields
                 .iter()
                 .filter(|f| !f.is_opaque())
@@ -467,11 +464,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 })
                 .join(", ");
             format!(
-                indoc! {r#"
-                    parseJSON = withObject "{ty_name}" $ \o -> do
-                      {field_parsers}
-                      pure {ty_name} {{ {field_list} }}
-                "#},
+                "parseJSON = withObject \"{ty_name}\" $ \\o -> do\n{field_parsers}\n    pure {ty_name} {{ {field_list} }}",
                 ty_name = ty_name,
                 field_parsers = field_parsers,
                 field_list = field_list
@@ -491,15 +484,13 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                         // Complex variant - parse as object with single key
                         let field_count = variant.fields.iter().filter(|f| !f.is_opaque()).count();
                         if field_count == 1 {
-                            format!(
-                                indoc! {r#"
-                                    Object o | H.lookup "{rust_name}" o /= Nothing -> do
-                                      v <- o .: "{rust_name}"
-                                      {variant_name} <$> parseJSON v
-                                "#},
-                                rust_name = rust_name,
-                                variant_name = variant_name
-                            )
+                            // Single field variant
+                            let lines = vec![
+                                format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
+                                format!("  v <- o .: \"{rust_name}\""),
+                                format!("  {variant_name} <$> parseJSON v"),
+                            ];
+                            lines.join("\n      ")
                         } else {
                             // Multiple fields - parse inner value as array
                             let field_parsers = variant
@@ -508,7 +499,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 .enumerate()
                                 .filter(|(_, f)| !f.is_opaque())
                                 .map(|(i, _)| format!("v{i} <- parseJSON =<< arr .! {i}"))
-                                .join("\n        ");
+                                .collect_vec();
                             let field_vars = variant
                                 .fields
                                 .iter()
@@ -516,30 +507,32 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 .filter(|(_, f)| !f.is_opaque())
                                 .map(|(i, _)| format!("v{i}"))
                                 .join(" ");
-                            format!(
-                                indoc! {r#"
-                                    Object o | H.lookup "{rust_name}" o /= Nothing -> do
-                                      arr <- o .: "{rust_name}"
-                                      withArray "{variant_name}" (\v -> do
-                                        {field_parsers}
-                                        pure ({variant_name} {field_vars})) arr
-                                "#},
-                                rust_name = rust_name,
-                                variant_name = variant_name,
-                                field_parsers = field_parsers,
-                                field_vars = field_vars
-                            )
+                            
+                            let mut lines = vec![
+                                format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
+                                format!("  arr <- o .: \"{rust_name}\""),
+                                format!("  withArray \"{variant_name}\" (\\v -> do"),
+                            ];
+                            for parser in field_parsers {
+                                lines.push(format!("    {parser}"));
+                            }
+                            lines.push(format!("    pure ({variant_name} {field_vars})) arr"));
+                            lines.join("\n      ")
                         }
                     }
                 })
-                .join("\n    ");
+                .collect_vec();
+            
+            // Join variant parsers with proper indentation
+            // Each variant pattern should be indented 4 spaces from "parseJSON v = case v of"
+            let formatted_parsers = variant_parsers
+                .iter()
+                .map(|p| format!("    {}", p.replace("\n      ", "\n    ")))
+                .join("\n");
+            
             format!(
-                indoc! {r#"
-                    parseJSON v = case v of
-                      {variant_parsers}
-                      _ -> fail "Unknown variant"
-                "#},
-                variant_parsers = variant_parsers
+                "parseJSON v = case v of\n{}\n    _ -> fail \"Unknown variant\"",
+                formatted_parsers
             )
         }
         TypeDeclKind::Alias(ty) => {

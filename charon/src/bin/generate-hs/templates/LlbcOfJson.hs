@@ -1,3 +1,4 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_LlbcOfJson.hs`
 by hand. Edit `templates/LlbcOfJson.hs` instead, or improve the code
