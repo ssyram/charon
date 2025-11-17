@@ -36,7 +36,26 @@ make generate-hs-keep-llbc
 
 ## Building and Testing
 
-To build and test the Haskell bindings:
+This project uses **Stack** for building and dependency management with LTS 22.43 resolver.
+
+### Using Stack (Recommended)
+
+```bash
+cd charon-hs
+
+# Build the library
+stack build
+
+# Run tests
+stack test
+
+# Run tests with verbose output
+stack test --test-show-details=always
+```
+
+### Using Cabal (Alternative)
+
+If you prefer Cabal, you can still use it:
 
 ```bash
 cd charon-hs
@@ -50,6 +69,8 @@ cabal test
 # Run tests with verbose output
 cabal test --test-show-details=direct
 ```
+
+Note: The project is configured with Stack using `package.yaml`. The `.cabal` file is generated automatically by Stack from `package.yaml`.
 
 ## Usage Example
 

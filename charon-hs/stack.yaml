@@ -1,0 +1,11 @@
+# Stack configuration for charon-hs
+# Using LTS 22.43 as requested
+snapshot: lts-22.43
+
+packages:
+- .
+
+# Use system GHC to avoid network downloads during CI
+system-ghc: true
+install-ghc: false
+skip-ghc-check: true
