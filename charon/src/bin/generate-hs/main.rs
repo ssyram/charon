@@ -692,6 +692,7 @@ fn generate_hs(
         "Body",
         "FunDecl",
         "TranslatedCrate",
+        "FileId",  // Manually implemented in Meta.hs template
     ]
     .iter()
     .map(|name| ctx.id_from_name(name))

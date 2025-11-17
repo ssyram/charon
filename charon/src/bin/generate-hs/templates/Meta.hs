@@ -15,7 +15,17 @@ import Data.Aeson
 import Data.Text (Text)
 import qualified Data.HashMap.Strict as H
 
-type PathBuf = Text
-type FileId = Text
+-- Using newtype instead of type alias to avoid duplicate instance issues
+newtype PathBuf = PathBuf Text
+  deriving (Show, Eq, Ord)
+
+instance FromJSON PathBuf where
+  parseJSON v = PathBuf <$> parseJSON v
+
+newtype FileId = FileId Text
+  deriving (Show, Eq, Ord)
+
+instance FromJSON FileId where
+  parseJSON v = FileId <$> parseJSON v
 
 {- __REPLACE0__ -}

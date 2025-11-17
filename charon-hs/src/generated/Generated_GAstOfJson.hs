@@ -506,10 +506,6 @@ instance FromJSON File where
     pure File { fileName, fileCrateName, fileContents }
 
 
-instance FromJSON FileId where
-  parseJSON v = parseJSON v
-
-
 instance FromJSON FileName where
   parseJSON v = case v of
     Object o | H.lookup "Virtual" o /= Nothing -> do
