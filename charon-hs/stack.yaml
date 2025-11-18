@@ -8,3 +8,6 @@ packages:
 # Let Stack install the correct GHC version (9.6.6) instead of using system GHC (9.12.2)
 system-ghc: false
 install-ghc: true
+
+# Allow newer versions to avoid hash issues
+allow-newer: true

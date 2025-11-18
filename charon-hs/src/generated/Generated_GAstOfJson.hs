@@ -19,7 +19,6 @@ import Generated_Meta hiding (Local)
 import Generated_Values
 import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
 import Generated_Expressions
-import Generated_GAst hiding (TraitImpl, TraitMethod, Field, Local)
 import qualified Generated_GAst as G
 
 -- Vector is manually defined here since it's excluded from generation
@@ -37,13 +36,13 @@ instance FromJSON G.TraitImpl where
     traitimplTypes <- o .: "types"
     traitimplMethods <- o .: "methods"
     traitimplVtable <- o .: "vtable"
-    pure G.TraitImpl { traitimplDefId, traitimplItemMeta, traitimplImplTrait, traitimplGenerics, traitimplImpliedTraitRefs, traitimplConsts, traitimplTypes, traitimplMethods, traitimplVtable }
+    pure $ G.TraitImpl traitimplDefId traitimplItemMeta traitimplImplTrait traitimplGenerics traitimplImpliedTraitRefs traitimplConsts traitimplTypes traitimplMethods traitimplVtable
 
 instance FromJSON G.TraitMethod where
   parseJSON = withObject "TraitMethod" $ \o -> do
     traitmethodName <- o .: "name"
     traitmethodItem <- o .: "item"
-    pure G.TraitMethod { traitmethodName, traitmethodItem }
+    pure $ G.TraitMethod traitmethodName traitmethodItem
 
 instance FromJSON G.Field where
   parseJSON = withObject "Field" $ \o -> do
@@ -51,14 +50,35 @@ instance FromJSON G.Field where
     fieldAttrInfo <- o .: "attr_info"
     fieldFieldName <- o .: "name"
     fieldFieldTy <- o .: "ty"
-    pure G.Field { fieldSpan, fieldAttrInfo, fieldFieldName, fieldFieldTy }
+    pure $ G.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
 
 instance FromJSON G.Local where
   parseJSON = withObject "Local" $ \o -> do
     localIndex <- o .: "index"
     localName <- o .: "name"
     localLocalTy <- o .: "ty"
-    pure G.Local { localIndex, localName, localLocalTy }
+    pure $ G.Local localIndex localName localLocalTy
+
+instance FromJSON G.Assertion where
+  parseJSON = withObject "Assertion" $ \o -> do
+    assertionCond <- o .: "cond"
+    assertionExpected <- o .: "expected"
+    pure $ G.Assertion assertionCond assertionExpected
+
+instance FromJSON G.Call where
+  parseJSON = withObject "Call" $ \o -> do
+    callFunc <- o .: "func"
+    callGenerics <- o .: "generics"
+    callArgs <- o .: "args"
+    callDest <- o .: "dest"
+    pure $ G.Call callFunc callGenerics callArgs callDest
+
+instance FromJSON G.CopyNonOverlapping where
+  parseJSON = withObject "CopyNonOverlapping" $ \o -> do
+    copysrc <- o .: "src"
+    copydst <- o .: "dst"
+    copycount <- o .: "count"
+    pure $ G.CopyNonOverlapping copysrc copydst copycount
 
 instance FromJSON AbortKind where
   parseJSON v = case v of
@@ -100,14 +120,6 @@ instance FromJSON AlignmentModifier where
       v <- o .: "Pack"
       Pack <$> parseJSON v
     _ -> fail "Unknown variant"
-
-
-instance FromJSON Assertion where
-  parseJSON = withObject "Assertion" $ \o -> do
-    assertionCond <- o .: "cond"
-    assertionExpected <- o .: "expected"
-    assertionOnFailure <- o .: "on_failure"
-    pure Assertion { assertionCond, assertionExpected, assertionOnFailure }
 
 
 instance FromJSON AttrInfo where
@@ -268,14 +280,6 @@ instance FromJSON BuiltinTy where
     _ -> fail "Unknown variant"
 
 
-instance FromJSON Call where
-  parseJSON = withObject "Call" $ \o -> do
-    callFunc <- o .: "func"
-    callArgs <- o .: "args"
-    callDest <- o .: "dest"
-    pure Call { callFunc, callArgs, callDest }
-
-
 instance FromJSON CastKind where
   parseJSON v = case v of
     Object o | H.lookup "Scalar" o /= Nothing -> do
@@ -433,14 +437,6 @@ instance FromJSON ConstantExprKind where
       v <- o .: "Opaque"
       COpaque <$> parseJSON v
     _ -> fail "Unknown variant"
-
-
-instance FromJSON CopyNonOverlapping where
-  parseJSON = withObject "CopyNonOverlapping" $ \o -> do
-    copynonoverlappingSrc <- o .: "src"
-    copynonoverlappingDst <- o .: "dst"
-    copynonoverlappingCount <- o .: "count"
-    pure CopyNonOverlapping { copynonoverlappingSrc, copynonoverlappingDst, copynonoverlappingCount }
 
 
 instance FromJSON DeBruijnId where

@@ -224,14 +224,6 @@ data DynPredicate = DynPredicate
   }
   deriving (Show, Eq, Ord)
 
-data Field = Field
-  { fieldSpan :: Span
-  , fieldAttrInfo :: AttrInfo
-  , fieldFieldName :: Maybe String
-  , fieldFieldTy :: Ty
-  }
-  deriving (Show, Eq, Ord)
-
 data FieldId = FieldId
   { fieldidRaw :: Int
   }

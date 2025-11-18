@@ -694,11 +694,14 @@ fn generate_hs(
         "TranslatedCrate",
         "FileId",  // Manually implemented in Meta.hs template
         // These have name conflicts between GAst structs and Types variants/fields
-        // Manual instances in GAstOfJson.hs template
+        // Manual instances in GAstOfJson.hs template and type defs in GAst.hs template
         "TraitImpl",
         "TraitMethod",
         "Field",
         "Local",
+        "Assert",  // Renamed to "Assertion" in JSON
+        "Call",
+        "CopyNonOverlapping",
     ]
     .iter()
     .map(|name| ctx.id_from_name(name))
@@ -742,6 +745,14 @@ fn generate_hs(
         "Ty",
         "Vector",
         "FileId",  // Manually defined in template
+        // These have name conflicts and are manually defined in GAst.hs template
+        "TraitImpl",
+        "TraitMethod",
+        "Field",
+        "Local",
+        "Assert",  // Renamed to "Assertion" in JSON
+        "Call",
+        "CopyNonOverlapping",
     ];
 
     let mut processed_tys: HashSet<TypeDeclId> = dont_generate_ty
