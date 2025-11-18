@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Deserialize (tests) where
+module Test.Deserialize (tests, getAllLlbcTests) where
 
 import Data.Aeson (eitherDecodeFileStrict, eitherDecodeStrict, Value(..))
 import qualified Data.Aeson as Aeson
@@ -39,7 +39,7 @@ test_fileId_parse = do
   let result = eitherDecodeStrict json :: Either String FileId
   case result of
     Left err -> assertFailure $ "Failed to parse FileId: " ++ err
-    Right fileId -> assertEqual "FileId value" "test/file.rs" fileId
+    Right (FileId text) -> assertEqual "FileId value" "test/file.rs" text
 
 test_intTy_parse :: Assertion
 test_intTy_parse = do

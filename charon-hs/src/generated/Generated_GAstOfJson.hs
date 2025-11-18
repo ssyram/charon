@@ -16,10 +16,12 @@ import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import Generated_Meta hiding (Local)
+import qualified Generated_Meta as M
 import Generated_Values
+import qualified Generated_Types as T
 import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
 import Generated_Expressions
-import Generated_GAst (Preset, TargetInfo, TraitAssocConst, TraitAssocTy, TraitDecl, CliOptions, DeclarationGroup, FnOperand, FunSig, GDeclarationGroup, GexprBody, GlobalDecl, GlobalKind, Locals, MirLevel, MonomorphizeMut)
+import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
 -- Vector is manually defined here since it's excluded from generation
@@ -536,7 +538,7 @@ instance FromJSON FileName where
       Virtual <$> parseJSON v
     Object o | H.lookup "Local" o /= Nothing -> do
       v <- o .: "Local"
-      Local <$> parseJSON v
+      M.Local <$> parseJSON v
     _ -> fail "Unknown variant"
 
 
@@ -584,7 +586,7 @@ instance FromJSON FnPtrKind where
         v0 <- parseJSON (v V.! 0)
         v1 <- parseJSON (v V.! 1)
         v2 <- parseJSON (v V.! 2)
-        pure (TraitMethod v0 v1 v2)) =<< o .: "Trait"
+        pure (T.TraitMethod v0 v1 v2)) =<< o .: "Trait"
     _ -> fail "Unknown variant"
 
 
@@ -913,8 +915,8 @@ instance FromJSON Operand where
 
 instance (FromJSON a0, FromJSON a1) => FromJSON (OutlivesPred a0 a1) where
   parseJSON = withArray "OutlivesPred" $ \v -> do
-    v0 <- parseJSON =<< v V.! 0
-    v1 <- parseJSON =<< v V.! 1
+    v0 <- parseJSON (v V.! 0)
+    v1 <- parseJSON (v V.! 1)
     pure (OutlivesPred v0 v1)
 
 
@@ -1247,7 +1249,7 @@ instance FromJSON TraitImplRef where
 
 instance FromJSON TraitItemName where
   parseJSON = withArray "TraitItemName" $ \v -> do
-    v0 <- parseJSON =<< v V.! 0
+    v0 <- parseJSON (v V.! 0)
     pure (TraitItemName v0)
 
 
@@ -1270,7 +1272,7 @@ instance FromJSON TraitRefKind where
   parseJSON v = case v of
     Object o | H.lookup "TraitImpl" o /= Nothing -> do
       v <- o .: "TraitImpl"
-      TraitImpl <$> parseJSON v
+      T.TraitImpl <$> parseJSON v
     Object o | H.lookup "Clause" o /= Nothing -> do
       v <- o .: "Clause"
       Clause <$> parseJSON v
@@ -1488,8 +1490,4 @@ instance FromJSON VariantLayout where
     variantlayoutUninhabited <- o .: "uninhabited"
     variantlayoutTag <- o .: "tag"
     pure (VariantLayout variantlayoutFieldOffsets variantlayoutUninhabited variantlayoutTag)
-
-
-instance (FromJSON a0, FromJSON a1) => FromJSON (Vector a0 a1) where
-  parseJSON = fmap catMaybes . parseJSON
 

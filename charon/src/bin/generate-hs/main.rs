@@ -430,7 +430,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .iter()
                 .enumerate()
                 .filter(|(_, f)| !f.is_opaque())
-                .map(|(i, _)| format!("    v{i} <- parseJSON =<< v V.! {i}"))
+                .map(|(i, _)| format!("    v{i} <- parseJSON (v V.! {i})"))
                 .join("\n");
             let field_vars = fields
                 .iter()
@@ -476,15 +476,29 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
             )
         }
         TypeDeclKind::Enum(variants) => {
+            // List of enum variant constructors that conflict with struct names from other modules
+            // TraitImpl (in TraitRefKind) and TraitMethod (in FnPtrKind) conflict with GAst structs
+            let types_variant_conflicts = ["TraitImpl", "TraitMethod"];
+            // Meta variants that conflict with GAst structs  
+            let meta_variant_conflicts = ["Local"];
+            
             let variant_parsers = variants
                 .iter()
                 .filter(|v| !v.is_opaque())
                 .map(|variant| {
                     let variant_name = make_haskell_ident(&variant.renamed_name());
+                    // Qualify with appropriate prefix if this variant conflicts
+                    let qualified_variant = if types_variant_conflicts.contains(&variant_name.as_str()) {
+                        format!("T.{}", variant_name)
+                    } else if meta_variant_conflicts.contains(&variant_name.as_str()) {
+                        format!("M.{}", variant_name)
+                    } else {
+                        variant_name.clone()
+                    };
                     let rust_name = &variant.name;
                     if variant.fields.is_empty() {
                         // Unit variant
-                        format!(r#"String "{rust_name}" -> pure {variant_name}"#)
+                        format!(r#"String "{rust_name}" -> pure {qualified_variant}"#)
                     } else {
                         // Complex variant - parse as object with single key
                         let field_count = variant.fields.iter().filter(|f| !f.is_opaque()).count();
@@ -493,7 +507,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                             let lines = vec![
                                 format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
                                 format!("  v <- o .: \"{rust_name}\""),
-                                format!("  {variant_name} <$> parseJSON v"),
+                                format!("  {qualified_variant} <$> parseJSON v"),
                             ];
                             lines.join("\n      ")
                         } else {
@@ -520,7 +534,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                             for parser in field_parsers {
                                 lines.push(format!("    {parser}"));
                             }
-                            lines.push(format!("    pure ({variant_name} {field_vars})) =<< o .: \"{rust_name}\""));
+                            lines.push(format!("    pure ({qualified_variant} {field_vars})) =<< o .: \"{rust_name}\""));
                             lines.join("\n      ")
                         }
                     }
@@ -695,6 +709,7 @@ fn generate_hs(
         "FunDecl",
         "TranslatedCrate",
         "FileId",  // Manually implemented in Meta.hs template
+        "Vector",  // Type alias for [(a, b)] - don't generate instance (would conflict with list instance)
         // These have name conflicts between GAst structs and Types variants/fields
         // Manual instances in GAstOfJson.hs template and type defs in GAst.hs template
         "TraitImpl",

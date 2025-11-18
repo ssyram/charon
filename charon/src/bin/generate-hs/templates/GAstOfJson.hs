@@ -16,10 +16,12 @@ import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import Generated_Meta hiding (Local)
+import qualified Generated_Meta as M
 import Generated_Values
+import qualified Generated_Types as T
 import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
 import Generated_Expressions
-import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), CliOptions, DeclarationGroup, FnOperand, FunSig, GDeclarationGroup, GexprBody, GlobalDecl, GlobalKind, Locals, MirLevel, MonomorphizeMut)
+import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
 -- Vector is manually defined here since it's excluded from generation
