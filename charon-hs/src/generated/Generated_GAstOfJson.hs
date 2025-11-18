@@ -1162,12 +1162,12 @@ instance FromJSON ScalarValue where
     Object o | H.lookup "Unsigned" o /= Nothing -> do
       withArray "UnsignedScalar" (\v -> do
         v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
+        v1 <- parseIntegerValue (v V.! 1)
         pure (UnsignedScalar v0 v1)) =<< o .: "Unsigned"
     Object o | H.lookup "Signed" o /= Nothing -> do
       withArray "SignedScalar" (\v -> do
         v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
+        v1 <- parseIntegerValue (v V.! 1)
         pure (SignedScalar v0 v1)) =<< o .: "Signed"
     _ -> fail "Unknown variant"
 
@@ -1265,9 +1265,7 @@ instance FromJSON TraitImplRef where
 
 
 instance FromJSON TraitItemName where
-  parseJSON = withArray "TraitItemName" $ \v -> do
-    v0 <- parseJSON (v V.! 0)
-    pure (TraitItemName v0)
+  parseJSON = fmap TraitItemName . parseJSON
 
 
 instance FromJSON TraitParam where

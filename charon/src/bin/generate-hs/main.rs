@@ -696,6 +696,35 @@ fn generate_hs(
                 "#,
             ),
         ),
+        // TraitItemName is a single-field tuple struct that serializes transparently
+        (
+            "TraitItemName",
+            indoc!(
+                r#"
+                parseJSON = fmap TraitItemName . parseJSON
+                "#,
+            ),
+        ),
+        // ScalarValue contains Integer that may be serialized as String for large values
+        (
+            "ScalarValue",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    Object o | H.lookup "Unsigned" o /= Nothing -> do
+                      withArray "UnsignedScalar" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseIntegerValue (v V.! 1)
+                        pure (UnsignedScalar v0 v1)) =<< o .: "Unsigned"
+                    Object o | H.lookup "Signed" o /= Nothing -> do
+                      withArray "SignedScalar" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseIntegerValue (v V.! 1)
+                        pure (SignedScalar v0 v1)) =<< o .: "Signed"
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
     ];
     
     let ctx = GenerateCtx::new(

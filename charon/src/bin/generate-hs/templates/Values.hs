@@ -7,7 +7,17 @@ generation tool to avoid the need for hand-writing things.
 module Generated_Values where
 
 import Data.Aeson
+import Data.Aeson.Types (Parser)
 import Data.Text (Text)
-import qualified Data.HashMap.Strict as H
+import qualified Data.Text as T
+import qualified Data.Vector as V
+
+-- Helper to parse Integer from either String or Number
+parseIntegerValue :: Value -> Parser Integer
+parseIntegerValue (String s) = case reads (T.unpack s) of
+  [(n, "")] -> return n
+  _ -> fail $ "Failed to parse Integer from string: " ++ T.unpack s
+parseIntegerValue (Number n) = parseJSON (Number n)
+parseIntegerValue v = fail $ "Expected String or Number for Integer, got: " ++ show v
 
 {- __REPLACE0__ -}
