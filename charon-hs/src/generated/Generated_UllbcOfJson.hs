@@ -20,7 +20,7 @@ import Generated_Meta
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
-import Generated_GAst hiding (CopyNonOverlapping, Call)
+import qualified Generated_GAst as G
 import Generated_UllbcAst
 
 instance FromJSON Block where
@@ -52,13 +52,13 @@ instance FromJSON StatementKind where
   parseJSON v = case v of
     Object o | H.lookup "Assign" o /= Nothing -> do
       withArray "Assign" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
         pure (Assign v0 v1)) =<< o .: "Assign"
     Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
       withArray "SetDiscriminant" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
         pure (SetDiscriminant v0 v1)) =<< o .: "SetDiscriminant"
     Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
       v <- o .: "CopyNonOverlapping"
@@ -74,8 +74,8 @@ instance FromJSON StatementKind where
       Deinit <$> parseJSON v
     Object o | H.lookup "Drop" o /= Nothing -> do
       withArray "Drop" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
         pure (Drop v0 v1)) =<< o .: "Drop"
     Object o | H.lookup "Assert" o /= Nothing -> do
       v <- o .: "Assert"
@@ -88,14 +88,14 @@ instance FromJSON Switch where
   parseJSON v = case v of
     Object o | H.lookup "If" o /= Nothing -> do
       withArray "If" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
         pure (If v0 v1)) =<< o .: "If"
     Object o | H.lookup "SwitchInt" o /= Nothing -> do
       withArray "SwitchInt" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
-        v2 <- parseJSON =<< v V.! 2
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
+        v2 <- parseJSON (v V.! 2)
         pure (SwitchInt v0 v1 v2)) =<< o .: "SwitchInt"
     _ -> fail "Unknown variant"
 
@@ -115,14 +115,14 @@ instance FromJSON TerminatorKind where
       Goto <$> parseJSON v
     Object o | H.lookup "Switch" o /= Nothing -> do
       withArray "Switch" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
         pure (Switch v0 v1)) =<< o .: "Switch"
     Object o | H.lookup "Call" o /= Nothing -> do
       withArray "Call" (\v -> do
-        v0 <- parseJSON =<< v V.! 0
-        v1 <- parseJSON =<< v V.! 1
-        v2 <- parseJSON =<< v V.! 2
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseJSON (v V.! 1)
+        v2 <- parseJSON (v V.! 2)
         pure (Call v0 v1 v2)) =<< o .: "Call"
     Object o | H.lookup "Abort" o /= Nothing -> do
       v <- o .: "Abort"

@@ -498,7 +498,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 .iter()
                                 .enumerate()
                                 .filter(|(_, f)| !f.is_opaque())
-                                .map(|(i, _)| format!("v{i} <- parseJSON =<< v V.! {i}"))
+                                .map(|(i, _)| format!("v{i} <- parseJSON (v V.! {i})"))
                                 .collect_vec();
                             let field_vars = variant
                                 .fields
@@ -693,6 +693,12 @@ fn generate_hs(
         "FunDecl",
         "TranslatedCrate",
         "FileId",  // Manually implemented in Meta.hs template
+        // These have name conflicts between GAst structs and Types variants/fields
+        // Manual instances in GAstOfJson.hs template
+        "TraitImpl",
+        "TraitMethod",
+        "Field",
+        "Local",
     ]
     .iter()
     .map(|name| ctx.id_from_name(name))

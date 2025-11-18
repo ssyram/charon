@@ -17,12 +17,46 @@ import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import Generated_Meta hiding (Local)
 import Generated_Values
-import Generated_Types hiding (TraitImpl, TraitMethod)
-import qualified Generated_Types as T
-import Generated_Expressions hiding (Field)
-import Generated_GAst
+import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
+import Generated_Expressions
+import qualified Generated_GAst as G
 
 -- Vector is manually defined here since it's excluded from generation
 type Vector a b = [(a, b)]
+
+-- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
+instance FromJSON G.TraitImpl where
+  parseJSON = withObject "TraitImpl" $ \o -> do
+    traitimplDefId <- o .: "def_id"
+    traitimplItemMeta <- o .: "item_meta"
+    traitimplImplTrait <- o .: "impl_trait"
+    traitimplGenerics <- o .: "generics"
+    traitimplImpliedTraitRefs <- o .: "implied_trait_refs"
+    traitimplConsts <- o .: "consts"
+    traitimplTypes <- o .: "types"
+    traitimplMethods <- o .: "methods"
+    traitimplVtable <- o .: "vtable"
+    pure G.TraitImpl { traitimplDefId, traitimplItemMeta, traitimplImplTrait, traitimplGenerics, traitimplImpliedTraitRefs, traitimplConsts, traitimplTypes, traitimplMethods, traitimplVtable }
+
+instance FromJSON G.TraitMethod where
+  parseJSON = withObject "TraitMethod" $ \o -> do
+    traitmethodName <- o .: "name"
+    traitmethodItem <- o .: "item"
+    pure G.TraitMethod { traitmethodName, traitmethodItem }
+
+instance FromJSON G.Field where
+  parseJSON = withObject "Field" $ \o -> do
+    fieldSpan <- o .: "span"
+    fieldAttrInfo <- o .: "attr_info"
+    fieldFieldName <- o .: "name"
+    fieldFieldTy <- o .: "ty"
+    pure G.Field { fieldSpan, fieldAttrInfo, fieldFieldName, fieldFieldTy }
+
+instance FromJSON G.Local where
+  parseJSON = withObject "Local" $ \o -> do
+    localIndex <- o .: "index"
+    localName <- o .: "name"
+    localLocalTy <- o .: "ty"
+    pure G.Local { localIndex, localName, localLocalTy }
 
 {- __REPLACE0__ -}
