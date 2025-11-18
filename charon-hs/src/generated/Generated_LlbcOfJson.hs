@@ -40,9 +40,7 @@ instance FromJSON Statement where
 
 
 instance FromJSON StatementId where
-  parseJSON = withObject "StatementId" $ \o -> do
-    statementidRaw <- o .: "_raw"
-    pure (StatementId statementidRaw)
+  parseJSON = fmap StatementId . parseJSON
 
 
 instance FromJSON StatementKind where

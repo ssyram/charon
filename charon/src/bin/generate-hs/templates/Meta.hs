@@ -22,10 +22,4 @@ newtype PathBuf = PathBuf Text
 instance FromJSON PathBuf where
   parseJSON v = PathBuf <$> parseJSON v
 
-newtype FileId = FileId Text
-  deriving (Show, Eq, Ord)
-
-instance FromJSON FileId where
-  parseJSON v = FileId <$> parseJSON v
-
 {- __REPLACE0__ -}

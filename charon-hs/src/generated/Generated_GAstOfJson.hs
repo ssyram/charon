@@ -24,8 +24,8 @@ import Generated_Expressions
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
--- Vector is manually defined here since it's excluded from generation
-type Vector a b = [(a, b)]
+-- Vector type alias (just a list with phantom type parameter for the index type)
+type Vector a b = [b]
 
 -- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
 instance FromJSON G.TraitImpl where
@@ -94,6 +94,13 @@ data TranslatedCrate = TranslatedCrate
   }
   deriving (Show, Eq, Ord)
 
+-- Wrapper type for the top-level LLBC file structure
+data LlbcFile = LlbcFile
+  { llbcfileCharon_version :: String
+  , llbcfileTranslated :: TranslatedCrate
+  }
+  deriving (Show, Eq, Ord)
+
 instance FromJSON TranslatedCrate where
   parseJSON = withObject "TranslatedCrate" $ \o -> do
     crateName <- o .: "crate_name"
@@ -103,6 +110,12 @@ instance FromJSON TranslatedCrate where
     traitImpls <- o .: "trait_impls"
     -- We skip fields that we can't deserialize yet (options, target_information, fun_decls, etc.)
     pure $ TranslatedCrate crateName typeDecls globalDecls traitDecls traitImpls
+
+instance FromJSON LlbcFile where
+  parseJSON = withObject "LlbcFile" $ \o -> do
+    charonVersion <- o .: "charon_version"
+    translated <- o .: "translated"
+    pure $ LlbcFile charonVersion translated
 
 instance FromJSON AbortKind where
   parseJSON v = case v of
@@ -426,9 +439,7 @@ instance FromJSON ConstGenericParam where
 
 
 instance FromJSON ConstGenericVarId where
-  parseJSON = withObject "ConstGenericVarId" $ \o -> do
-    constgenericvaridRaw <- o .: "_raw"
-    pure (ConstGenericVarId constgenericvaridRaw)
+  parseJSON = fmap ConstGenericVarId . parseJSON
 
 
 instance FromJSON ConstantExpr where
@@ -506,9 +517,7 @@ instance FromJSON DeclarationGroup where
 
 
 instance FromJSON Disambiguator where
-  parseJSON = withObject "Disambiguator" $ \o -> do
-    disambiguatorRaw <- o .: "_raw"
-    pure (Disambiguator disambiguatorRaw)
+  parseJSON = fmap Disambiguator . parseJSON
 
 
 instance FromJSON DiscriminantLayout where
@@ -526,9 +535,7 @@ instance FromJSON DynPredicate where
 
 
 instance FromJSON FieldId where
-  parseJSON = withObject "FieldId" $ \o -> do
-    fieldidRaw <- o .: "_raw"
-    pure (FieldId fieldidRaw)
+  parseJSON = fmap FieldId . parseJSON
 
 
 instance FromJSON FieldProjKind where
@@ -550,6 +557,10 @@ instance FromJSON File where
     fileCrateName <- o .: "crate_name"
     fileContents <- o .: "contents"
     pure (File fileName fileCrateName fileContents)
+
+
+instance FromJSON FileId where
+  parseJSON = fmap FileId . parseJSON
 
 
 instance FromJSON FileName where
@@ -612,9 +623,7 @@ instance FromJSON FnPtrKind where
 
 
 instance FromJSON FunDeclId where
-  parseJSON = withObject "FunDeclId" $ \o -> do
-    fundeclidRaw <- o .: "_raw"
-    pure (FunDeclId fundeclidRaw)
+  parseJSON = fmap FunDeclId . parseJSON
 
 
 instance FromJSON FunDeclRef where
@@ -697,9 +706,7 @@ instance FromJSON GlobalDecl where
 
 
 instance FromJSON GlobalDeclId where
-  parseJSON = withObject "GlobalDeclId" $ \o -> do
-    globaldeclidRaw <- o .: "_raw"
-    pure (GlobalDeclId globaldeclidRaw)
+  parseJSON = fmap GlobalDeclId . parseJSON
 
 
 instance FromJSON GlobalDeclRef where
@@ -875,9 +882,7 @@ instance FromJSON Loc where
 
 
 instance FromJSON LocalId where
-  parseJSON = withObject "LocalId" $ \o -> do
-    localidRaw <- o .: "_raw"
-    pure (LocalId localidRaw)
+  parseJSON = fmap LocalId . parseJSON
 
 
 instance FromJSON Locals where
@@ -904,9 +909,7 @@ instance FromJSON MonomorphizeMut where
 
 
 instance FromJSON Name where
-  parseJSON = withObject "Name" $ \o -> do
-    nameName <- o .: "name"
-    pure (Name nameName)
+  parseJSON = fmap Name . parseJSON
 
 
 instance FromJSON Nullop where
@@ -1066,9 +1069,7 @@ instance (FromJSON a0) => FromJSON (RegionBinder a0) where
 
 
 instance FromJSON RegionId where
-  parseJSON = withObject "RegionId" $ \o -> do
-    regionidRaw <- o .: "_raw"
-    pure (RegionId regionidRaw)
+  parseJSON = fmap RegionId . parseJSON
 
 
 instance FromJSON RegionParam where
@@ -1224,9 +1225,7 @@ instance FromJSON TraitAssocTyImpl where
 
 
 instance FromJSON TraitClauseId where
-  parseJSON = withObject "TraitClauseId" $ \o -> do
-    traitclauseidRaw <- o .: "_raw"
-    pure (TraitClauseId traitclauseidRaw)
+  parseJSON = fmap TraitClauseId . parseJSON
 
 
 instance FromJSON TraitDecl where
@@ -1243,9 +1242,7 @@ instance FromJSON TraitDecl where
 
 
 instance FromJSON TraitDeclId where
-  parseJSON = withObject "TraitDeclId" $ \o -> do
-    traitdeclidRaw <- o .: "_raw"
-    pure (TraitDeclId traitdeclidRaw)
+  parseJSON = fmap TraitDeclId . parseJSON
 
 
 instance FromJSON TraitDeclRef where
@@ -1256,9 +1253,7 @@ instance FromJSON TraitDeclRef where
 
 
 instance FromJSON TraitImplId where
-  parseJSON = withObject "TraitImplId" $ \o -> do
-    traitimplidRaw <- o .: "_raw"
-    pure (TraitImplId traitimplidRaw)
+  parseJSON = fmap TraitImplId . parseJSON
 
 
 instance FromJSON TraitImplRef where
@@ -1331,9 +1326,7 @@ instance FromJSON TraitTypeConstraint where
 
 
 instance FromJSON TraitTypeConstraintId where
-  parseJSON = withObject "TraitTypeConstraintId" $ \o -> do
-    traittypeconstraintidRaw <- o .: "_raw"
-    pure (TraitTypeConstraintId traittypeconstraintidRaw)
+  parseJSON = fmap TraitTypeConstraintId . parseJSON
 
 
 instance FromJSON Ty where
@@ -1396,9 +1389,7 @@ instance FromJSON TypeDecl where
 
 
 instance FromJSON TypeDeclId where
-  parseJSON = withObject "TypeDeclId" $ \o -> do
-    typedeclidRaw <- o .: "_raw"
-    pure (TypeDeclId typedeclidRaw)
+  parseJSON = fmap TypeDeclId . parseJSON
 
 
 instance FromJSON TypeDeclKind where
@@ -1449,9 +1440,7 @@ instance FromJSON TypeParam where
 
 
 instance FromJSON TypeVarId where
-  parseJSON = withObject "TypeVarId" $ \o -> do
-    typevaridRaw <- o .: "_raw"
-    pure (TypeVarId typevaridRaw)
+  parseJSON = fmap TypeVarId . parseJSON
 
 
 instance FromJSON UIntTy where
@@ -1500,9 +1489,7 @@ instance FromJSON Variant where
 
 
 instance FromJSON VariantId where
-  parseJSON = withObject "VariantId" $ \o -> do
-    variantidRaw <- o .: "_raw"
-    pure (VariantId variantidRaw)
+  parseJSON = fmap VariantId . parseJSON
 
 
 instance FromJSON VariantLayout where

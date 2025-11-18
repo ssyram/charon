@@ -22,12 +22,6 @@ newtype PathBuf = PathBuf Text
 instance FromJSON PathBuf where
   parseJSON v = PathBuf <$> parseJSON v
 
-newtype FileId = FileId Text
-  deriving (Show, Eq, Ord)
-
-instance FromJSON FileId where
-  parseJSON v = FileId <$> parseJSON v
-
 -- | Information about the attributes and visibility of an item, field or variant..
 data AttrInfo = AttrInfo
   {   -- | Attributes (`#[...]`).
@@ -77,6 +71,11 @@ data File = File
   ,   -- | The contents of the source file, as seen by rustc at the time of translation.
   -- | Some files don't have contents.
   fileContents :: Maybe String
+  }
+  deriving (Show, Eq, Ord)
+
+data FileId = FileId
+  { fileidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 

@@ -22,7 +22,7 @@ import Generated_Expressions
 import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
 import Generated_LlbcAst
 import Generated_UllbcAst
-import Generated_GAstOfJson (TranslatedCrate(..), Vector)  -- For TranslatedCrate and the FromJSON instances
+import Generated_GAstOfJson (TranslatedCrate(..), LlbcFile(..), Vector)  -- For TranslatedCrate and the FromJSON instances
 import Generated_LlbcOfJson ()
 import Generated_UllbcOfJson ()
 
@@ -43,11 +43,11 @@ tests = testGroup "Deserialization Tests"
 -- Test parsing basic types from JSON
 test_fileId_parse :: Assertion
 test_fileId_parse = do
-  let json = BS8.pack "\"test/file.rs\""
+  let json = BS8.pack "0"
   let result = eitherDecodeStrict json :: Either String FileId
   case result of
     Left err -> assertFailure $ "Failed to parse FileId: " ++ err
-    Right (FileId text) -> assertEqual "FileId value" "test/file.rs" text
+    Right (FileId fileIdVal) -> assertEqual "FileId value" 0 fileIdVal
 
 test_intTy_parse :: Assertion
 test_intTy_parse = do
@@ -101,11 +101,12 @@ findLlbcFiles dir = do
 -- This tests that we can actually deserialize LLBC files into Haskell AST types
 createLlbcTest :: FilePath -> TestTree
 createLlbcTest filepath = testCase filepath $ do
-  -- Parse the entire LLBC file as a TranslatedCrate
-  result <- eitherDecodeFileStrict filepath :: IO (Either String TranslatedCrate)
+  -- Parse the entire LLBC file as an LlbcFile (which contains TranslatedCrate)
+  result <- eitherDecodeFileStrict filepath :: IO (Either String LlbcFile)
   case result of
-    Left err -> assertFailure $ "Failed to deserialize LLBC file as TranslatedCrate in " ++ filepath ++ ": " ++ err
-    Right crate -> do
+    Left err -> assertFailure $ "Failed to deserialize LLBC file in " ++ filepath ++ ": " ++ err
+    Right llbcFile -> do
+      let crate = llbcfileTranslated llbcFile
       -- Successfully deserialized the entire crate!
       -- We can validate that it has the expected structure
       let typeDeclCount = length (translatedCrateType_decls crate)
@@ -115,7 +116,11 @@ createLlbcTest filepath = testCase filepath $ do
       
       -- The test passes if we successfully deserialized the TranslatedCrate
       assertBool (concat
-        [ "Successfully deserialized TranslatedCrate with: "
+        [ "Successfully deserialized LLBC file with charon version "
+        , llbcfileCharon_version llbcFile
+        , ": crate '"
+        , translatedCrateCrate_name crate
+        , "' with "
         , show typeDeclCount, " type decls, "
         , show globalDeclCount, " global decls, "
         , show traitDeclCount, " trait decls, "

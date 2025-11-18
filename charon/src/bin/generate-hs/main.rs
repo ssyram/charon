@@ -423,6 +423,15 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 parseJSON _ = fail "Expected null"
             "#}.to_string()
         }
+        // Special case for ID types: single field named "_raw" of type Int
+        // These are serialized as plain numbers in JSON
+        TypeDeclKind::Struct(fields) if fields.elem_count() == 1 
+            && fields.iter().next().and_then(|f| f.name.as_deref()) == Some("_raw") 
+            && fields.iter().next().is_some_and(|f| matches!(f.ty.kind(), TyKind::Literal(LiteralTy::Int(_) | LiteralTy::UInt(_)))) => {
+            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
+            // Deserialize from a plain number
+            format!("parseJSON = fmap {ty_name} . parseJSON", ty_name = ty_name)
+        }
         TypeDeclKind::Struct(fields) if fields.iter().all(|f| f.name.is_none()) => {
             // Tuple struct - parse as array
             let ty_name = type_name_to_haskell_ident(&decl.item_meta);
@@ -669,8 +678,7 @@ fn generate_hs(
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let manual_type_impls = &[
-        // Hand-written because we replace the `FileId` with the corresponding file.
-        ("FileId", "Text"),
+        // None currently needed
     ];
     let manual_json_impls = &[
         // Hand-written because we filter out `None` values.
@@ -682,12 +690,12 @@ fn generate_hs(
                 "#
             ),
         ),
-        // Hand-written because we replace the `FileId` with the corresponding file name.
+        // Hand-written because Name is transparent in Rust (serializes as just the inner vec)
         (
-            "FileId",
+            "Name",
             indoc!(
                 r#"
-                parseJSON v = parseJSON v
+                parseJSON = fmap Name . parseJSON
                 "#,
             ),
         ),
@@ -708,8 +716,7 @@ fn generate_hs(
         "Body",
         "FunDecl",
         "TranslatedCrate",  // Too complex with LLBC/ULLBC dependencies - manually implement
-        "FileId",  // Manually implemented in Meta.hs template
-        "Vector",  // Type alias for [(a, b)] - don't generate instance (would conflict with list instance)
+        "Vector",  // Type alias for [v] with phantom type parameter - don't generate instance (would conflict with list instance)
         // These have name conflicts between GAst structs and Types variants/fields
         // Manual instances in GAstOfJson.hs template and type defs in GAst.hs template
         "TraitImpl",
@@ -761,7 +768,6 @@ fn generate_hs(
         "TraitTypeConstraintId",
         "Ty",
         "Vector",
-        "FileId",  // Manually defined in template
         "TargetInfo",  // Manually defined in GAst.hs template
         // These have name conflicts and are manually defined in GAst.hs template
         "TraitImpl",
