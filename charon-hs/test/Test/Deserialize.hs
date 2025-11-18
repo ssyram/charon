@@ -22,7 +22,7 @@ import Generated_Expressions
 import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
 import Generated_LlbcAst
 import Generated_UllbcAst
-import Generated_GAstOfJson ()  -- For the FromJSON instances
+import Generated_GAstOfJson (TranslatedCrate(..), Vector)  -- For TranslatedCrate and the FromJSON instances
 import Generated_LlbcOfJson ()
 import Generated_UllbcOfJson ()
 
@@ -101,54 +101,26 @@ findLlbcFiles dir = do
 -- This tests that we can actually deserialize LLBC files into Haskell AST types
 createLlbcTest :: FilePath -> TestTree
 createLlbcTest filepath = testCase filepath $ do
-  -- Parse the LLBC file as JSON Object and try to deserialize key components
-  result <- eitherDecodeFileStrict filepath :: IO (Either String Object)
+  -- Parse the entire LLBC file as a TranslatedCrate
+  result <- eitherDecodeFileStrict filepath :: IO (Either String TranslatedCrate)
   case result of
-    Left err -> assertFailure $ "Failed to parse JSON in " ++ filepath ++ ": " ++ err
-    Right obj -> do
-      -- Try to deserialize specific fields to validate FromJSON instances work
-      -- The LLBC file should be a JSON object with fields like "type_decls", "fun_decls", etc.
+    Left err -> assertFailure $ "Failed to deserialize LLBC file as TranslatedCrate in " ++ filepath ++ ": " ++ err
+    Right crate -> do
+      -- Successfully deserialized the entire crate!
+      -- We can validate that it has the expected structure
+      let typeDeclCount = length (translatedCrateType_decls crate)
+          globalDeclCount = length (translatedCrateGlobal_decls crate)
+          traitDeclCount = length (translatedCrateTrait_decls crate)
+          traitImplCount = length (translatedCrateTrait_impls crate)
       
-      -- Test that we can deserialize key LLBC components
-      -- Since FunDecl and TranslatedCrate are in manually_implemented list,
-      -- we test the types that ARE generated with FromJSON instances
-      
-      -- Test type_decls field if present (Vector TypeDeclId TypeDecl)
-      case KM.lookup "type_decls" obj of
-        Just typeDeclsVal -> do
-          let typeDeclsResult = Aeson.fromJSON typeDeclsVal :: Aeson.Result (Vector TypeDeclId TypeDecl)
-          case typeDeclsResult of
-            Aeson.Error err -> assertFailure $ "Failed to deserialize type_decls in " ++ filepath ++ ": " ++ err
-            Aeson.Success decls -> do
-              -- Successfully deserialized! Verify it's a proper vector (list of pairs)
-              let declCount = length decls
-              assertBool ("Deserialized " ++ show declCount ++ " type declarations") True
-        Nothing -> return () -- Field not present, skip
-      
-      -- Test global_decls field if present (Vector GlobalDeclId GlobalDecl)
-      case KM.lookup "global_decls" obj of
-        Just globalDeclsVal -> do
-          let globalDeclsResult = Aeson.fromJSON globalDeclsVal :: Aeson.Result (Vector GlobalDeclId GlobalDecl)
-          case globalDeclsResult of
-            Aeson.Error err -> assertFailure $ "Failed to deserialize global_decls in " ++ filepath ++ ": " ++ err
-            Aeson.Success decls -> do
-              let declCount = length decls
-              assertBool ("Deserialized " ++ show declCount ++ " global declarations") True
-        Nothing -> return () -- Field not present, skip
-      
-      -- Test trait_decls field if present (Vector TraitDeclId TraitDecl)
-      case KM.lookup "trait_decls" obj of
-        Just traitDeclsVal -> do
-          let traitDeclsResult = Aeson.fromJSON traitDeclsVal :: Aeson.Result (Vector TraitDeclId TraitDecl)
-          case traitDeclsResult of
-            Aeson.Error err -> assertFailure $ "Failed to deserialize trait_decls in " ++ filepath ++ ": " ++ err
-            Aeson.Success decls -> do
-              let declCount = length decls
-              assertBool ("Deserialized " ++ show declCount ++ " trait declarations") True
-        Nothing -> return () -- Field not present, skip
-      
-      -- If we got here, all present fields were successfully deserialized
-      return ()
+      -- The test passes if we successfully deserialized the TranslatedCrate
+      assertBool (concat
+        [ "Successfully deserialized TranslatedCrate with: "
+        , show typeDeclCount, " type decls, "
+        , show globalDeclCount, " global decls, "
+        , show traitDeclCount, " trait decls, "
+        , show traitImplCount, " trait impls"
+        ]) True
 
 -- Export function to get all LLBC test cases
 getAllLlbcTests :: IO TestTree

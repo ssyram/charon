@@ -707,7 +707,7 @@ fn generate_hs(
         "Opaque",
         "Body",
         "FunDecl",
-        "TranslatedCrate",
+        "TranslatedCrate",  // Too complex with LLBC/ULLBC dependencies - manually implement
         "FileId",  // Manually implemented in Meta.hs template
         "Vector",  // Type alias for [(a, b)] - don't generate instance (would conflict with list instance)
         // These have name conflicts between GAst structs and Types variants/fields
@@ -762,6 +762,7 @@ fn generate_hs(
         "Ty",
         "Vector",
         "FileId",  // Manually defined in template
+        "TargetInfo",  // Manually defined in GAst.hs template
         // These have name conflicts and are manually defined in GAst.hs template
         "TraitImpl",
         "TraitMethod",
