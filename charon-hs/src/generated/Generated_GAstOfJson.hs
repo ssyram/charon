@@ -476,9 +476,9 @@ instance FromJSON ConstantExprKind where
 
 
 instance FromJSON DeBruijnId where
-  parseJSON = withObject "DeBruijnId" $ \o -> do
-    debruijnidIndex <- o .: "index"
-    pure (DeBruijnId debruijnidIndex)
+  parseJSON v = do
+    index <- parseJSON v
+    pure (DeBruijnId index)
 
 
 instance (FromJSON a0) => FromJSON (DeBruijnVar a0) where
@@ -801,21 +801,22 @@ instance FromJSON ItemSource where
   parseJSON v = case v of
     String "TopLevel" -> pure TopLevelItem
     Object o | H.lookup "Closure" o /= Nothing -> do
-      v <- o .: "Closure"
-      ClosureItem <$> parseJSON v
+      obj <- o .: "Closure"
+      info <- obj .: "info"
+      pure (ClosureItem info)
     Object o | H.lookup "TraitDecl" o /= Nothing -> do
-      withArray "TraitDeclItem" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (TraitDeclItem v0 v1 v2)) =<< o .: "TraitDecl"
+      obj <- o .: "TraitDecl"
+      trait_ref <- obj .: "trait_ref"
+      item_name <- obj .: "item_name"
+      has_default <- obj .: "has_default"
+      pure (TraitDeclItem trait_ref item_name has_default)
     Object o | H.lookup "TraitImpl" o /= Nothing -> do
-      withArray "TraitImplItem" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        v3 <- parseJSON (v V.! 3)
-        pure (TraitImplItem v0 v1 v2 v3)) =<< o .: "TraitImpl"
+      obj <- o .: "TraitImpl"
+      impl_ref <- obj .: "impl_"
+      trait_ref <- obj .: "trait_ref"
+      item_name <- obj .: "item_name"
+      has_default <- obj .: "has_default"
+      pure (TraitImplItem impl_ref trait_ref item_name has_default)
     Object o | H.lookup "VTableTy" o /= Nothing -> do
       v <- o .: "VTableTy"
       VTableTyItem <$> parseJSON v

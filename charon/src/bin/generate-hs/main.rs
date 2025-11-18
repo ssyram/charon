@@ -705,6 +705,52 @@ fn generate_hs(
                 "#,
             ),
         ),
+        // DeBruijnId is transparent (just the index number)
+        (
+            "DeBruijnId",
+            indoc!(
+                r#"
+                parseJSON v = do
+                    index <- parseJSON v
+                    pure (DeBruijnId index)
+                "#,
+            ),
+        ),
+        // ItemSource has struct variants with named fields
+        (
+            "ItemSource",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    String "TopLevel" -> pure TopLevelItem
+                    Object o | H.lookup "Closure" o /= Nothing -> do
+                      obj <- o .: "Closure"
+                      info <- obj .: "info"
+                      pure (ClosureItem info)
+                    Object o | H.lookup "TraitDecl" o /= Nothing -> do
+                      obj <- o .: "TraitDecl"
+                      trait_ref <- obj .: "trait_ref"
+                      item_name <- obj .: "item_name"
+                      has_default <- obj .: "has_default"
+                      pure (TraitDeclItem trait_ref item_name has_default)
+                    Object o | H.lookup "TraitImpl" o /= Nothing -> do
+                      obj <- o .: "TraitImpl"
+                      impl_ref <- obj .: "impl_"
+                      trait_ref <- obj .: "trait_ref"
+                      item_name <- obj .: "item_name"
+                      has_default <- obj .: "has_default"
+                      pure (TraitImplItem impl_ref trait_ref item_name has_default)
+                    Object o | H.lookup "VTableTy" o /= Nothing -> do
+                      v <- o .: "VTableTy"
+                      VTableTyItem <$> parseJSON v
+                    Object o | H.lookup "VTableInstance" o /= Nothing -> do
+                      v <- o .: "VTableInstance"
+                      VTableInstanceItem <$> parseJSON v
+                    String "VTableMethodShim" -> pure VTableMethodShimItem
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
         // ScalarValue contains Integer that may be serialized as String for large values
         (
             "ScalarValue",
