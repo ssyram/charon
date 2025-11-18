@@ -16,6 +16,7 @@ import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import qualified Generated_Meta as M
+import Generated_Meta
 import Generated_Values
 import qualified Generated_Types as T
 import Generated_Types hiding (TraitImpl, TraitMethod, Local)
@@ -24,12 +25,7 @@ import Generated_Expressions
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
--- Vector newtype (filters out None values from JSON)
-newtype Vector a b = Vector [b]
-  deriving (Show, Eq, Ord)
-
-instance FromJSON b => FromJSON (Vector a b) where
-  parseJSON = fmap (Vector . catMaybes) . parseJSON
+-- Vector newtype is defined in Generated_Meta to avoid circular dependencies
 
 -- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
 instance FromJSON G.TraitImpl where

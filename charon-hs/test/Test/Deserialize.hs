@@ -22,7 +22,7 @@ import Generated_Expressions
 import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
 import Generated_LlbcAst
 import Generated_UllbcAst
-import Generated_GAstOfJson (TranslatedCrate(..), LlbcFile(..), Vector)  -- For TranslatedCrate and the FromJSON instances
+import Generated_GAstOfJson (TranslatedCrate(..), LlbcFile(..))  -- For TranslatedCrate and FromJSON instances
 import Generated_LlbcOfJson ()
 import Generated_UllbcOfJson ()
 

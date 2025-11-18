@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Meta.hs`
 by hand. Edit `templates/Meta.hs` instead, or improve the code
@@ -26,7 +29,7 @@ instance FromJSON PathBuf where
 -- Vector is used for indexed sequences in Rust (IndexVec in charon)
 -- Defined here to avoid circular dependencies
 newtype Vector k v = Vector [v]
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
 instance FromJSON b => FromJSON (Vector a b) where
   parseJSON = fmap (Vector . catMaybes) . parseJSON

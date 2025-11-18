@@ -9,7 +9,7 @@ module Generated_Types where
 import Data.Aeson
 import Data.Text (Text)
 import qualified Data.HashMap.Strict as H
-import Generated_Meta (Vector)
+import Generated_Meta
 import Generated_Values
 
 -- Manually defined type aliases and newtypes
