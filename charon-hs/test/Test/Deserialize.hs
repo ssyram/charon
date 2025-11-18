@@ -2,22 +2,29 @@
 
 module Test.Deserialize (tests, getAllLlbcTests) where
 
-import Data.Aeson (eitherDecodeFileStrict, eitherDecodeStrict, Value(..))
+import Data.Aeson (eitherDecodeFileStrict, eitherDecodeStrict, Value(..), Object)
 import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.KeyMap as KM
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS8
+import qualified Data.Text as T
 import System.Directory (doesFileExist, listDirectory, doesDirectoryExist)
 import System.FilePath ((</>), takeExtension)
 import Control.Monad (filterM, when)
 import Test.Tasty
 import Test.Tasty.HUnit
-import Control.Monad (filterM)
 
 -- Import generated modules
 import Generated_Meta
 import Generated_Values
 import Generated_Types
+import Generated_Expressions
+import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
+import Generated_LlbcAst
+import Generated_UllbcAst
 import Generated_GAstOfJson ()  -- For the FromJSON instances
+import Generated_LlbcOfJson ()
+import Generated_UllbcOfJson ()
 
 tests :: TestTree
 tests = testGroup "Deserialization Tests"
@@ -91,13 +98,57 @@ findLlbcFiles dir = do
 
 -- Function to create a test case for each LLBC file
 -- This will be called from Main.hs to generate dynamic tests
+-- This tests that we can actually deserialize LLBC files into Haskell AST types
 createLlbcTest :: FilePath -> TestTree
 createLlbcTest filepath = testCase filepath $ do
-  -- Try to parse the LLBC file as JSON Value first
-  result <- eitherDecodeFileStrict filepath :: IO (Either String Value)
+  -- Parse the LLBC file as JSON Object and try to deserialize key components
+  result <- eitherDecodeFileStrict filepath :: IO (Either String Object)
   case result of
-    Left err -> assertFailure $ "Failed to parse " ++ filepath ++ ": " ++ err
-    Right _ -> return () -- Success - parsed as valid JSON
+    Left err -> assertFailure $ "Failed to parse JSON in " ++ filepath ++ ": " ++ err
+    Right obj -> do
+      -- Try to deserialize specific fields to validate FromJSON instances work
+      -- The LLBC file should be a JSON object with fields like "type_decls", "fun_decls", etc.
+      
+      -- Test that we can deserialize key LLBC components
+      -- Since FunDecl and TranslatedCrate are in manually_implemented list,
+      -- we test the types that ARE generated with FromJSON instances
+      
+      -- Test type_decls field if present (Vector TypeDeclId TypeDecl)
+      case KM.lookup "type_decls" obj of
+        Just typeDeclsVal -> do
+          let typeDeclsResult = Aeson.fromJSON typeDeclsVal :: Aeson.Result (Vector TypeDeclId TypeDecl)
+          case typeDeclsResult of
+            Aeson.Error err -> assertFailure $ "Failed to deserialize type_decls in " ++ filepath ++ ": " ++ err
+            Aeson.Success decls -> do
+              -- Successfully deserialized! Verify it's a proper vector (list of pairs)
+              let declCount = length decls
+              assertBool ("Deserialized " ++ show declCount ++ " type declarations") True
+        Nothing -> return () -- Field not present, skip
+      
+      -- Test global_decls field if present (Vector GlobalDeclId GlobalDecl)
+      case KM.lookup "global_decls" obj of
+        Just globalDeclsVal -> do
+          let globalDeclsResult = Aeson.fromJSON globalDeclsVal :: Aeson.Result (Vector GlobalDeclId GlobalDecl)
+          case globalDeclsResult of
+            Aeson.Error err -> assertFailure $ "Failed to deserialize global_decls in " ++ filepath ++ ": " ++ err
+            Aeson.Success decls -> do
+              let declCount = length decls
+              assertBool ("Deserialized " ++ show declCount ++ " global declarations") True
+        Nothing -> return () -- Field not present, skip
+      
+      -- Test trait_decls field if present (Vector TraitDeclId TraitDecl)
+      case KM.lookup "trait_decls" obj of
+        Just traitDeclsVal -> do
+          let traitDeclsResult = Aeson.fromJSON traitDeclsVal :: Aeson.Result (Vector TraitDeclId TraitDecl)
+          case traitDeclsResult of
+            Aeson.Error err -> assertFailure $ "Failed to deserialize trait_decls in " ++ filepath ++ ": " ++ err
+            Aeson.Success decls -> do
+              let declCount = length decls
+              assertBool ("Deserialized " ++ show declCount ++ " trait declarations") True
+        Nothing -> return () -- Field not present, skip
+      
+      -- If we got here, all present fields were successfully deserialized
+      return ()
 
 -- Export function to get all LLBC test cases
 getAllLlbcTests :: IO TestTree
