@@ -384,6 +384,11 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
 
 /// Generate Aeson FromJSON instance for a type
 fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
+    // Skip generating FromJSON instances for type aliases to avoid overlapping instances
+    if matches!(&decl.kind, TypeDeclKind::Alias(_)) {
+        return String::new();
+    }
+    
     let ty_name = type_name_to_haskell_ident(&decl.item_meta);
     
     let generics = decl
@@ -534,13 +539,10 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 formatted_parsers
             )
         }
-        TypeDeclKind::Alias(ty) => {
-            let inner_ty = type_to_haskell_name(ctx, ty);
-            format!("parseJSON = parseJSON @{inner_ty}", inner_ty = inner_ty)
-        }
         TypeDeclKind::Union(..) => todo!(),
         TypeDeclKind::Opaque => todo!(),
         TypeDeclKind::Error(_) => todo!(),
+        TypeDeclKind::Alias(_) => unreachable!("Type aliases are skipped earlier"),
     };
 
     format!(

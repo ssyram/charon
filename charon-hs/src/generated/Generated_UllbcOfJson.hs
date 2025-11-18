@@ -36,8 +36,6 @@ instance FromJSON BlockId where
     pure BlockId { blockidRaw }
 
 
-instance FromJSON Blocks where
-  parseJSON = parseJSON @[BlockId]
 
 
 instance FromJSON Statement where
