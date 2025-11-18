@@ -224,6 +224,14 @@ data DynPredicate = DynPredicate
   }
   deriving (Show, Eq, Ord)
 
+data Field = Field
+  { fieldSpan :: Span
+  , fieldAttrInfo :: AttrInfo
+  , fieldFieldName :: Maybe String
+  , fieldFieldTy :: Ty
+  }
+  deriving (Show, Eq, Ord)
+
 data FieldId = FieldId
   { fieldidRaw :: Int
   }
@@ -259,10 +267,10 @@ data FunId = FRegular FunDeclId
 
 -- | A set of generic arguments.
 data GenericArgs = GenericArgs
-  { genericargsRegions :: [RegionId]
-  , genericargsTypes :: [TypeVarId]
-  , genericargsConstGenerics :: [ConstGenericVarId]
-  , genericargsTraitRefs :: [TraitClauseId]
+  { genericargsRegions :: [Region]
+  , genericargsTypes :: [Ty]
+  , genericargsConstGenerics :: [ConstGeneric]
+  , genericargsTraitRefs :: [TraitRef]
   }
   deriving (Show, Eq, Ord)
 
@@ -274,16 +282,16 @@ data GenericArgs = GenericArgs
 -- | trait clauses, because those enforce constraints but do not need to
 -- | be filled with witnesses/instances.
 data GenericParams = GenericParams
-  { genericparamsRegions :: [RegionId]
-  , genericparamsTypes :: [TypeVarId]
-  , genericparamsConstGenerics :: [ConstGenericVarId]
-  , genericparamsTraitClauses :: [TraitClauseId]
+  { genericparamsRegions :: [RegionParam]
+  , genericparamsTypes :: [TypeParam]
+  , genericparamsConstGenerics :: [ConstGenericParam]
+  , genericparamsTraitClauses :: [TraitParam]
   ,   -- | The first region in the pair outlives the second region
   genericparamsRegionsOutlive :: [(RegionBinder (OutlivesPred Region Region))]
   ,   -- | The type outlives the region
   genericparamsTypesOutlive :: [(RegionBinder (OutlivesPred Ty Region))]
   ,   -- | Constraints over trait associated types
-  genericparamsTraitTypeConstraints :: [TraitTypeConstraintId]
+  genericparamsTraitTypeConstraints :: [(RegionBinder TraitTypeConstraint)]
   }
   deriving (Show, Eq, Ord)
 
@@ -384,7 +392,7 @@ data Layout = Layout
   layoutUninhabited :: Bool
   ,   -- | Map from `VariantId` to the corresponding field layouts. Structs are modeled as having
   -- | exactly one variant, unions as having no variant.
-  layoutVariantLayouts :: [VariantId]
+  layoutVariantLayouts :: [VariantLayout]
   }
   deriving (Show, Eq, Ord)
 
@@ -460,7 +468,7 @@ data Region = RVar ((DeBruijnVar RegionId))
 -- | issues in the derived ocaml visitors.
 -- | TODO: merge with `binder`
 data RegionBinder a0 = RegionBinder
-  { regionbinderBinderRegions :: [RegionId]
+  { regionbinderBinderRegions :: [RegionParam]
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
   regionbinderBinderValue :: a0
@@ -582,7 +590,7 @@ data TraitRefKind = TraitImpl TraitImplRef
   | ParentClause TraitRef TraitClauseId
   | ItemClause TraitRef TraitItemName TraitClauseId
   | Self
-  | BuiltinOrAuto BuiltinImplData [TraitClauseId] ([(TraitItemName, TraitAssocTyImpl)])
+  | BuiltinOrAuto BuiltinImplData [TraitRef] ([(TraitItemName, TraitAssocTyImpl)])
   | Dyn
   | UnknownTrait String
   deriving (Show, Eq, Ord)
@@ -653,9 +661,9 @@ data TypeDeclId = TypeDeclId
   }
   deriving (Show, Eq, Ord)
 
-data TypeDeclKind = Struct [FieldId]
-  | Enum [VariantId]
-  | Union [FieldId]
+data TypeDeclKind = Struct [Field]
+  | Enum [Variant]
+  | Union [Field]
   | Opaque
   | Alias Ty
   | TDeclError String
@@ -694,7 +702,7 @@ data Variant = Variant
   { variantSpan :: Span
   , variantAttrInfo :: AttrInfo
   , variantVariantName :: String
-  , variantFields :: [FieldId]
+  , variantFields :: [Field]
   ,   -- | The discriminant value outputted by `std::mem::discriminant` for this variant.
   -- | This can be different than the discriminant stored in memory (called `tag`).
   -- | That one is described by [`DiscriminantLayout`] and [`TagEncoding`].
@@ -712,7 +720,7 @@ data VariantId = VariantId
 -- | Maps fields to their offset within the layout.
 data VariantLayout = VariantLayout
   {   -- | The offset of each field.
-  variantlayoutFieldOffsets :: [FieldId]
+  variantlayoutFieldOffsets :: [Int]
   ,   -- | Whether the variant is uninhabited, i.e. has any valid possible value.
   -- | Note that uninhabited types can have arbitrary layouts.
   variantlayoutUninhabited :: Bool

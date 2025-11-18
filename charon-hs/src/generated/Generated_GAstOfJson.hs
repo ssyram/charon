@@ -19,7 +19,8 @@ import Generated_Meta hiding (Local)
 import qualified Generated_Meta as M
 import Generated_Values
 import qualified Generated_Types as T
-import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
+import Generated_Types hiding (TraitImpl, TraitMethod, Local)
+import qualified Generated_Expressions as E
 import Generated_Expressions
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
@@ -47,13 +48,14 @@ instance FromJSON G.TraitMethod where
     traitmethodItem <- o .: "item"
     pure $ G.TraitMethod traitmethodName traitmethodItem
 
-instance FromJSON G.Field where
+-- Field struct conflicts with Field variant in ProjectionElem, need to qualify
+instance FromJSON T.Field where
   parseJSON = withObject "Field" $ \o -> do
     fieldSpan <- o .: "span"
     fieldAttrInfo <- o .: "attr_info"
     fieldFieldName <- o .: "name"
     fieldFieldTy <- o .: "ty"
-    pure $ G.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
+    pure $ T.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
 
 instance FromJSON G.Local where
   parseJSON = withObject "Local" $ \o -> do
@@ -1008,7 +1010,7 @@ instance FromJSON ProjectionElem where
       withArray "Field" (\v -> do
         v0 <- parseJSON (v V.! 0)
         v1 <- parseJSON (v V.! 1)
-        pure (Field v0 v1)) =<< o .: "Field"
+        pure (E.Field v0 v1)) =<< o .: "Field"
     String "PtrMetadata" -> pure PtrMetadata
     Object o | H.lookup "Index" o /= Nothing -> do
       withArray "ProjIndex" (\v -> do

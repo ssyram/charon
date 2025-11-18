@@ -199,7 +199,8 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                         return "Text".to_string();
                     }
                     if base_ty == "Vector" {
-                        return format!("[{}]", args[0]);
+                        // Vector<K, V> in Rust becomes [V] in Haskell (the key is implicit)
+                        return format!("[{}]", args[1]);
                     }
                     if base_ty == "Option" {
                         return format!("Maybe {}", args[0]);
@@ -490,6 +491,8 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
             let types_variant_conflicts = ["TraitImpl", "TraitMethod"];
             // Meta variants that conflict with GAst structs  
             let meta_variant_conflicts = ["Local"];
+            // Expressions variants that conflict with Types structs
+            let expressions_variant_conflicts = ["Field"];
             
             let variant_parsers = variants
                 .iter()
@@ -501,6 +504,8 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                         format!("T.{}", variant_name)
                     } else if meta_variant_conflicts.contains(&variant_name.as_str()) {
                         format!("M.{}", variant_name)
+                    } else if expressions_variant_conflicts.contains(&variant_name.as_str()) {
+                        format!("E.{}", variant_name)
                     } else {
                         variant_name.clone()
                     };
@@ -717,11 +722,11 @@ fn generate_hs(
         "FunDecl",
         "TranslatedCrate",  // Too complex with LLBC/ULLBC dependencies - manually implement
         "Vector",  // Type alias for [v] with phantom type parameter - don't generate instance (would conflict with list instance)
+        "Field",  // Conflicts with Field variant in ProjectionElem - manually implement FromJSON
         // These have name conflicts between GAst structs and Types variants/fields
         // Manual instances in GAstOfJson.hs template and type defs in GAst.hs template
         "TraitImpl",
         "TraitMethod",
-        "Field",
         "Local",
         "Assert",  // Renamed to "Assertion" in JSON
         "Call",
@@ -772,7 +777,6 @@ fn generate_hs(
         // These have name conflicts and are manually defined in GAst.hs template
         "TraitImpl",
         "TraitMethod",
-        "Field",
         "Local",
         "Assert",  // Renamed to "Assertion" in JSON
         "Call",

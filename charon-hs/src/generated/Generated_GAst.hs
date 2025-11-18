@@ -28,14 +28,6 @@ data TargetInfo = TargetInfo
   deriving (Show, Eq, Ord)
 
 -- Types with name conflicts - defined manually to avoid issues with Types module
-data Field = Field
-  { fieldSpan :: Span
-  , fieldAttrInfo :: AttrInfo
-  , fieldFieldName :: (Maybe String)
-  , fieldFieldTy :: Ty
-  }
-  deriving (Show, Eq, Ord)
-
 data Local = Local
   { localIndex :: LocalId
   , localName :: (Maybe String)
@@ -255,7 +247,7 @@ data Locals = Locals
   -- | - the local used for the return value (index 0)
   -- | - the `arg_count` input arguments
   -- | - the remaining locals, used for the intermediate computations
-  localsLocals :: [LocalId]
+  localsLocals :: [Local]
   }
   deriving (Show, Eq, Ord)
 
@@ -293,7 +285,7 @@ data TraitAssocTy = TraitAssocTy
   { traitassoctyName :: TraitItemName
   , traitassoctyDefault :: Maybe Ty
   ,   -- | List of trait clauses that apply to this type.
-  traitassoctyImpliedClauses :: [TraitClauseId]
+  traitassoctyImpliedClauses :: [TraitParam]
   }
   deriving (Show, Eq, Ord)
 
@@ -345,7 +337,7 @@ data TraitDecl = TraitDecl
   -- | ```
   -- | TODO: actually, as of today, we consider that all trait clauses of
   -- | trait declarations are parent clauses.
-  traitdeclImpliedClauses :: [TraitClauseId]
+  traitdeclImpliedClauses :: [TraitParam]
   ,   -- | The associated constants declared in the trait.
   traitdeclConsts :: [TraitAssocConst]
   ,   -- | The associated types declared in the trait. The binder binds the generic parameters of the
