@@ -467,9 +467,9 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                     // Prefix field name with type name to match the type definition
                     make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name))
                 })
-                .join(", ");
+                .join(" ");
             format!(
-                "parseJSON = withObject \"{ty_name}\" $ \\o -> do\n{field_parsers}\n    pure {ty_name} {{ {field_list} }}",
+                "parseJSON = withObject \"{ty_name}\" $ \\o -> do\n{field_parsers}\n    pure ({ty_name} {field_list})",
                 ty_name = ty_name,
                 field_parsers = field_parsers,
                 field_list = field_list

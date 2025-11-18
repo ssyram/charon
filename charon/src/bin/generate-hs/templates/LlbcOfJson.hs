@@ -20,6 +20,7 @@ import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
+import Generated_GAstOfJson ()  -- Import FromJSON instances
 import Generated_LlbcAst
 
 {- __REPLACE0__ -}

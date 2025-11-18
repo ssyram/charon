@@ -20,13 +20,14 @@ import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
+import Generated_GAstOfJson ()  -- Import FromJSON instances
 import Generated_LlbcAst
 
 instance FromJSON Block where
   parseJSON = withObject "Block" $ \o -> do
     blockSpan <- o .: "span"
     blockStatements <- o .: "statements"
-    pure Block { blockSpan, blockStatements }
+    pure (Block blockSpan blockStatements)
 
 
 instance FromJSON Statement where
@@ -35,13 +36,13 @@ instance FromJSON Statement where
     statementStatementId <- o .: "id"
     statementKind <- o .: "kind"
     statementCommentsBefore <- o .: "comments_before"
-    pure Statement { statementSpan, statementStatementId, statementKind, statementCommentsBefore }
+    pure (Statement statementSpan statementStatementId statementKind statementCommentsBefore)
 
 
 instance FromJSON StatementId where
   parseJSON = withObject "StatementId" $ \o -> do
     statementidRaw <- o .: "_raw"
-    pure StatementId { statementidRaw }
+    pure (StatementId statementidRaw)
 
 
 instance FromJSON StatementKind where

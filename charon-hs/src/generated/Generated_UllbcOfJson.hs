@@ -21,19 +21,20 @@ import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
+import Generated_GAstOfJson ()  -- Import FromJSON instances
 import Generated_UllbcAst
 
 instance FromJSON Block where
   parseJSON = withObject "Block" $ \o -> do
     blockStatements <- o .: "statements"
     blockTerminator <- o .: "terminator"
-    pure Block { blockStatements, blockTerminator }
+    pure (Block blockStatements blockTerminator)
 
 
 instance FromJSON BlockId where
   parseJSON = withObject "BlockId" $ \o -> do
     blockidRaw <- o .: "_raw"
-    pure BlockId { blockidRaw }
+    pure (BlockId blockidRaw)
 
 
 
@@ -43,7 +44,7 @@ instance FromJSON Statement where
     statementSpan <- o .: "span"
     statementKind <- o .: "kind"
     statementCommentsBefore <- o .: "comments_before"
-    pure Statement { statementSpan, statementKind, statementCommentsBefore }
+    pure (Statement statementSpan statementKind statementCommentsBefore)
 
 
 instance FromJSON StatementKind where
@@ -103,7 +104,7 @@ instance FromJSON Terminator where
     terminatorSpan <- o .: "span"
     terminatorKind <- o .: "kind"
     terminatorCommentsBefore <- o .: "comments_before"
-    pure Terminator { terminatorSpan, terminatorKind, terminatorCommentsBefore }
+    pure (Terminator terminatorSpan terminatorKind terminatorCommentsBefore)
 
 
 instance FromJSON TerminatorKind where

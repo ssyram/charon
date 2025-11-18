@@ -19,6 +19,7 @@ import Generated_Meta hiding (Local)
 import Generated_Values
 import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
 import Generated_Expressions
+import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), CliOptions, DeclarationGroup, FnOperand, FunSig, GDeclarationGroup, GexprBody, GlobalDecl, GlobalKind, Locals, MirLevel, MonomorphizeMut)
 import qualified Generated_GAst as G
 
 -- Vector is manually defined here since it's excluded from generation
