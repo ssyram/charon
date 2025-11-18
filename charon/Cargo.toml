@@ -29,6 +29,10 @@ path = "src/bin/charon-driver/main.rs"
 name = "generate-ml"
 path = "src/bin/generate-ml/main.rs"
 
+[[bin]]
+name = "generate-hs"
+path = "src/bin/generate-hs/main.rs"
+
 [[test]]
 name = "ui"
 path = "tests/ui.rs"

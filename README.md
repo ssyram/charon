@@ -36,8 +36,11 @@ Run `charon` inside the crate of interest, much like you would call `cargo build
 a `crate_name.llbc` file.
 
 The `charon-lib` crate can read this file and let you manipulate its contents. Parse the file using
-`serde_json::from_reader::<charon_lib::export::CrateData>(file)`. OCaml bindings are also available
-in the `charon-ml` folder.
+`serde_json::from_reader::<charon_lib::export::CrateData>(file)`. 
+
+Language bindings are available for:
+- **OCaml**: in the `charon-ml` folder
+- **Haskell**: in the `charon-hs` folder (auto-generated, see [Haskell bindings](./charon-hs/README.md))
 
 For more detailed usage instructions, see the [documentation](./docs/usage.md).
 
@@ -90,6 +93,15 @@ You can then run `make build-charon-ml` to build the ML library, or even simply
 tests with `make test`.
 
 Alternatively, you can use Nix and do `nix develop` and all dependencies should be made available.
+
+## Code Generation
+
+Charon includes code generators that automatically create language bindings from the Rust AST definitions:
+
+- `make generate-ml` - Generates OCaml types and JSON deserializers in `charon-ml/src/generated/`
+- `make generate-hs` - Generates Haskell types and Aeson FromJSON instances in `charon-hs/src/generated/`
+
+Both generators work by running Charon on itself to extract the AST definitions, then generate the appropriate code for the target language. During development, you can use `make generate-ml-keep-llbc` or `make generate-hs-keep-llbc` to skip re-running Charon on itself.
 
 ## Documentation
 

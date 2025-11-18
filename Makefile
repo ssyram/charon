@@ -82,6 +82,16 @@ generate-ml:
 generate-ml-keep-llbc:
 	CHARON_ML_REUSE_LLBC=1 $(MAKE) generate-ml
 
+# Generate Haskell code automatically from the rust definitions.
+.PHONY: generate-hs
+generate-hs:
+	cd charon && cargo build --release && cargo run --release --bin generate-hs
+
+# Same as `generate-hs` but don't re-run charon on itself. Useful when developing.
+.PHONY: generate-hs-keep-llbc
+generate-hs-keep-llbc:
+	CHARON_HS_REUSE_LLBC=1 $(MAKE) generate-hs
+
 # Run Charon on rustc's ui test suite
 .PHONY: rustc-tests
 rustc-tests:
