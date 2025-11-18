@@ -199,8 +199,8 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                         return "Text".to_string();
                     }
                     if base_ty == "Vector" {
-                        // Vector<K, V> in Rust becomes [V] in Haskell (the key is implicit)
-                        return format!("[{}]", args[1]);
+                        // Vector<K, V> in Rust becomes (Vector K V) in Haskell
+                        return format!("(Vector {} {})", args[0], args[1]);
                     }
                     if base_ty == "Option" {
                         return format!("Maybe {}", args[0]);
@@ -686,16 +686,8 @@ fn generate_hs(
         // None currently needed
     ];
     let manual_json_impls = &[
-        // Hand-written because we filter out `None` values.
-        (
-            "Vector",
-            indoc!(
-                r#"
-                parseJSON = fmap catMaybes . parseJSON
-                "#
-            ),
-        ),
-        // Hand-written because Name is transparent in Rust (serializes as just the inner vec)
+        // Vector has a custom FromJSON in GAstOfJson.hs that filters out Nones
+        // Name is transparent in Rust (serializes as just the inner vec)
         (
             "Name",
             indoc!(

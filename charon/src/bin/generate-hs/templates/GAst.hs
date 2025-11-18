@@ -16,11 +16,6 @@ import Generated_Expressions
 
 -- Manually defined types
 
--- Vector is used for indexed sequences in Rust (IndexVec in charon)
--- The key type is just for type safety, the actual storage is just a list
--- where the index is implicit from the position
-type Vector k v = [v]
-
 data TargetInfo = TargetInfo
   { targetinfoTargetPointerSize :: Int
   , targetinfoIsLittleEndian :: Bool

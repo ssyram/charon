@@ -26,7 +26,7 @@ data BlockId = BlockId
   }
   deriving (Show, Eq, Ord)
 
-type Blocks = [Block]
+type Blocks = (Vector BlockId Block)
 
 data Statement = Statement
   { statementSpan :: Span

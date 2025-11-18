@@ -16,11 +16,6 @@ import Generated_Expressions
 
 -- Manually defined types
 
--- Vector is used for indexed sequences in Rust (IndexVec in charon)
--- The key type is just for type safety, the actual storage is just a list
--- where the index is implicit from the position
-type Vector k v = [v]
-
 data TargetInfo = TargetInfo
   { targetinfoTargetPointerSize :: Int
   , targetinfoIsLittleEndian :: Bool
@@ -247,7 +242,7 @@ data Locals = Locals
   -- | - the local used for the return value (index 0)
   -- | - the `arg_count` input arguments
   -- | - the remaining locals, used for the intermediate computations
-  localsLocals :: [Local]
+  localsLocals :: (Vector LocalId Local)
   }
   deriving (Show, Eq, Ord)
 
@@ -285,7 +280,7 @@ data TraitAssocTy = TraitAssocTy
   { traitassoctyName :: TraitItemName
   , traitassoctyDefault :: Maybe Ty
   ,   -- | List of trait clauses that apply to this type.
-  traitassoctyImpliedClauses :: [TraitParam]
+  traitassoctyImpliedClauses :: (Vector TraitClauseId TraitParam)
   }
   deriving (Show, Eq, Ord)
 
@@ -337,7 +332,7 @@ data TraitDecl = TraitDecl
   -- | ```
   -- | TODO: actually, as of today, we consider that all trait clauses of
   -- | trait declarations are parent clauses.
-  traitdeclImpliedClauses :: [TraitParam]
+  traitdeclImpliedClauses :: (Vector TraitClauseId TraitParam)
   ,   -- | The associated constants declared in the trait.
   traitdeclConsts :: [TraitAssocConst]
   ,   -- | The associated types declared in the trait. The binder binds the generic parameters of the

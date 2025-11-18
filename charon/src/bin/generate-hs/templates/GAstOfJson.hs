@@ -15,7 +15,6 @@ import Data.Text (Text)
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta hiding (Local)
 import qualified Generated_Meta as M
 import Generated_Values
 import qualified Generated_Types as T
@@ -25,8 +24,12 @@ import Generated_Expressions
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
--- Vector type alias (just a list with phantom type parameter for the index type)
-type Vector a b = [b]
+-- Vector newtype (filters out None values from JSON)
+newtype Vector a b = Vector [b]
+  deriving (Show, Eq, Ord)
+
+instance FromJSON b => FromJSON (Vector a b) where
+  parseJSON = fmap (Vector . catMaybes) . parseJSON
 
 -- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
 instance FromJSON G.TraitImpl where
