@@ -818,6 +818,7 @@ fn generate_hs(
         "Ty",
         "Vector",
         "TargetInfo", // Manually defined in GAst.hs template
+        "Body", // Manually defined in Crate.hs template to properly qualify LLBC/ULLBC types
     ];
 
     // Compute conflict sets for auto-qualification
@@ -1096,6 +1097,26 @@ fn generate_hs(
         markers: vec![
             (GenerationKind::TypeDecl, ullbc_type_decl.clone()),
             (GenerationKind::FromJson, ullbc_type_decl),
+        ],
+    });
+
+    // Crate - types that depend on both LLBC and ULLBC
+    // This includes Body (which has Structured and Unstructured variants), FunDecl, and TranslatedCrate
+    let crate_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &[
+            "Body",
+            "FunDecl",
+            "TranslatedCrate",
+        ],
+    );
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("Crate.hs"),
+        target: output_dir.join("Generated_Crate.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, crate_type_decl.clone()),
+            (GenerationKind::FromJson, crate_type_decl),
         ],
     });
 

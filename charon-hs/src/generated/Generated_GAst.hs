@@ -142,6 +142,7 @@ data CliOptions = CliOptions
   ,   -- | Named builtin sets of options. Currently used only for dependent projects, eveentually
   -- | should be replaced with semantically-meaningful presets.
   clioptionsPreset :: Maybe Preset
+  , clioptionsDesugarDrops :: Bool
   }
   deriving (Show, Eq, Ord)
 
@@ -392,40 +393,6 @@ data TraitMethod = TraitMethod
   }
   deriving (Show, Eq, Ord)
 
--- Manual instance for TranslatedCrate - simplified version that parses the key fields
--- Full deserialization would require FunDecl and Body instances which have complex dependencies
-data TranslatedCrate = TranslatedCrate
-  { translatedCrateCrate_name :: String
-  , translatedCrateType_decls :: Vector TypeDeclId TypeDecl
-  , translatedCrateGlobal_decls :: Vector GlobalDeclId GlobalDecl
-  , translatedCrateTrait_decls :: Vector TraitDeclId TraitDecl
-  , translatedCrateTrait_impls :: Vector TraitImplId TraitImpl
-  }
-  deriving (Show, Eq, Ord)
-
--- Wrapper type for the top-level LLBC file structure
-data LlbcFile = LlbcFile
-  { llbcfileCharon_version :: String
-  , llbcfileTranslated :: TranslatedCrate
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON TranslatedCrate where
-  parseJSON = withObject "TranslatedCrate" $ \o -> do
-    crateName <- o .: "crate_name"
-    typeDecls <- o .: "type_decls"
-    globalDecls <- o .: "global_decls"
-    traitDecls <- o .: "trait_decls"
-    traitImpls <- o .: "trait_impls"
-    -- We skip fields that we can't deserialize yet (options, target_information, fun_decls, etc.)
-    pure $ TranslatedCrate crateName typeDecls globalDecls traitDecls traitImpls
-
-instance FromJSON LlbcFile where
-  parseJSON = withObject "LlbcFile" $ \o -> do
-    charonVersion <- o .: "charon_version"
-    translated <- o .: "translated"
-    pure $ LlbcFile charonVersion translated
-
 instance FromJSON Assertion where
   parseJSON = withObject "Assertion" $ \o -> do
     assertionCond <- o .: "cond"
@@ -484,7 +451,8 @@ instance FromJSON CliOptions where
     clioptionsNoOpsToFunctionCalls <- o .: "no_ops_to_function_calls"
     clioptionsRawBoxes <- o .: "raw_boxes"
     clioptionsPreset <- o .: "preset"
-    pure (CliOptions clioptionsUllbc clioptionsLib clioptionsBin clioptionsMirPromoted clioptionsMirOptimized clioptionsMir clioptionsInputFile clioptionsReadLlbc clioptionsDestDir clioptionsDestFile clioptionsUsePolonius clioptionsSkipBorrowck clioptionsMonomorphize clioptionsMonomorphizeMut clioptionsExtractOpaqueBodies clioptionsTranslateAllMethods clioptionsIncluded clioptionsOpaque clioptionsExclude clioptionsRemoveAssociatedTypes clioptionsHideMarkerTraits clioptionsRemoveAdtClauses clioptionsHideAllocator clioptionsRemoveUnusedSelfClauses clioptionsAddDropBounds clioptionsStartFrom clioptionsNoCargo clioptionsRustcArgs clioptionsCargoArgs clioptionsAbortOnError clioptionsErrorOnWarnings clioptionsNoSerialize clioptionsPrintOriginalUllbc clioptionsPrintUllbc clioptionsPrintBuiltLlbc clioptionsPrintLlbc clioptionsNoMergeGotoChains clioptionsNoOpsToFunctionCalls clioptionsRawBoxes clioptionsPreset)
+    clioptionsDesugarDrops <- o .: "desugar_drops"
+    pure (CliOptions clioptionsUllbc clioptionsLib clioptionsBin clioptionsMirPromoted clioptionsMirOptimized clioptionsMir clioptionsInputFile clioptionsReadLlbc clioptionsDestDir clioptionsDestFile clioptionsUsePolonius clioptionsSkipBorrowck clioptionsMonomorphize clioptionsMonomorphizeMut clioptionsExtractOpaqueBodies clioptionsTranslateAllMethods clioptionsIncluded clioptionsOpaque clioptionsExclude clioptionsRemoveAssociatedTypes clioptionsHideMarkerTraits clioptionsRemoveAdtClauses clioptionsHideAllocator clioptionsRemoveUnusedSelfClauses clioptionsAddDropBounds clioptionsStartFrom clioptionsNoCargo clioptionsRustcArgs clioptionsCargoArgs clioptionsAbortOnError clioptionsErrorOnWarnings clioptionsNoSerialize clioptionsPrintOriginalUllbc clioptionsPrintUllbc clioptionsPrintBuiltLlbc clioptionsPrintLlbc clioptionsNoMergeGotoChains clioptionsNoOpsToFunctionCalls clioptionsRawBoxes clioptionsPreset clioptionsDesugarDrops)
 
 
 instance FromJSON CopyNonOverlapping where
@@ -666,4 +634,5 @@ instance FromJSON TraitMethod where
     traitmethodName <- o .: "name"
     traitmethodItem <- o .: "item"
     pure (TraitMethod traitmethodName traitmethodItem)
+
 

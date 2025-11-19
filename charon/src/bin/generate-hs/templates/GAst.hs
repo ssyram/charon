@@ -26,38 +26,5 @@ data TargetInfo = TargetInfo
 
 {- __REPLACE0__ -}
 
--- Manual instance for TranslatedCrate - simplified version that parses the key fields
--- Full deserialization would require FunDecl and Body instances which have complex dependencies
-data TranslatedCrate = TranslatedCrate
-  { translatedCrateCrate_name :: String
-  , translatedCrateType_decls :: Vector TypeDeclId TypeDecl
-  , translatedCrateGlobal_decls :: Vector GlobalDeclId GlobalDecl
-  , translatedCrateTrait_decls :: Vector TraitDeclId TraitDecl
-  , translatedCrateTrait_impls :: Vector TraitImplId TraitImpl
-  }
-  deriving (Show, Eq, Ord)
-
--- Wrapper type for the top-level LLBC file structure
-data LlbcFile = LlbcFile
-  { llbcfileCharon_version :: String
-  , llbcfileTranslated :: TranslatedCrate
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON TranslatedCrate where
-  parseJSON = withObject "TranslatedCrate" $ \o -> do
-    crateName <- o .: "crate_name"
-    typeDecls <- o .: "type_decls"
-    globalDecls <- o .: "global_decls"
-    traitDecls <- o .: "trait_decls"
-    traitImpls <- o .: "trait_impls"
-    -- We skip fields that we can't deserialize yet (options, target_information, fun_decls, etc.)
-    pure $ TranslatedCrate crateName typeDecls globalDecls traitDecls traitImpls
-
-instance FromJSON LlbcFile where
-  parseJSON = withObject "LlbcFile" $ \o -> do
-    charonVersion <- o .: "charon_version"
-    translated <- o .: "translated"
-    pure $ LlbcFile charonVersion translated
-
 {- __REPLACE1__ -}
+

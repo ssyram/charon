@@ -48,7 +48,6 @@ data StatementKind = Assign Place Rvalue
   | StorageLive LocalId
   | StorageDead LocalId
   | Deinit Place
-  | Drop Place TraitRef
   | Assert Assertion
   | Nop
   deriving (Show, Eq, Ord)
@@ -69,6 +68,7 @@ data Terminator = Terminator
 data TerminatorKind = Goto BlockId
   | Switch Operand Switch
   | Call G.Call BlockId BlockId
+  | Drop Place TraitRef BlockId BlockId
   | Abort AbortKind
   | Return
   | UnwindResume
@@ -119,11 +119,6 @@ instance FromJSON StatementKind where
     Object o | H.lookup "Deinit" o /= Nothing -> do
       v <- o .: "Deinit"
       Deinit <$> parseJSON v
-    Object o | H.lookup "Drop" o /= Nothing -> do
-      withArray "Drop" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (Drop v0 v1)) =<< o .: "Drop"
     Object o | H.lookup "Assert" o /= Nothing -> do
       v <- o .: "Assert"
       Assert <$> parseJSON v
@@ -172,6 +167,13 @@ instance FromJSON TerminatorKind where
       target <- obj .: "target"
       onUnwind <- obj .: "on_unwind"
       pure (Call call target onUnwind)
+    Object o | H.lookup "Drop" o /= Nothing -> do
+      obj <- o .: "Drop"
+      place <- obj .: "place"
+      tref <- obj .: "tref"
+      target <- obj .: "target"
+      onUnwind <- obj .: "on_unwind"
+      pure (Drop place tref target onUnwind)
     Object o | H.lookup "Abort" o /= Nothing -> do
       v <- o .: "Abort"
       Abort <$> parseJSON v
