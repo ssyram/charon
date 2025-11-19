@@ -72,7 +72,79 @@ cabal test --test-show-details=direct
 
 Note: The project is configured with Stack using `package.yaml`. The `.cabal` file is generated automatically by Stack from `package.yaml`.
 
-## Usage Example
+## Printing Mechanism
+
+The `Charon.Printing` module provides a context-aware printing mechanism for the Charon AST, mirroring the functionality in `charon/src/pretty/fmt_with_ctx.rs`. It uses `Builder` for efficient string construction.
+
+### Usage Example
+
+```haskell
+{-# LANGUAGE OverloadedStrings #-}
+
+import Charon.Printing
+import Generated_Types
+import Generated_Expressions
+
+-- Print basic types
+main :: IO ()
+main = do
+  -- Create an empty context
+  let ctx = emptyCtx
+  
+  -- Print basic types
+  putStrLn $ printWithCtx ctx I32              -- "i32"
+  putStrLn $ printWithCtx ctx U64              -- "u64"
+  putStrLn $ printWithCtx ctx F32              -- "f32"
+  
+  -- Print operators
+  putStrLn $ printWithCtx ctx BitXor           -- "^"
+  putStrLn $ printWithCtx ctx (Add OPanic)     -- "panic.+"
+  putStrLn $ printWithCtx ctx Not              -- "~"
+  
+  -- Print names
+  let name = Name [PeIdent "std" (Disambiguator 0), 
+                   PeIdent "vec" (Disambiguator 0)]
+  putStrLn $ printWithCtx ctx name             -- "std::vec"
+  
+  -- Create context with translated crate for better output
+  -- let ctxWithCrate = ctx { translated = Just myCrate }
+  -- putStrLn $ printWithCtx ctxWithCrate myTypeId
+```
+
+### PrintingCtx Structure
+
+The `PrintingCtx` data structure contains:
+- `translated :: Maybe TranslatedCrate` - The translated crate for name resolution
+- `generics :: [GenericParams]` - Generic parameters binding stack
+- `locals :: Maybe Locals` - Local variable information
+- `indentLevel :: Int` - Current indentation level
+
+Helper functions:
+- `emptyCtx` - Create an empty printing context
+- `pushGenerics` - Push generic parameters onto the stack
+- `setLocals` - Set local variables
+- `increaseIndent` - Increase indentation
+- `indent` - Get current indentation string
+
+### BuildWithCtx Typeclass
+
+The `BuildWithCtx` typeclass provides context-aware formatting:
+
+```haskell
+class BuildWithCtx a where
+  buildWithCtx :: PrintingCtx -> a -> Builder
+
+printWithCtx :: BuildWithCtx a => PrintingCtx -> a -> String
+```
+
+Instances are provided for all core AST types including:
+- Basic types: `IntTy`, `UIntTy`, `FloatType`
+- Operators: `Binop`, `Unop`, `OverflowMode`
+- AST elements: `Name`, `PathElem`, `AbortKind`
+- IDs: `LocalId`, `FieldId`, `TypeDeclId`
+- And many more...
+
+## Deserialization Example
 
 ```haskell
 {-# LANGUAGE OverloadedStrings #-}
