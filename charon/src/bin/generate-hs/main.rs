@@ -67,15 +67,13 @@ fn type_name_to_haskell_ident(item_meta: &ItemMeta) -> String {
 
 /// Check if a type name conflicts with Types/Expressions/Meta module types
 /// and needs to be qualified in GAstOfJson
-fn needs_gast_qualification(ty_name: &str) -> bool {
-    // These GAst struct types conflict with Types module variants/fields
-    matches!(ty_name, "TraitImpl" | "TraitMethod" | "Local" | "Call" | "Assertion" | "CopyNonOverlapping")
+fn needs_gast_qualification(ctx: &GenerateCtx, ty_name: &str) -> bool {
+    ctx.gast_needs_qualification.contains(ty_name)
 }
 
 /// Check if a type name needs T. qualification (for Types module types that conflict)
-fn needs_types_qualification(ty_name: &str) -> bool {
-    // Field exists in both Types and Expressions modules
-    matches!(ty_name, "Field")
+fn needs_types_qualification(ctx: &GenerateCtx, ty_name: &str) -> bool {
+    ctx.types_needs_qualification.contains(ty_name)
 }
 
 struct GenerateCtx<'a> {
@@ -85,6 +83,16 @@ struct GenerateCtx<'a> {
     type_tree: HashMap<TypeDeclId, HashSet<TypeDeclId>>,
     manual_type_impls: HashMap<TypeDeclId, String>,
     manual_json_impls: HashMap<TypeDeclId, String>,
+    /// Names that require qualification in GAstOfJson (GAst types that conflict with other modules)
+    gast_needs_qualification: HashSet<String>,
+    /// Names that require qualification with T. (Types module types that conflict)
+    types_needs_qualification: HashSet<String>,
+    /// Variant names in Types module (for qualifying enum variants in GAstOfJson)
+    types_variant_names: HashSet<String>,
+    /// Variant names in Meta module
+    meta_variant_names: HashSet<String>,
+    /// Variant names in Expressions module
+    expressions_variant_names: HashSet<String>,
 }
 
 impl<'a> GenerateCtx<'a> {
@@ -125,6 +133,11 @@ impl<'a> GenerateCtx<'a> {
             type_tree,
             manual_type_impls: Default::default(),
             manual_json_impls: Default::default(),
+            gast_needs_qualification: Default::default(),
+            types_needs_qualification: Default::default(),
+            types_variant_names: Default::default(),
+            meta_variant_names: Default::default(),
+            expressions_variant_names: Default::default(),
         };
         ctx.manual_type_impls = manual_type_impls
             .iter()
@@ -173,6 +186,36 @@ impl<'a> GenerateCtx<'a> {
             }
         }
         children
+    }
+
+    /// Collect all variant constructor names from enum types in the given set
+    fn collect_variant_names(&self, type_ids: &HashSet<TypeDeclId>) -> HashSet<String> {
+        let mut variant_names = HashSet::new();
+        for &id in type_ids {
+            if let Some(decl) = self.crate_data.type_decls.get(id) {
+                if let TypeDeclKind::Enum(variants) = &decl.kind {
+                    for variant in variants {
+                        if !variant.is_opaque() {
+                            let variant_name = make_haskell_ident(&variant.renamed_name());
+                            variant_names.insert(variant_name);
+                        }
+                    }
+                }
+            }
+        }
+        variant_names
+    }
+
+    /// Collect all type names (both data types and type aliases) from the given set
+    fn collect_type_names(&self, type_ids: &HashSet<TypeDeclId>) -> HashSet<String> {
+        let mut type_names = HashSet::new();
+        for &id in type_ids {
+            if let Some(decl) = self.crate_data.type_decls.get(id) {
+                let ty_name = type_name_to_haskell_ident(&decl.item_meta);
+                type_names.insert(ty_name);
+            }
+        }
+        type_names
     }
 }
 
@@ -416,9 +459,9 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
     let ty_name = type_name_to_haskell_ident(&decl.item_meta);
 
     // Check if this type needs qualification in GAstOfJson due to conflicts
-    let qualified_ty_name = if needs_gast_qualification(&ty_name) {
+    let qualified_ty_name = if needs_gast_qualification(ctx, &ty_name) {
         format!("G.{}", ty_name)
-    } else if needs_types_qualification(&ty_name) {
+    } else if needs_types_qualification(ctx, &ty_name) {
         format!("T.{}", ty_name)
     } else {
         ty_name.clone()
@@ -538,25 +581,17 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
             )
         }
         TypeDeclKind::Enum(variants) => {
-            // List of enum variant constructors that conflict with struct names from other modules
-            // TraitImpl (in TraitRefKind) and TraitMethod (in FnPtrKind) conflict with GAst structs
-            let types_variant_conflicts = ["TraitImpl", "TraitMethod"];
-            // Meta variants that conflict with GAst structs
-            let meta_variant_conflicts = ["Local"];
-            // Expressions variants that conflict with Types structs
-            let expressions_variant_conflicts = ["Field"];
-
             let variant_parsers = variants
                 .iter()
                 .filter(|v| !v.is_opaque())
                 .map(|variant| {
                     let variant_name = make_haskell_ident(&variant.renamed_name());
                     // Qualify with appropriate prefix if this variant conflicts
-                    let qualified_variant = if types_variant_conflicts.contains(&variant_name.as_str()) {
+                    let qualified_variant = if ctx.types_variant_names.contains(&variant_name) {
                         format!("T.{}", variant_name)
-                    } else if meta_variant_conflicts.contains(&variant_name.as_str()) {
+                    } else if ctx.meta_variant_names.contains(&variant_name) {
                         format!("M.{}", variant_name)
-                    } else if expressions_variant_conflicts.contains(&variant_name.as_str()) {
+                    } else if ctx.expressions_variant_names.contains(&variant_name) {
                         format!("E.{}", variant_name)
                     } else {
                         variant_name.clone()
@@ -789,7 +824,7 @@ fn generate_hs(
         ),
     ];
 
-    let ctx = GenerateCtx::new(&crate_data, manual_type_impls, manual_json_impls);
+    let mut ctx = GenerateCtx::new(&crate_data, manual_type_impls, manual_json_impls);
 
     // Compute the sets of types to be put in each module (similar to generate-ml).
     let manually_implemented: HashSet<_> = [
@@ -975,6 +1010,69 @@ fn generate_hs(
             markers: vec![(GenerationKind::FromJson, ullbc_types)],
         },
     ];
+
+    // Compute conflict sets for auto-qualification
+    // First, we need to extract the type sets for each module from the markers
+    let mut meta_types = HashSet::new();
+    let mut types_types = HashSet::new();
+    let mut expressions_types = HashSet::new();
+    let mut gast_module_types = HashSet::new();
+    
+    // Recompute the markers to extract type sets (we'll use the same logic)
+    let mut temp_processed = dont_generate_ty
+        .iter()
+        .map(|name| ctx.id_from_name(name))
+        .collect::<HashSet<_>>();
+    
+    let extract_types = |ctx: &GenerateCtx, temp_processed: &mut HashSet<TypeDeclId>, type_names: &[&str]| -> HashSet<TypeDeclId> {
+        let types: HashSet<_> = ctx.children_of_many(type_names);
+        let unprocessed: HashSet<_> = types.difference(temp_processed).copied().collect();
+        temp_processed.extend(unprocessed.iter().copied());
+        unprocessed
+    };
+    
+    meta_types = extract_types(&ctx, &mut temp_processed, &["File", "Span", "AttrInfo"]);
+    // Skip Values module - it doesn't cause conflicts
+    types_types = extract_types(&ctx, &mut temp_processed, &[
+        "TypeVarId", "ConstGeneric", "TraitClauseId", "DeBruijnVar", "ItemId", "TyKind",
+        "TraitImplRef", "FunDeclRef", "GlobalDeclRef", "Binder", "AbortKind", "TypeDecl",
+    ]);
+    expressions_types = extract_types(&ctx, &mut temp_processed, &["Rvalue"]);
+    gast_module_types = extract_types(&ctx, &mut temp_processed, &[
+        "Call", "Assert", "ItemSource", "Locals", "FunSig", "CopyNonOverlapping",
+        "GlobalDecl", "TraitDecl", "TraitImpl", "CliOpts", "GExprBody", "DeclarationGroup",
+    ]);
+    
+    // Collect variant names from each module
+    ctx.types_variant_names = ctx.collect_variant_names(&types_types);
+    ctx.meta_variant_names = ctx.collect_variant_names(&meta_types);
+    ctx.expressions_variant_names = ctx.collect_variant_names(&expressions_types);
+    
+    // Collect type names from each module
+    let gast_type_names = ctx.collect_type_names(&gast_module_types);
+    let types_type_names = ctx.collect_type_names(&types_types);
+    let expressions_type_names = ctx.collect_type_names(&expressions_types);
+    
+    // Compute GAst types that need qualification (conflict with variant names in other modules)
+    ctx.gast_needs_qualification = gast_type_names
+        .iter()
+        .filter(|name| {
+            ctx.types_variant_names.contains(*name)
+                || ctx.meta_variant_names.contains(*name)
+                || ctx.expressions_variant_names.contains(*name)
+        })
+        .cloned()
+        .collect();
+    
+    // Compute Types types that need qualification (conflict with types/variants in other modules)
+    ctx.types_needs_qualification = types_type_names
+        .iter()
+        .filter(|name| {
+            expressions_type_names.contains(*name)
+                || ctx.expressions_variant_names.contains(*name)
+        })
+        .cloned()
+        .collect();
 
     // Create output directory if it doesn't exist
     fs::create_dir_all(&output_dir)?;
