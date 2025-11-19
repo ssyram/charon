@@ -19,7 +19,9 @@ ghc-options:
   - -Wredundant-constraints
 
 library:
-  source-dirs: src/generated
+  source-dirs: 
+    - src
+    - src/generated
   exposed-modules:
     - Generated_Meta
     - Generated_Values
@@ -28,6 +30,7 @@ library:
     - Generated_GAst
     - Generated_LlbcAst
     - Generated_UllbcAst
+    - Charon.Printing
   dependencies:
     - base >= 4.14 && < 5
     - aeson >= 2.0
@@ -41,6 +44,7 @@ tests:
     source-dirs: test
     other-modules:
       - Test.Deserialize
+      - Test.Printing
     dependencies:
       - base >= 4.14 && < 5
       - charon-hs

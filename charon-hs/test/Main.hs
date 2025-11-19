@@ -2,6 +2,7 @@ module Main (main) where
 
 import Test.Tasty ( defaultMain, testGroup )
 import qualified Test.Deserialize
+import qualified Test.Printing
 
 main :: IO ()
 main = do
@@ -12,4 +13,5 @@ main = do
   defaultMain $ testGroup "Charon Haskell Tests"
     [ Test.Deserialize.tests
     , llbcTests
+    , Test.Printing.tests
     ]
