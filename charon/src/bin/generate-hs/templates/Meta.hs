@@ -1,10 +1,6 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Meta.hs`
@@ -23,7 +19,6 @@ import Data.Aeson
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
-import qualified Data.Vector as V
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text

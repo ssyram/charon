@@ -1,7 +1,5 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Values.hs`
@@ -13,7 +11,6 @@ module Generated_Values where
 
 import Data.Aeson
 import Data.Aeson.Types (Parser)
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V

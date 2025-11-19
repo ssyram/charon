@@ -1,8 +1,6 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_GAst.hs`
@@ -13,16 +11,9 @@ generation tool to avoid the need for hand-writing things.
 module Generated_GAst where
 
 import Data.Aeson
-import Data.Text (Text)
-import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
-import qualified Data.Vector as V
-import qualified Generated_Meta as M
 import Generated_Meta hiding (Local)
-import Generated_Values
-import qualified Generated_Types as T
 import Generated_Types hiding (Field, TraitImpl, TraitMethod)
-import qualified Generated_Expressions as E
 import Generated_Expressions hiding (Field)
 
 -- Manually defined types

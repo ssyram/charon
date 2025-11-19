@@ -826,43 +826,78 @@ fn generate_hs(
     let mut types_types = HashSet::new();
     let mut expressions_types = HashSet::new();
     let mut gast_module_types = HashSet::new();
-    
+
     // Recompute the markers to extract type sets (we'll use the same logic)
     let mut temp_processed = dont_generate_ty
         .iter()
         .map(|name| ctx.id_from_name(name))
         .collect::<HashSet<_>>();
-    
-    let extract_types = |ctx: &GenerateCtx, temp_processed: &mut HashSet<TypeDeclId>, type_names: &[&str]| -> HashSet<TypeDeclId> {
+
+    let extract_types = |ctx: &GenerateCtx,
+                         temp_processed: &mut HashSet<TypeDeclId>,
+                         type_names: &[&str]|
+     -> HashSet<TypeDeclId> {
         let types: HashSet<_> = ctx.children_of_many(type_names);
         let unprocessed: HashSet<_> = types.difference(temp_processed).copied().collect();
         temp_processed.extend(unprocessed.iter().copied());
         unprocessed
     };
-    
+
     meta_types = extract_types(&ctx, &mut temp_processed, &["File", "Span", "AttrInfo"]);
     // Extract Values module types first to exclude them from types_types
-    let _values_types = extract_types(&ctx, &mut temp_processed, &["Literal", "IntegerTy", "LiteralTy"]);
-    types_types = extract_types(&ctx, &mut temp_processed, &[
-        "TypeVarId", "ConstGeneric", "TraitClauseId", "DeBruijnVar", "ItemId", "TyKind",
-        "TraitImplRef", "FunDeclRef", "GlobalDeclRef", "Binder", "AbortKind", "TypeDecl",
-    ]);
+    let _values_types = extract_types(
+        &ctx,
+        &mut temp_processed,
+        &["Literal", "IntegerTy", "LiteralTy"],
+    );
+    types_types = extract_types(
+        &ctx,
+        &mut temp_processed,
+        &[
+            "TypeVarId",
+            "ConstGeneric",
+            "TraitClauseId",
+            "DeBruijnVar",
+            "ItemId",
+            "TyKind",
+            "TraitImplRef",
+            "FunDeclRef",
+            "GlobalDeclRef",
+            "Binder",
+            "AbortKind",
+            "TypeDecl",
+        ],
+    );
     expressions_types = extract_types(&ctx, &mut temp_processed, &["Rvalue"]);
-    gast_module_types = extract_types(&ctx, &mut temp_processed, &[
-        "Call", "Assert", "ItemSource", "Locals", "FunSig", "CopyNonOverlapping",
-        "GlobalDecl", "TraitDecl", "TraitImpl", "CliOpts", "GExprBody", "DeclarationGroup",
-    ]);
-    
+    gast_module_types = extract_types(
+        &ctx,
+        &mut temp_processed,
+        &[
+            "Call",
+            "Assert",
+            "ItemSource",
+            "Locals",
+            "FunSig",
+            "CopyNonOverlapping",
+            "GlobalDecl",
+            "TraitDecl",
+            "TraitImpl",
+            "CliOpts",
+            "GExprBody",
+            "DeclarationGroup",
+        ],
+    );
+
     // Collect variant names from each module
     ctx.types_variant_names = ctx.collect_variant_names(&types_types);
     ctx.meta_variant_names = ctx.collect_variant_names(&meta_types);
     ctx.expressions_variant_names = ctx.collect_variant_names(&expressions_types);
-    
+
     // Collect type names from each module
     let gast_type_names = ctx.collect_type_names(&gast_module_types);
     let types_type_names = ctx.collect_type_names(&types_types);
     let expressions_type_names = ctx.collect_type_names(&expressions_types);
-    
+
     // Compute GAst types that need qualification
     // These are GAst types that either:
     // 1. Conflict with variant names in Types/Expressions/Meta modules, OR
@@ -873,11 +908,27 @@ fn generate_hs(
     // GlobalKind, Locals, GDeclarationGroup, GexprBody, GlobalDecl, CliOptions, DeclarationGroup,
     // FnOperand, FunSig
     let gast_directly_imported: HashSet<&str> = [
-        "Preset", "TargetInfo", "TraitAssocConst", "TraitAssocTy", "TraitDecl", "MirLevel",
-        "MonomorphizeMut", "GlobalKind", "Locals", "GDeclarationGroup", "GexprBody",
-        "GlobalDecl", "CliOptions", "DeclarationGroup", "FnOperand", "FunSig"
-    ].iter().copied().collect();
-    
+        "Preset",
+        "TargetInfo",
+        "TraitAssocConst",
+        "TraitAssocTy",
+        "TraitDecl",
+        "MirLevel",
+        "MonomorphizeMut",
+        "GlobalKind",
+        "Locals",
+        "GDeclarationGroup",
+        "GexprBody",
+        "GlobalDecl",
+        "CliOptions",
+        "DeclarationGroup",
+        "FnOperand",
+        "FunSig",
+    ]
+    .iter()
+    .copied()
+    .collect();
+
     ctx.gast_needs_qualification = gast_type_names
         .iter()
         .filter(|name| {
@@ -891,34 +942,36 @@ fn generate_hs(
         })
         .cloned()
         .collect();
-    
+
     // Compute Types types that need qualification (conflict with types/variants in other modules)
     ctx.types_needs_qualification = types_type_names
         .iter()
         .filter(|name| {
-            expressions_type_names.contains(*name)
-                || ctx.expressions_variant_names.contains(*name)
+            expressions_type_names.contains(*name) || ctx.expressions_variant_names.contains(*name)
         })
         .cloned()
         .collect();
-    
+
     // Now add FromJSON instance markers to each module
     // We need to reset processed_tys and add the FromJSON markers to each template
     let mut generate_code_for_with_json = vec![];
-    
+
     // Helper to create markers with both TypeDecl and FromJson
     let mut temp_processed2 = dont_generate_ty
         .iter()
         .map(|name| ctx.id_from_name(name))
         .collect::<HashSet<_>>();
-    
-    let extract_types2 = |ctx: &GenerateCtx, temp_processed: &mut HashSet<TypeDeclId>, type_names: &[&str]| -> HashSet<TypeDeclId> {
+
+    let extract_types2 = |ctx: &GenerateCtx,
+                          temp_processed: &mut HashSet<TypeDeclId>,
+                          type_names: &[&str]|
+     -> HashSet<TypeDeclId> {
         let types: HashSet<_> = ctx.children_of_many(type_names);
         let unprocessed: HashSet<_> = types.difference(temp_processed).copied().collect();
         temp_processed.extend(unprocessed.iter().copied());
         unprocessed
     };
-    
+
     // Meta
     let meta_type_decl = extract_types2(&ctx, &mut temp_processed2, &["File", "Span", "AttrInfo"]);
     generate_code_for_with_json.push(GenerateCodeFor {
@@ -929,9 +982,13 @@ fn generate_hs(
             (GenerationKind::FromJson, meta_type_decl),
         ],
     });
-    
+
     // Values
-    let values_type_decl = extract_types2(&ctx, &mut temp_processed2, &["Literal", "IntegerTy", "LiteralTy"]);
+    let values_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &["Literal", "IntegerTy", "LiteralTy"],
+    );
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Values.hs"),
         target: output_dir.join("Generated_Values.hs"),
@@ -940,12 +997,26 @@ fn generate_hs(
             (GenerationKind::FromJson, values_type_decl),
         ],
     });
-    
+
     // Types
-    let types_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
-        "TypeVarId", "ConstGeneric", "TraitClauseId", "DeBruijnVar", "ItemId", "TyKind",
-        "TraitImplRef", "FunDeclRef", "GlobalDeclRef", "Binder", "AbortKind", "TypeDecl",
-    ]);
+    let types_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &[
+            "TypeVarId",
+            "ConstGeneric",
+            "TraitClauseId",
+            "DeBruijnVar",
+            "ItemId",
+            "TyKind",
+            "TraitImplRef",
+            "FunDeclRef",
+            "GlobalDeclRef",
+            "Binder",
+            "AbortKind",
+            "TypeDecl",
+        ],
+    );
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Types.hs"),
         target: output_dir.join("Generated_Types.hs"),
@@ -954,7 +1025,7 @@ fn generate_hs(
             (GenerationKind::FromJson, types_type_decl),
         ],
     });
-    
+
     // Expressions
     let expressions_type_decl = extract_types2(&ctx, &mut temp_processed2, &["Rvalue"]);
     generate_code_for_with_json.push(GenerateCodeFor {
@@ -965,12 +1036,26 @@ fn generate_hs(
             (GenerationKind::FromJson, expressions_type_decl),
         ],
     });
-    
+
     // GAst - use same types for both TypeDecl and FromJson
-    let gast_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
-        "Call", "Assert", "ItemSource", "Locals", "FunSig", "CopyNonOverlapping",
-        "GlobalDecl", "TraitDecl", "TraitImpl", "CliOpts", "GExprBody", "DeclarationGroup",
-    ]);
+    let gast_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &[
+            "Call",
+            "Assert",
+            "ItemSource",
+            "Locals",
+            "FunSig",
+            "CopyNonOverlapping",
+            "GlobalDecl",
+            "TraitDecl",
+            "TraitImpl",
+            "CliOpts",
+            "GExprBody",
+            "DeclarationGroup",
+        ],
+    );
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("GAst.hs"),
         target: output_dir.join("Generated_GAst.hs"),
@@ -979,11 +1064,13 @@ fn generate_hs(
             (GenerationKind::FromJson, gast_type_decl),
         ],
     });
-    
+
     // LlbcAst
-    let llbc_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
-        "charon_lib::ast::llbc_ast::Statement",
-    ]);
+    let llbc_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &["charon_lib::ast::llbc_ast::Statement"],
+    );
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("LlbcAst.hs"),
         target: output_dir.join("Generated_LlbcAst.hs"),
@@ -992,13 +1079,17 @@ fn generate_hs(
             (GenerationKind::FromJson, llbc_type_decl),
         ],
     });
-    
+
     // UllbcAst
-    let ullbc_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
-        "charon_lib::ast::ullbc_ast::Statement",
-        "charon_lib::ast::ullbc_ast::SwitchTargets",
-        "charon_lib::ast::ullbc_ast::BodyContents",
-    ]);
+    let ullbc_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &[
+            "charon_lib::ast::ullbc_ast::Statement",
+            "charon_lib::ast::ullbc_ast::SwitchTargets",
+            "charon_lib::ast::ullbc_ast::BodyContents",
+        ],
+    );
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("UllbcAst.hs"),
         target: output_dir.join("Generated_UllbcAst.hs"),

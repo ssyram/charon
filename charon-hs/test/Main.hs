@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Test.Tasty
+import Test.Tasty ( defaultMain, testGroup )
 import qualified Test.Deserialize
 
 main :: IO ()
