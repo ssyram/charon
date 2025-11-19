@@ -18,7 +18,7 @@ import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
 -- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping, Error)
+import Generated_GAst hiding (Call, CopyNonOverlapping)
 
 {- __REPLACE0__ -}
 

@@ -253,6 +253,11 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                     if base_ty == "Ustr" || base_ty == "String_" {
                         return "Text".to_string();
                     }
+                    if base_ty == "HashMap" {
+                        // HashMap<K, V> in Rust becomes [(K, V)] in Haskell
+                        // This handles the case where HashMap is serialized with HashMapToArray
+                        return format!("[({}, {})]", args[0], args[1]);
+                    }
                     if base_ty == "Vector" {
                         // Vector<K, V> in Rust becomes (Vector K V) in Haskell
                         return format!("(Vector {} {})", args[0], args[1]);
@@ -818,9 +823,6 @@ fn generate_hs(
         "Ty",
         "Vector",
         "TargetInfo", // Manually defined in GAst.hs template
-        "Body", // Manually defined in Crate.hs template to properly qualify LLBC/ULLBC types
-        "TranslatedCrate", // Manually defined in Crate.hs template to fix HashMap type parameters
-        "Error", // Manually defined in GAst.hs template to avoid name collision with Body variant
     ];
 
     // Compute conflict sets for auto-qualification
@@ -1057,6 +1059,9 @@ fn generate_hs(
             "CliOpts",
             "GExprBody",
             "DeclarationGroup",
+            "Body",
+            "FunDecl",
+            "TranslatedCrate",
         ],
     );
     generate_code_for_with_json.push(GenerateCodeFor {
@@ -1099,26 +1104,6 @@ fn generate_hs(
         markers: vec![
             (GenerationKind::TypeDecl, ullbc_type_decl.clone()),
             (GenerationKind::FromJson, ullbc_type_decl),
-        ],
-    });
-
-    // Crate - types that depend on both LLBC and ULLBC
-    // This includes Body (which has Structured and Unstructured variants), FunDecl, and TranslatedCrate
-    let crate_type_decl = extract_types2(
-        &ctx,
-        &mut temp_processed2,
-        &[
-            "Body",
-            "FunDecl",
-            "TranslatedCrate",
-        ],
-    );
-    generate_code_for_with_json.push(GenerateCodeFor {
-        template: template_dir.join("Crate.hs"),
-        target: output_dir.join("Generated_Crate.hs"),
-        markers: vec![
-            (GenerationKind::TypeDecl, crate_type_decl.clone()),
-            (GenerationKind::FromJson, crate_type_decl),
         ],
     });
 

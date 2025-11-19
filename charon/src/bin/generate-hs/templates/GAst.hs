@@ -10,8 +10,10 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson hiding (Error)
+import Data.Aeson
+import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
 import Generated_Meta hiding (Local)
 import Generated_Types hiding (Field, TraitImpl, TraitMethod)
 import Generated_Expressions hiding (Field)
@@ -30,22 +32,20 @@ instance FromJSON TargetInfo where
     isLittleEndian <- o .: "is_little_endian"
     pure (TargetInfo targetPointerSize isLittleEndian)
 
--- Common error used during the translation.
--- This is defined here instead of in Crate module to avoid name collision
--- with the Body::Error variant constructor
-data Error = Error
-  { errorSpan :: Span
-  , errorMsg :: String
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON Error where
-  parseJSON = withObject "Error" $ \o -> do
-    errorSpan <- o .: "span"
-    errorMsg <- o .: "msg"
-    pure (Error errorSpan errorMsg)
-
 {- __REPLACE0__ -}
 
 {- __REPLACE1__ -}
 
+-- Wrapper type for the top-level LLBC file structure
+-- This is a Haskell-specific convenience type, not from Rust
+data LlbcFile = LlbcFile
+  { llbcfileCharonVersion :: String
+  , llbcfileTranslated :: TranslatedCrate
+  }
+  deriving (Show, Eq, Ord)
+
+instance FromJSON LlbcFile where
+  parseJSON = withObject "LlbcFile" $ \o -> do
+    charonVersion <- o .: "charon_version"
+    translated <- o .: "translated"
+    pure $ LlbcFile charonVersion translated
