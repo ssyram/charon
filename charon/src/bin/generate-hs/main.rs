@@ -458,14 +458,8 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
 
     let ty_name = type_name_to_haskell_ident(&decl.item_meta);
 
-    // Check if this type needs qualification in GAstOfJson due to conflicts
-    let qualified_ty_name = if needs_gast_qualification(ctx, &ty_name) {
-        format!("G.{}", ty_name)
-    } else if needs_types_qualification(ctx, &ty_name) {
-        format!("T.{}", ty_name)
-    } else {
-        ty_name.clone()
-    };
+    // No qualification needed - types and their FromJSON instances are in the same module
+    let qualified_ty_name = ty_name.clone();
 
     let generics = decl
         .generics
@@ -586,16 +580,8 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .filter(|v| !v.is_opaque())
                 .map(|variant| {
                     let variant_name = make_haskell_ident(&variant.renamed_name());
-                    // Qualify with appropriate prefix if this variant conflicts
-                    let qualified_variant = if ctx.types_variant_names.contains(&variant_name) {
-                        format!("T.{}", variant_name)
-                    } else if ctx.meta_variant_names.contains(&variant_name) {
-                        format!("M.{}", variant_name)
-                    } else if ctx.expressions_variant_names.contains(&variant_name) {
-                        format!("E.{}", variant_name)
-                    } else {
-                        variant_name.clone()
-                    };
+                    // No qualification needed - variants are in the same module as their FromJSON instance
+                    let qualified_variant = variant_name.clone();
                     let rust_name = &variant.name;
                     if variant.fields.is_empty() {
                         // Unit variant
@@ -881,136 +867,6 @@ fn generate_hs(
         "TargetInfo", // Manually defined in GAst.hs template
     ];
 
-    let mut processed_tys: HashSet<TypeDeclId> = dont_generate_ty
-        .iter()
-        .map(|name| ctx.id_from_name(name))
-        .collect();
-
-    // Helper to get children of types that haven't been processed yet
-    let mut markers_from_children = |ctx: &GenerateCtx, markers: &[_]| {
-        markers
-            .iter()
-            .copied()
-            .map(|(kind, type_names)| {
-                let types: HashSet<_> = ctx.children_of_many(type_names);
-                let unprocessed_types: HashSet<_> =
-                    types.difference(&processed_tys).copied().collect();
-                processed_tys.extend(unprocessed_types.iter().copied());
-                (kind, unprocessed_types)
-            })
-            .collect()
-    };
-
-    #[rustfmt::skip]
-    let generate_code_for = vec![
-        GenerateCodeFor {
-            template: template_dir.join("Meta.hs"),
-            target: output_dir.join("Generated_Meta.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "File",
-                    "Span",
-                    "AttrInfo",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("Values.hs"),
-            target: output_dir.join("Generated_Values.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "Literal",
-                    "IntegerTy",
-                    "LiteralTy",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("Types.hs"),
-            target: output_dir.join("Generated_Types.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "TypeVarId",
-                    "ConstGeneric",
-                    "TraitClauseId",
-                    "DeBruijnVar",
-                    "ItemId",
-                    "TyKind",
-                    "TraitImplRef",
-                    "FunDeclRef",
-                    "GlobalDeclRef",
-                    "Binder",
-                    "AbortKind",
-                    "TypeDecl",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("Expressions.hs"),
-            target: output_dir.join("Generated_Expressions.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "Rvalue",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("GAst.hs"),
-            target: output_dir.join("Generated_GAst.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "Call",
-                    "Assert",
-                    "ItemSource",
-                    "Locals",
-                    "FunSig",
-                    "CopyNonOverlapping",
-                    "GlobalDecl",
-                    "TraitDecl",
-                    "TraitImpl",
-                    "CliOpts",
-                    "GExprBody",
-                    "DeclarationGroup",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("LlbcAst.hs"),
-            target: output_dir.join("Generated_LlbcAst.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "charon_lib::ast::llbc_ast::Statement",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("UllbcAst.hs"),
-            target: output_dir.join("Generated_UllbcAst.hs"),
-            markers: markers_from_children(&ctx, &[
-                (GenerationKind::TypeDecl, &[
-                    "charon_lib::ast::ullbc_ast::Statement",
-                    "charon_lib::ast::ullbc_ast::SwitchTargets",
-                    "charon_lib::ast::ullbc_ast::BodyContents",
-                ]),
-            ]),
-        },
-        GenerateCodeFor {
-            template: template_dir.join("GAstOfJson.hs"),
-            target: output_dir.join("Generated_GAstOfJson.hs"),
-            markers: vec![(GenerationKind::FromJson, gast_types)],
-        },
-        GenerateCodeFor {
-            template: template_dir.join("LlbcOfJson.hs"),
-            target: output_dir.join("Generated_LlbcOfJson.hs"),
-            markers: vec![(GenerationKind::FromJson, llbc_types)],
-        },
-        GenerateCodeFor {
-            template: template_dir.join("UllbcOfJson.hs"),
-            target: output_dir.join("Generated_UllbcOfJson.hs"),
-            markers: vec![(GenerationKind::FromJson, ullbc_types)],
-        },
-    ];
-
     // Compute conflict sets for auto-qualification
     // First, we need to extract the type sets for each module from the markers
     let mut meta_types = HashSet::new();
@@ -1092,11 +948,117 @@ fn generate_hs(
         })
         .cloned()
         .collect();
+    
+    // Now add FromJSON instance markers to each module
+    // We need to reset processed_tys and add the FromJSON markers to each template
+    let mut generate_code_for_with_json = vec![];
+    
+    // Helper to create markers with both TypeDecl and FromJson
+    let mut temp_processed2 = dont_generate_ty
+        .iter()
+        .map(|name| ctx.id_from_name(name))
+        .collect::<HashSet<_>>();
+    
+    let extract_types2 = |ctx: &GenerateCtx, temp_processed: &mut HashSet<TypeDeclId>, type_names: &[&str]| -> HashSet<TypeDeclId> {
+        let types: HashSet<_> = ctx.children_of_many(type_names);
+        let unprocessed: HashSet<_> = types.difference(temp_processed).copied().collect();
+        temp_processed.extend(unprocessed.iter().copied());
+        unprocessed
+    };
+    
+    // Meta
+    let meta_type_decl = extract_types2(&ctx, &mut temp_processed2, &["File", "Span", "AttrInfo"]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("Meta.hs"),
+        target: output_dir.join("Generated_Meta.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, meta_type_decl.clone()),
+            (GenerationKind::FromJson, meta_type_decl),
+        ],
+    });
+    
+    // Values
+    let values_type_decl = extract_types2(&ctx, &mut temp_processed2, &["Literal", "IntegerTy", "LiteralTy"]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("Values.hs"),
+        target: output_dir.join("Generated_Values.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, values_type_decl.clone()),
+            (GenerationKind::FromJson, values_type_decl),
+        ],
+    });
+    
+    // Types
+    let types_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
+        "TypeVarId", "ConstGeneric", "TraitClauseId", "DeBruijnVar", "ItemId", "TyKind",
+        "TraitImplRef", "FunDeclRef", "GlobalDeclRef", "Binder", "AbortKind", "TypeDecl",
+    ]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("Types.hs"),
+        target: output_dir.join("Generated_Types.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, types_type_decl.clone()),
+            (GenerationKind::FromJson, types_type_decl),
+        ],
+    });
+    
+    // Expressions
+    let expressions_type_decl = extract_types2(&ctx, &mut temp_processed2, &["Rvalue"]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("Expressions.hs"),
+        target: output_dir.join("Generated_Expressions.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, expressions_type_decl.clone()),
+            (GenerationKind::FromJson, expressions_type_decl),
+        ],
+    });
+    
+    // GAst - use same types for both TypeDecl and FromJson
+    let gast_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
+        "Call", "Assert", "ItemSource", "Locals", "FunSig", "CopyNonOverlapping",
+        "GlobalDecl", "TraitDecl", "TraitImpl", "CliOpts", "GExprBody", "DeclarationGroup",
+    ]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("GAst.hs"),
+        target: output_dir.join("Generated_GAst.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, gast_type_decl.clone()),
+            (GenerationKind::FromJson, gast_type_decl),
+        ],
+    });
+    
+    // LlbcAst
+    let llbc_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
+        "charon_lib::ast::llbc_ast::Statement",
+    ]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("LlbcAst.hs"),
+        target: output_dir.join("Generated_LlbcAst.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, llbc_type_decl.clone()),
+            (GenerationKind::FromJson, llbc_type_decl),
+        ],
+    });
+    
+    // UllbcAst
+    let ullbc_type_decl = extract_types2(&ctx, &mut temp_processed2, &[
+        "charon_lib::ast::ullbc_ast::Statement",
+        "charon_lib::ast::ullbc_ast::SwitchTargets",
+        "charon_lib::ast::ullbc_ast::BodyContents",
+    ]);
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("UllbcAst.hs"),
+        target: output_dir.join("Generated_UllbcAst.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, ullbc_type_decl.clone()),
+            (GenerationKind::FromJson, ullbc_type_decl),
+        ],
+    });
 
     // Create output directory if it doesn't exist
     fs::create_dir_all(&output_dir)?;
 
-    for file in generate_code_for {
+    for file in generate_code_for_with_json {
         file.generate(&ctx)?;
     }
     Ok(())

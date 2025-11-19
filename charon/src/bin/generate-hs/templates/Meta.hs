@@ -1,6 +1,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Meta.hs`
 by hand. Edit `templates/Meta.hs` instead, or improve the code
@@ -17,7 +20,8 @@ module Generated_Meta where
 import Data.Aeson
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
-import qualified Data.HashMap.Strict as H
+import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -35,3 +39,5 @@ instance FromJSON b => FromJSON (Vector a b) where
   parseJSON = fmap (Vector . catMaybes) . parseJSON
 
 {- __REPLACE0__ -}
+
+{- __REPLACE1__ -}

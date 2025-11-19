@@ -19,12 +19,9 @@ import Generated_Meta
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
-import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
+import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion; TranslatedCrate and LlbcFile are here too
 import Generated_LlbcAst
 import Generated_UllbcAst
-import Generated_GAstOfJson (TranslatedCrate(..), LlbcFile(..))  -- For TranslatedCrate and FromJSON instances
-import Generated_LlbcOfJson ()
-import Generated_UllbcOfJson ()
 
 tests :: TestTree
 tests = testGroup "Deserialization Tests"

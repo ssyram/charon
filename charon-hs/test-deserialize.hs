@@ -1,5 +1,5 @@
 import Data.Aeson (eitherDecodeFileStrict)
-import Generated_GAstOfJson (TranslatedCrate(..))
+import Generated_GAst (TranslatedCrate(..))
 
 main :: IO ()
 main = do

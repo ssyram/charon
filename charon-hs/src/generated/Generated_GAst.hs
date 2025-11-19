@@ -1,3 +1,8 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_GAst.hs`
 by hand. Edit `templates/GAst.hs` instead, or improve the code
@@ -8,11 +13,16 @@ module Generated_GAst where
 
 import Data.Aeson
 import Data.Text (Text)
-import qualified Data.HashMap.Strict as H
-import Generated_Meta
+import Data.Maybe (catMaybes)
+import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
+import qualified Generated_Meta as M
+import Generated_Meta hiding (Local)
 import Generated_Values
-import Generated_Types
-import Generated_Expressions
+import qualified Generated_Types as T
+import Generated_Types hiding (Field, TraitImpl, TraitMethod)
+import qualified Generated_Expressions as E
+import Generated_Expressions hiding (Field)
 
 -- Manually defined types
 
@@ -389,3 +399,279 @@ data TraitMethod = TraitMethod
   traitmethodItem :: FunDeclRef
   }
   deriving (Show, Eq, Ord)
+
+-- Manual instance for TranslatedCrate - simplified version that parses the key fields
+-- Full deserialization would require FunDecl and Body instances which have complex dependencies
+data TranslatedCrate = TranslatedCrate
+  { translatedCrateCrate_name :: String
+  , translatedCrateType_decls :: Vector TypeDeclId TypeDecl
+  , translatedCrateGlobal_decls :: Vector GlobalDeclId GlobalDecl
+  , translatedCrateTrait_decls :: Vector TraitDeclId TraitDecl
+  , translatedCrateTrait_impls :: Vector TraitImplId TraitImpl
+  }
+  deriving (Show, Eq, Ord)
+
+-- Wrapper type for the top-level LLBC file structure
+data LlbcFile = LlbcFile
+  { llbcfileCharon_version :: String
+  , llbcfileTranslated :: TranslatedCrate
+  }
+  deriving (Show, Eq, Ord)
+
+instance FromJSON TranslatedCrate where
+  parseJSON = withObject "TranslatedCrate" $ \o -> do
+    crateName <- o .: "crate_name"
+    typeDecls <- o .: "type_decls"
+    globalDecls <- o .: "global_decls"
+    traitDecls <- o .: "trait_decls"
+    traitImpls <- o .: "trait_impls"
+    -- We skip fields that we can't deserialize yet (options, target_information, fun_decls, etc.)
+    pure $ TranslatedCrate crateName typeDecls globalDecls traitDecls traitImpls
+
+instance FromJSON LlbcFile where
+  parseJSON = withObject "LlbcFile" $ \o -> do
+    charonVersion <- o .: "charon_version"
+    translated <- o .: "translated"
+    pure $ LlbcFile charonVersion translated
+
+instance FromJSON Assertion where
+  parseJSON = withObject "Assertion" $ \o -> do
+    assertionCond <- o .: "cond"
+    assertionExpected <- o .: "expected"
+    assertionOnFailure <- o .: "on_failure"
+    pure (Assertion assertionCond assertionExpected assertionOnFailure)
+
+
+instance FromJSON Call where
+  parseJSON = withObject "Call" $ \o -> do
+    callFunc <- o .: "func"
+    callArgs <- o .: "args"
+    callDest <- o .: "dest"
+    pure (Call callFunc callArgs callDest)
+
+
+instance FromJSON CliOptions where
+  parseJSON = withObject "CliOptions" $ \o -> do
+    clioptionsUllbc <- o .: "ullbc"
+    clioptionsLib <- o .: "lib"
+    clioptionsBin <- o .: "bin"
+    clioptionsMirPromoted <- o .: "mir_promoted"
+    clioptionsMirOptimized <- o .: "mir_optimized"
+    clioptionsMir <- o .: "mir"
+    clioptionsInputFile <- o .: "input_file"
+    clioptionsReadLlbc <- o .: "read_llbc"
+    clioptionsDestDir <- o .: "dest_dir"
+    clioptionsDestFile <- o .: "dest_file"
+    clioptionsUsePolonius <- o .: "use_polonius"
+    clioptionsSkipBorrowck <- o .: "skip_borrowck"
+    clioptionsMonomorphize <- o .: "monomorphize"
+    clioptionsMonomorphizeMut <- o .: "monomorphize_mut"
+    clioptionsExtractOpaqueBodies <- o .: "extract_opaque_bodies"
+    clioptionsTranslateAllMethods <- o .: "translate_all_methods"
+    clioptionsIncluded <- o .: "include"
+    clioptionsOpaque <- o .: "opaque"
+    clioptionsExclude <- o .: "exclude"
+    clioptionsRemoveAssociatedTypes <- o .: "remove_associated_types"
+    clioptionsHideMarkerTraits <- o .: "hide_marker_traits"
+    clioptionsRemoveAdtClauses <- o .: "remove_adt_clauses"
+    clioptionsHideAllocator <- o .: "hide_allocator"
+    clioptionsRemoveUnusedSelfClauses <- o .: "remove_unused_self_clauses"
+    clioptionsAddDropBounds <- o .: "add_drop_bounds"
+    clioptionsStartFrom <- o .: "start_from"
+    clioptionsNoCargo <- o .: "no_cargo"
+    clioptionsRustcArgs <- o .: "rustc_args"
+    clioptionsCargoArgs <- o .: "cargo_args"
+    clioptionsAbortOnError <- o .: "abort_on_error"
+    clioptionsErrorOnWarnings <- o .: "error_on_warnings"
+    clioptionsNoSerialize <- o .: "no_serialize"
+    clioptionsPrintOriginalUllbc <- o .: "print_original_ullbc"
+    clioptionsPrintUllbc <- o .: "print_ullbc"
+    clioptionsPrintBuiltLlbc <- o .: "print_built_llbc"
+    clioptionsPrintLlbc <- o .: "print_llbc"
+    clioptionsNoMergeGotoChains <- o .: "no_merge_goto_chains"
+    clioptionsNoOpsToFunctionCalls <- o .: "no_ops_to_function_calls"
+    clioptionsRawBoxes <- o .: "raw_boxes"
+    clioptionsPreset <- o .: "preset"
+    pure (CliOptions clioptionsUllbc clioptionsLib clioptionsBin clioptionsMirPromoted clioptionsMirOptimized clioptionsMir clioptionsInputFile clioptionsReadLlbc clioptionsDestDir clioptionsDestFile clioptionsUsePolonius clioptionsSkipBorrowck clioptionsMonomorphize clioptionsMonomorphizeMut clioptionsExtractOpaqueBodies clioptionsTranslateAllMethods clioptionsIncluded clioptionsOpaque clioptionsExclude clioptionsRemoveAssociatedTypes clioptionsHideMarkerTraits clioptionsRemoveAdtClauses clioptionsHideAllocator clioptionsRemoveUnusedSelfClauses clioptionsAddDropBounds clioptionsStartFrom clioptionsNoCargo clioptionsRustcArgs clioptionsCargoArgs clioptionsAbortOnError clioptionsErrorOnWarnings clioptionsNoSerialize clioptionsPrintOriginalUllbc clioptionsPrintUllbc clioptionsPrintBuiltLlbc clioptionsPrintLlbc clioptionsNoMergeGotoChains clioptionsNoOpsToFunctionCalls clioptionsRawBoxes clioptionsPreset)
+
+
+instance FromJSON CopyNonOverlapping where
+  parseJSON = withObject "CopyNonOverlapping" $ \o -> do
+    copynonoverlappingSrc <- o .: "src"
+    copynonoverlappingDst <- o .: "dst"
+    copynonoverlappingCount <- o .: "count"
+    pure (CopyNonOverlapping copynonoverlappingSrc copynonoverlappingDst copynonoverlappingCount)
+
+
+instance FromJSON DeclarationGroup where
+  parseJSON v = case v of
+    Object o | H.lookup "Type" o /= Nothing -> do
+      v <- o .: "Type"
+      TypeGroup <$> parseJSON v
+    Object o | H.lookup "Fun" o /= Nothing -> do
+      v <- o .: "Fun"
+      FunGroup <$> parseJSON v
+    Object o | H.lookup "Global" o /= Nothing -> do
+      v <- o .: "Global"
+      GlobalGroup <$> parseJSON v
+    Object o | H.lookup "TraitDecl" o /= Nothing -> do
+      v <- o .: "TraitDecl"
+      TraitDeclGroup <$> parseJSON v
+    Object o | H.lookup "TraitImpl" o /= Nothing -> do
+      v <- o .: "TraitImpl"
+      TraitImplGroup <$> parseJSON v
+    Object o | H.lookup "Mixed" o /= Nothing -> do
+      v <- o .: "Mixed"
+      MixedGroup <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON FnOperand where
+  parseJSON v = case v of
+    Object o | H.lookup "Regular" o /= Nothing -> do
+      v <- o .: "Regular"
+      FnOpRegular <$> parseJSON v
+    Object o | H.lookup "Move" o /= Nothing -> do
+      v <- o .: "Move"
+      FnOpMove <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON FunSig where
+  parseJSON = withObject "FunSig" $ \o -> do
+    funsigIsUnsafe <- o .: "is_unsafe"
+    funsigGenerics <- o .: "generics"
+    funsigInputs <- o .: "inputs"
+    funsigOutput <- o .: "output"
+    pure (FunSig funsigIsUnsafe funsigGenerics funsigInputs funsigOutput)
+
+
+instance (FromJSON a0) => FromJSON (GDeclarationGroup a0) where
+  parseJSON v = case v of
+    Object o | H.lookup "NonRec" o /= Nothing -> do
+      v <- o .: "NonRec"
+      NonRecGroup <$> parseJSON v
+    Object o | H.lookup "Rec" o /= Nothing -> do
+      v <- o .: "Rec"
+      RecGroup <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance (FromJSON a0) => FromJSON (GexprBody a0) where
+  parseJSON = withObject "GexprBody" $ \o -> do
+    gexprbodySpan <- o .: "span"
+    gexprbodyLocals <- o .: "locals"
+    gexprbodyBody <- o .: "body"
+    pure (GexprBody gexprbodySpan gexprbodyLocals gexprbodyBody)
+
+
+instance FromJSON GlobalDecl where
+  parseJSON = withObject "GlobalDecl" $ \o -> do
+    globaldeclDefId <- o .: "def_id"
+    globaldeclItemMeta <- o .: "item_meta"
+    globaldeclGenerics <- o .: "generics"
+    globaldeclTy <- o .: "ty"
+    globaldeclSrc <- o .: "src"
+    globaldeclGlobalKind <- o .: "global_kind"
+    globaldeclInit <- o .: "init"
+    pure (GlobalDecl globaldeclDefId globaldeclItemMeta globaldeclGenerics globaldeclTy globaldeclSrc globaldeclGlobalKind globaldeclInit)
+
+
+instance FromJSON GlobalKind where
+  parseJSON v = case v of
+    String "Static" -> pure Static
+    String "NamedConst" -> pure NamedConst
+    String "AnonConst" -> pure AnonConst
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON Local where
+  parseJSON = withObject "Local" $ \o -> do
+    localIndex <- o .: "index"
+    localName <- o .: "name"
+    localLocalTy <- o .: "ty"
+    pure (Local localIndex localName localLocalTy)
+
+
+instance FromJSON Locals where
+  parseJSON = withObject "Locals" $ \o -> do
+    localsArgCount <- o .: "arg_count"
+    localsLocals <- o .: "locals"
+    pure (Locals localsArgCount localsLocals)
+
+
+instance FromJSON MirLevel where
+  parseJSON v = case v of
+    String "Built" -> pure Built
+    String "Promoted" -> pure Promoted
+    String "Elaborated" -> pure Elaborated
+    String "Optimized" -> pure Optimized
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON MonomorphizeMut where
+  parseJSON v = case v of
+    String "All" -> pure All
+    String "ExceptTypes" -> pure ExceptTypes
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON Preset where
+  parseJSON v = case v of
+    String "OldDefaults" -> pure OldDefaults
+    String "Aeneas" -> pure Aeneas
+    String "Eurydice" -> pure Eurydice
+    String "Soteria" -> pure Soteria
+    String "Tests" -> pure Tests
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON TraitAssocConst where
+  parseJSON = withObject "TraitAssocConst" $ \o -> do
+    traitassocconstName <- o .: "name"
+    traitassocconstTy <- o .: "ty"
+    traitassocconstDefault <- o .: "default"
+    pure (TraitAssocConst traitassocconstName traitassocconstTy traitassocconstDefault)
+
+
+instance FromJSON TraitAssocTy where
+  parseJSON = withObject "TraitAssocTy" $ \o -> do
+    traitassoctyName <- o .: "name"
+    traitassoctyDefault <- o .: "default"
+    traitassoctyImpliedClauses <- o .: "implied_clauses"
+    pure (TraitAssocTy traitassoctyName traitassoctyDefault traitassoctyImpliedClauses)
+
+
+instance FromJSON TraitDecl where
+  parseJSON = withObject "TraitDecl" $ \o -> do
+    traitdeclDefId <- o .: "def_id"
+    traitdeclItemMeta <- o .: "item_meta"
+    traitdeclGenerics <- o .: "generics"
+    traitdeclImpliedClauses <- o .: "implied_clauses"
+    traitdeclConsts <- o .: "consts"
+    traitdeclTypes <- o .: "types"
+    traitdeclMethods <- o .: "methods"
+    traitdeclVtable <- o .: "vtable"
+    pure (TraitDecl traitdeclDefId traitdeclItemMeta traitdeclGenerics traitdeclImpliedClauses traitdeclConsts traitdeclTypes traitdeclMethods traitdeclVtable)
+
+
+instance FromJSON TraitImpl where
+  parseJSON = withObject "TraitImpl" $ \o -> do
+    traitimplDefId <- o .: "def_id"
+    traitimplItemMeta <- o .: "item_meta"
+    traitimplImplTrait <- o .: "impl_trait"
+    traitimplGenerics <- o .: "generics"
+    traitimplImpliedTraitRefs <- o .: "implied_trait_refs"
+    traitimplConsts <- o .: "consts"
+    traitimplTypes <- o .: "types"
+    traitimplMethods <- o .: "methods"
+    traitimplVtable <- o .: "vtable"
+    pure (TraitImpl traitimplDefId traitimplItemMeta traitimplImplTrait traitimplGenerics traitimplImpliedTraitRefs traitimplConsts traitimplTypes traitimplMethods traitimplVtable)
+
+
+instance FromJSON TraitMethod where
+  parseJSON = withObject "TraitMethod" $ \o -> do
+    traitmethodName <- o .: "name"
+    traitmethodItem <- o .: "item"
+    pure (TraitMethod traitmethodName traitmethodItem)
+

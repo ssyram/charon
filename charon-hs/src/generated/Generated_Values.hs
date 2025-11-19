@@ -1,3 +1,6 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Values.hs`
 by hand. Edit `templates/Values.hs` instead, or improve the code
@@ -10,6 +13,7 @@ import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 
 -- Helper to parse Integer from either String or Number
@@ -78,3 +82,106 @@ data UIntTy = Usize
   | U64
   | U128
   deriving (Show, Eq, Ord)
+
+instance FromJSON FloatType where
+  parseJSON v = case v of
+    String "F16" -> pure F16
+    String "F32" -> pure F32
+    String "F64" -> pure F64
+    String "F128" -> pure F128
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON FloatValue where
+  parseJSON = withObject "FloatValue" $ \o -> do
+    floatvalueFloatValue <- o .: "value"
+    floatvalueFloatTy <- o .: "ty"
+    pure (FloatValue floatvalueFloatValue floatvalueFloatTy)
+
+
+instance FromJSON IntTy where
+  parseJSON v = case v of
+    String "Isize" -> pure Isize
+    String "I8" -> pure I8
+    String "I16" -> pure I16
+    String "I32" -> pure I32
+    String "I64" -> pure I64
+    String "I128" -> pure I128
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON IntegerType where
+  parseJSON v = case v of
+    Object o | H.lookup "Signed" o /= Nothing -> do
+      v <- o .: "Signed"
+      Signed <$> parseJSON v
+    Object o | H.lookup "Unsigned" o /= Nothing -> do
+      v <- o .: "Unsigned"
+      Unsigned <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON Literal where
+  parseJSON v = case v of
+    Object o | H.lookup "Scalar" o /= Nothing -> do
+      v <- o .: "Scalar"
+      VScalar <$> parseJSON v
+    Object o | H.lookup "Float" o /= Nothing -> do
+      v <- o .: "Float"
+      VFloat <$> parseJSON v
+    Object o | H.lookup "Bool" o /= Nothing -> do
+      v <- o .: "Bool"
+      VBool <$> parseJSON v
+    Object o | H.lookup "Char" o /= Nothing -> do
+      v <- o .: "Char"
+      VChar <$> parseJSON v
+    Object o | H.lookup "ByteStr" o /= Nothing -> do
+      v <- o .: "ByteStr"
+      VByteStr <$> parseJSON v
+    Object o | H.lookup "Str" o /= Nothing -> do
+      v <- o .: "Str"
+      VStr <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON LiteralType where
+  parseJSON v = case v of
+    Object o | H.lookup "Int" o /= Nothing -> do
+      v <- o .: "Int"
+      TInt <$> parseJSON v
+    Object o | H.lookup "UInt" o /= Nothing -> do
+      v <- o .: "UInt"
+      TuInt <$> parseJSON v
+    Object o | H.lookup "Float" o /= Nothing -> do
+      v <- o .: "Float"
+      TFloat <$> parseJSON v
+    String "Bool" -> pure TBool
+    String "Char" -> pure TChar
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON ScalarValue where
+  parseJSON v = case v of
+    Object o | H.lookup "Unsigned" o /= Nothing -> do
+      withArray "UnsignedScalar" (\v -> do
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseIntegerValue (v V.! 1)
+        pure (UnsignedScalar v0 v1)) =<< o .: "Unsigned"
+    Object o | H.lookup "Signed" o /= Nothing -> do
+      withArray "SignedScalar" (\v -> do
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseIntegerValue (v V.! 1)
+        pure (SignedScalar v0 v1)) =<< o .: "Signed"
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON UIntTy where
+  parseJSON v = case v of
+    String "Usize" -> pure Usize
+    String "U8" -> pure U8
+    String "U16" -> pure U16
+    String "U32" -> pure U32
+    String "U64" -> pure U64
+    String "U128" -> pure U128
+    _ -> fail "Unknown variant"
+
