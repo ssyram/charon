@@ -531,16 +531,19 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                     } else {
                         // Complex variant - parse as object with single key
                         let field_count = variant.fields.iter().filter(|f| !f.is_opaque()).count();
-                        if field_count == 1 {
-                            // Single field variant
+                        // Check if this is a tuple variant (all fields have no name) or struct variant (fields have names)
+                        let is_tuple_variant = variant.fields.iter().all(|f| f.name.is_none());
+                        
+                        if field_count == 1 && is_tuple_variant {
+                            // Single unnamed field variant
                             let lines = vec![
                                 format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
                                 format!("  v <- o .: \"{rust_name}\""),
                                 format!("  {qualified_variant} <$> parseJSON v"),
                             ];
                             lines.join("\n      ")
-                        } else {
-                            // Multiple fields - parse inner value as array
+                        } else if is_tuple_variant {
+                            // Multiple fields tuple variant - parse inner value as array
                             let field_parsers = variant
                                 .fields
                                 .iter()
@@ -564,6 +567,32 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 lines.push(format!("    {parser}"));
                             }
                             lines.push(format!("    pure ({qualified_variant} {field_vars})) =<< o .: \"{rust_name}\""));
+                            lines.join("\n      ")
+                        } else {
+                            // Struct variant with named fields - parse inner value as object
+                            let mut lines = vec![
+                                format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
+                                format!("  obj <- o .: \"{rust_name}\""),
+                            ];
+                            let field_parsers: Vec<_> = variant
+                                .fields
+                                .iter()
+                                .filter(|f| !f.is_opaque())
+                                .map(|f| {
+                                    let rust_field_name = f.name.as_ref().unwrap();
+                                    let var_name = make_haskell_field_name(rust_field_name);
+                                    format!("  {var_name} <- obj .: \"{rust_field_name}\"")
+                                })
+                                .collect();
+                            lines.extend(field_parsers);
+                            
+                            let field_vars = variant
+                                .fields
+                                .iter()
+                                .filter(|f| !f.is_opaque())
+                                .map(|f| make_haskell_field_name(f.name.as_ref().unwrap()))
+                                .join(" ");
+                            lines.push(format!("  pure ({qualified_variant} {field_vars})"));
                             lines.join("\n      ")
                         }
                     }
@@ -701,96 +730,6 @@ fn generate_hs(
         // None currently needed
     ];
     let manual_json_impls = &[
-        // ItemSource has struct variants with named fields
-        (
-            "ItemSource",
-            indoc!(
-                r#"
-                parseJSON v = case v of
-                    String "TopLevel" -> pure TopLevelItem
-                    Object o | H.lookup "Closure" o /= Nothing -> do
-                      obj <- o .: "Closure"
-                      info <- obj .: "info"
-                      pure (ClosureItem info)
-                    Object o | H.lookup "TraitDecl" o /= Nothing -> do
-                      obj <- o .: "TraitDecl"
-                      trait_ref <- obj .: "trait_ref"
-                      item_name <- obj .: "item_name"
-                      has_default <- obj .: "has_default"
-                      pure (TraitDeclItem trait_ref item_name has_default)
-                    Object o | H.lookup "TraitImpl" o /= Nothing -> do
-                      obj <- o .: "TraitImpl"
-                      impl_ref <- obj .: "impl_ref"
-                      trait_ref <- obj .: "trait_ref"
-                      item_name <- obj .: "item_name"
-                      reuses_default <- obj .: "reuses_default"
-                      pure (TraitImplItem impl_ref trait_ref item_name reuses_default)
-                    Object o | H.lookup "VTableTy" o /= Nothing -> do
-                      obj <- o .: "VTableTy"
-                      dyn_pred <- obj .: "dyn_predicate"
-                      pure (VTableTyItem dyn_pred)
-                    Object o | H.lookup "VTableInstance" o /= Nothing -> do
-                      obj <- o .: "VTableInstance"
-                      impl_ref <- obj .: "impl_ref"
-                      pure (VTableInstanceItem impl_ref)
-                    String "VTableMethodShim" -> pure VTableMethodShimItem
-                    _ -> fail "Unknown variant"
-                "#,
-            ),
-        ),
-        // TraitRefKind has BuiltinOrAuto as struct variant with named fields
-        (
-            "TraitRefKind",
-            indoc!(
-                r#"
-                parseJSON v = case v of
-                    Object o | H.lookup "TraitImpl" o /= Nothing -> do
-                      v <- o .: "TraitImpl"
-                      T.TraitImpl <$> parseJSON v
-                    Object o | H.lookup "Clause" o /= Nothing -> do
-                      v <- o .: "Clause"
-                      Clause <$> parseJSON v
-                    Object o | H.lookup "ParentClause" o /= Nothing -> do
-                      withArray "ParentClause" (\v -> do
-                        v0 <- parseJSON (v V.! 0)
-                        v1 <- parseJSON (v V.! 1)
-                        pure (ParentClause v0 v1)) =<< o .: "ParentClause"
-                    Object o | H.lookup "ItemClause" o /= Nothing -> do
-                      withArray "ItemClause" (\v -> do
-                        v0 <- parseJSON (v V.! 0)
-                        v1 <- parseJSON (v V.! 1)
-                        v2 <- parseJSON (v V.! 2)
-                        pure (ItemClause v0 v1 v2)) =<< o .: "ItemClause"
-                    String "SelfId" -> pure Self
-                    Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
-                      obj <- o .: "BuiltinOrAuto"
-                      builtin_data <- obj .: "builtin_data"
-                      parent_trait_refs <- obj .: "parent_trait_refs"
-                      types <- obj .: "types"
-                      pure (BuiltinOrAuto builtin_data parent_trait_refs types)
-                    String "Dyn" -> pure Dyn
-                    Object o | H.lookup "Unknown" o /= Nothing -> do
-                      v <- o .: "Unknown"
-                      UnknownTrait <$> parseJSON v
-                    _ -> fail "Unknown variant"
-                "#,
-            ),
-        ),
-        // TagEncoding has Niche as struct variant with named field
-        (
-            "TagEncoding",
-            indoc!(
-                r#"
-                parseJSON v = case v of
-                    String "Direct" -> pure Direct
-                    Object o | H.lookup "Niche" o /= Nothing -> do
-                      obj <- o .: "Niche"
-                      untagged_variant <- obj .: "untagged_variant"
-                      pure (Niche untagged_variant)
-                    _ -> fail "Unknown variant"
-                "#,
-            ),
-        ),
         // ScalarValue contains Integer that may be serialized as String for large values
         (
             "ScalarValue",

@@ -804,25 +804,25 @@ instance FromJSON ItemSource where
       pure (ClosureItem info)
     Object o | H.lookup "TraitDecl" o /= Nothing -> do
       obj <- o .: "TraitDecl"
-      trait_ref <- obj .: "trait_ref"
-      item_name <- obj .: "item_name"
-      has_default <- obj .: "has_default"
-      pure (TraitDeclItem trait_ref item_name has_default)
+      traitRef <- obj .: "trait_ref"
+      itemName <- obj .: "item_name"
+      hasDefault <- obj .: "has_default"
+      pure (TraitDeclItem traitRef itemName hasDefault)
     Object o | H.lookup "TraitImpl" o /= Nothing -> do
       obj <- o .: "TraitImpl"
-      impl_ref <- obj .: "impl_ref"
-      trait_ref <- obj .: "trait_ref"
-      item_name <- obj .: "item_name"
-      reuses_default <- obj .: "reuses_default"
-      pure (TraitImplItem impl_ref trait_ref item_name reuses_default)
+      implRef <- obj .: "impl_ref"
+      traitRef <- obj .: "trait_ref"
+      itemName <- obj .: "item_name"
+      reusesDefault <- obj .: "reuses_default"
+      pure (TraitImplItem implRef traitRef itemName reusesDefault)
     Object o | H.lookup "VTableTy" o /= Nothing -> do
       obj <- o .: "VTableTy"
-      dyn_pred <- obj .: "dyn_predicate"
-      pure (VTableTyItem dyn_pred)
+      dynPredicate <- obj .: "dyn_predicate"
+      pure (VTableTyItem dynPredicate)
     Object o | H.lookup "VTableInstance" o /= Nothing -> do
       obj <- o .: "VTableInstance"
-      impl_ref <- obj .: "impl_ref"
-      pure (VTableInstanceItem impl_ref)
+      implRef <- obj .: "impl_ref"
+      pure (VTableInstanceItem implRef)
     String "VTableMethodShim" -> pure VTableMethodShimItem
     _ -> fail "Unknown variant"
 
@@ -1013,16 +1013,16 @@ instance FromJSON ProjectionElem where
         pure (E.Field v0 v1)) =<< o .: "Field"
     String "PtrMetadata" -> pure PtrMetadata
     Object o | H.lookup "Index" o /= Nothing -> do
-      withArray "ProjIndex" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (ProjIndex v0 v1)) =<< o .: "Index"
+      obj <- o .: "Index"
+      offset <- obj .: "offset"
+      fromEnd <- obj .: "from_end"
+      pure (ProjIndex offset fromEnd)
     Object o | H.lookup "Subslice" o /= Nothing -> do
-      withArray "Subslice" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (Subslice v0 v1 v2)) =<< o .: "Subslice"
+      obj <- o .: "Subslice"
+      from <- obj .: "from"
+      to <- obj .: "to"
+      fromEnd <- obj .: "from_end"
+      pure (Subslice from to fromEnd)
     _ -> fail "Unknown variant"
 
 
@@ -1103,17 +1103,17 @@ instance FromJSON Rvalue where
       v <- o .: "Use"
       Use <$> parseJSON v
     Object o | H.lookup "Ref" o /= Nothing -> do
-      withArray "RvRef" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (RvRef v0 v1 v2)) =<< o .: "Ref"
+      obj <- o .: "Ref"
+      place <- obj .: "place"
+      kind <- obj .: "kind"
+      ptrMetadata <- obj .: "ptr_metadata"
+      pure (RvRef place kind ptrMetadata)
     Object o | H.lookup "RawPtr" o /= Nothing -> do
-      withArray "RawPtr" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (RawPtr v0 v1 v2)) =<< o .: "RawPtr"
+      obj <- o .: "RawPtr"
+      place <- obj .: "place"
+      kind <- obj .: "kind"
+      ptrMetadata <- obj .: "ptr_metadata"
+      pure (RawPtr place kind ptrMetadata)
     Object o | H.lookup "BinaryOp" o /= Nothing -> do
       withArray "BinaryOp" (\v -> do
         v0 <- parseJSON (v V.! 0)
@@ -1193,8 +1193,8 @@ instance FromJSON TagEncoding where
     String "Direct" -> pure Direct
     Object o | H.lookup "Niche" o /= Nothing -> do
       obj <- o .: "Niche"
-      untagged_variant <- obj .: "untagged_variant"
-      pure (Niche untagged_variant)
+      untaggedVariant <- obj .: "untagged_variant"
+      pure (Niche untaggedVariant)
     _ -> fail "Unknown variant"
 
 
@@ -1307,10 +1307,10 @@ instance FromJSON TraitRefKind where
     String "SelfId" -> pure Self
     Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
       obj <- o .: "BuiltinOrAuto"
-      builtin_data <- obj .: "builtin_data"
-      parent_trait_refs <- obj .: "parent_trait_refs"
+      builtinData <- obj .: "builtin_data"
+      parentTraitRefs <- obj .: "parent_trait_refs"
       types <- obj .: "types"
-      pure (BuiltinOrAuto builtin_data parent_trait_refs types)
+      pure (BuiltinOrAuto builtinData parentTraitRefs types)
     String "Dyn" -> pure Dyn
     Object o | H.lookup "Unknown" o /= Nothing -> do
       v <- o .: "Unknown"
