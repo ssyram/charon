@@ -735,17 +735,19 @@ fn generate_hs(
                       pure (TraitDeclItem trait_ref item_name has_default)
                     Object o | H.lookup "TraitImpl" o /= Nothing -> do
                       obj <- o .: "TraitImpl"
-                      impl_ref <- obj .: "impl_"
+                      impl_ref <- obj .: "impl_ref"
                       trait_ref <- obj .: "trait_ref"
                       item_name <- obj .: "item_name"
-                      has_default <- obj .: "has_default"
-                      pure (TraitImplItem impl_ref trait_ref item_name has_default)
+                      reuses_default <- obj .: "reuses_default"
+                      pure (TraitImplItem impl_ref trait_ref item_name reuses_default)
                     Object o | H.lookup "VTableTy" o /= Nothing -> do
-                      v <- o .: "VTableTy"
-                      VTableTyItem <$> parseJSON v
+                      obj <- o .: "VTableTy"
+                      dyn_pred <- obj .: "dyn_predicate"
+                      pure (VTableTyItem dyn_pred)
                     Object o | H.lookup "VTableInstance" o /= Nothing -> do
-                      v <- o .: "VTableInstance"
-                      VTableInstanceItem <$> parseJSON v
+                      obj <- o .: "VTableInstance"
+                      impl_ref <- obj .: "impl_ref"
+                      pure (VTableInstanceItem impl_ref)
                     String "VTableMethodShim" -> pure VTableMethodShimItem
                     _ -> fail "Unknown variant"
                 "#,
@@ -785,6 +787,21 @@ fn generate_hs(
                     Object o | H.lookup "Unknown" o /= Nothing -> do
                       v <- o .: "Unknown"
                       UnknownTrait <$> parseJSON v
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
+        // TagEncoding has Niche as struct variant with named field
+        (
+            "TagEncoding",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    String "Direct" -> pure Direct
+                    Object o | H.lookup "Niche" o /= Nothing -> do
+                      obj <- o .: "Niche"
+                      untagged_variant <- obj .: "untagged_variant"
+                      pure (Niche untagged_variant)
                     _ -> fail "Unknown variant"
                 "#,
             ),
