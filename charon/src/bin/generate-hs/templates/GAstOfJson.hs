@@ -19,70 +19,15 @@ import qualified Generated_Meta as M
 import Generated_Meta
 import Generated_Values
 import qualified Generated_Types as T
-import Generated_Types hiding (TraitImpl, TraitMethod, Local)
+import Generated_Types
 import qualified Generated_Expressions as E
 import Generated_Expressions
-import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
+-- Import specific types from Generated_GAst that we need for TranslatedCrate
+-- TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping will be qualified with G.
+import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
 -- Vector newtype is defined in Generated_Meta to avoid circular dependencies
-
--- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
-instance FromJSON G.TraitImpl where
-  parseJSON = withObject "TraitImpl" $ \o -> do
-    traitimplDefId <- o .: "def_id"
-    traitimplItemMeta <- o .: "item_meta"
-    traitimplImplTrait <- o .: "impl_trait"
-    traitimplGenerics <- o .: "generics"
-    traitimplImpliedTraitRefs <- o .: "implied_trait_refs"
-    traitimplConsts <- o .: "consts"
-    traitimplTypes <- o .: "types"
-    traitimplMethods <- o .: "methods"
-    traitimplVtable <- o .: "vtable"
-    pure $ G.TraitImpl traitimplDefId traitimplItemMeta traitimplImplTrait traitimplGenerics traitimplImpliedTraitRefs traitimplConsts traitimplTypes traitimplMethods traitimplVtable
-
-instance FromJSON G.TraitMethod where
-  parseJSON = withObject "TraitMethod" $ \o -> do
-    traitmethodName <- o .: "name"
-    traitmethodItem <- o .: "item"
-    pure $ G.TraitMethod traitmethodName traitmethodItem
-
--- Field struct conflicts with Field variant in ProjectionElem, need to qualify
-instance FromJSON T.Field where
-  parseJSON = withObject "Field" $ \o -> do
-    fieldSpan <- o .: "span"
-    fieldAttrInfo <- o .: "attr_info"
-    fieldFieldName <- o .: "name"
-    fieldFieldTy <- o .: "ty"
-    pure $ T.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
-
-instance FromJSON G.Local where
-  parseJSON = withObject "Local" $ \o -> do
-    localIndex <- o .: "index"
-    localName <- o .: "name"
-    localLocalTy <- o .: "ty"
-    pure $ G.Local localIndex localName localLocalTy
-
-instance FromJSON G.Assertion where
-  parseJSON = withObject "Assertion" $ \o -> do
-    assertionCond <- o .: "cond"
-    assertionExpected <- o .: "expected"
-    pure $ G.Assertion assertionCond assertionExpected
-
-instance FromJSON G.Call where
-  parseJSON = withObject "Call" $ \o -> do
-    callFunc <- o .: "func"
-    callGenerics <- o .: "generics"
-    callArgs <- o .: "args"
-    callDest <- o .: "dest"
-    pure $ G.Call callFunc callGenerics callArgs callDest
-
-instance FromJSON G.CopyNonOverlapping where
-  parseJSON = withObject "CopyNonOverlapping" $ \o -> do
-    copysrc <- o .: "src"
-    copydst <- o .: "dst"
-    copycount <- o .: "count"
-    pure $ G.CopyNonOverlapping copysrc copydst copycount
 
 -- Manual instance for TranslatedCrate - simplified version that parses the key fields
 -- Full deserialization would require FunDecl and Body instances which have complex dependencies

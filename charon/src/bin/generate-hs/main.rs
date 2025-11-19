@@ -65,6 +65,19 @@ fn type_name_to_haskell_ident(item_meta: &ItemMeta) -> String {
     make_haskell_ident(name)
 }
 
+/// Check if a type name conflicts with Types/Expressions/Meta module types
+/// and needs to be qualified in GAstOfJson
+fn needs_gast_qualification(ty_name: &str) -> bool {
+    // These GAst struct types conflict with Types module variants/fields
+    matches!(ty_name, "TraitImpl" | "TraitMethod" | "Local" | "Call" | "Assertion" | "CopyNonOverlapping")
+}
+
+/// Check if a type name needs T. qualification (for Types module types that conflict)
+fn needs_types_qualification(ty_name: &str) -> bool {
+    // Field exists in both Types and Expressions modules
+    matches!(ty_name, "Field")
+}
+
 struct GenerateCtx<'a> {
     crate_data: &'a TranslatedCrate,
     name_to_type: HashMap<String, &'a TypeDecl>,
@@ -283,7 +296,11 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
         _ if let Some(def) = ctx.manual_type_impls.get(&decl.def_id) => def.clone(),
         TypeDeclKind::Alias(ty) => {
             let ty_str = type_to_haskell_name(ctx, ty);
-            return format!("type {} = {}", type_name_to_haskell_ident(&decl.item_meta), ty_str);
+            return format!(
+                "type {} = {}",
+                type_name_to_haskell_ident(&decl.item_meta),
+                ty_str
+            );
         }
         TypeDeclKind::Struct(fields) if fields.is_empty() => {
             let ty_name = type_name_to_haskell_ident(&decl.item_meta);
@@ -314,9 +331,15 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
-                    let base_field_name = f.renamed_name().unwrap_or_else(|| f.name.as_deref().unwrap());
+                    let base_field_name = f
+                        .renamed_name()
+                        .unwrap_or_else(|| f.name.as_deref().unwrap());
                     // Prefix field name with type name to avoid conflicts in Haskell
-                    let field_name = make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name));
+                    let field_name = make_haskell_field_name(&format!(
+                        "{}_{}",
+                        ty_name.to_lowercase(),
+                        base_field_name
+                    ));
                     let field_ty = type_to_haskell_name(ctx, &f.ty);
                     let comment = extract_doc_comments(&f.attr_info);
                     let comment = build_doc_comment(comment, 1);
@@ -389,9 +412,18 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
     if matches!(&decl.kind, TypeDeclKind::Alias(_)) {
         return String::new();
     }
-    
+
     let ty_name = type_name_to_haskell_ident(&decl.item_meta);
-    
+
+    // Check if this type needs qualification in GAstOfJson due to conflicts
+    let qualified_ty_name = if needs_gast_qualification(&ty_name) {
+        format!("G.{}", ty_name)
+    } else if needs_types_qualification(&ty_name) {
+        format!("T.{}", ty_name)
+    } else {
+        ty_name.clone()
+    };
+
     let generics = decl
         .generics
         .types
@@ -399,58 +431,60 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
         .enumerate()
         .map(|(i, _)| format!("a{i}"))
         .collect_vec();
-    
+
     let instance_context = if !generics.is_empty() {
-        let constraints = generics
-            .iter()
-            .map(|g| format!("FromJSON {g}"))
-            .join(", ");
+        let constraints = generics.iter().map(|g| format!("FromJSON {g}")).join(", ");
         format!("({constraints}) => ", constraints = constraints)
     } else {
         String::new()
     };
-    
+
     let ty_with_params = if generics.is_empty() {
-        ty_name.clone()
+        qualified_ty_name.clone()
     } else {
-        format!("({} {})", ty_name, generics.join(" "))
+        format!("({} {})", qualified_ty_name, generics.join(" "))
     };
 
     let parse_impl = match &decl.kind {
         _ if let Some(def) = ctx.manual_json_impls.get(&decl.def_id) => def.clone(),
-        TypeDeclKind::Struct(fields) if fields.is_empty() => {
-            indoc! {r#"
+        TypeDeclKind::Struct(fields) if fields.is_empty() => indoc! {r#"
                 parseJSON Null = pure ()
                 parseJSON _ = fail "Expected null"
-            "#}.to_string()
-        }
+            "#}
+        .to_string(),
         // Special case for ID types: single field named "_raw" of type Int
         // These are serialized as plain numbers in JSON
-        TypeDeclKind::Struct(fields) if fields.elem_count() == 1 
-            && fields.iter().next().and_then(|f| f.name.as_deref()) == Some("_raw") 
-            && fields.iter().next().is_some_and(|f| matches!(f.ty.kind(), TyKind::Literal(LiteralTy::Int(_) | LiteralTy::UInt(_)))) => {
-            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
-            // Deserialize from a plain number
-            format!("parseJSON = fmap {ty_name} . parseJSON", ty_name = ty_name)
+        TypeDeclKind::Struct(fields)
+            if fields.elem_count() == 1
+                && fields.iter().next().and_then(|f| f.name.as_deref()) == Some("_raw")
+                && fields.iter().next().is_some_and(|f| {
+                    matches!(
+                        f.ty.kind(),
+                        TyKind::Literal(LiteralTy::Int(_) | LiteralTy::UInt(_))
+                    )
+                }) =>
+        {
+            // Deserialize from a plain number - use qualified name for constructor
+            format!("parseJSON = fmap {qualified_ty_name} . parseJSON")
         }
         // Single-field structs with serde(transparent) or tuple structs
         // These serialize transparently as their inner value
-        TypeDeclKind::Struct(fields) if fields.elem_count() == 1
-            && (fields[0].name.is_none()
-                || decl
-                    .item_meta
-                    .attr_info
-                    .attributes
-                    .iter()
-                    .filter_map(|a| a.as_unknown())
-                    .any(|a| a.to_string() == "serde(transparent)")) => {
-            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
-            // Deserialize transparently from inner type
-            format!("parseJSON = fmap {ty_name} . parseJSON", ty_name = ty_name)
+        TypeDeclKind::Struct(fields)
+            if fields.elem_count() == 1
+                && (fields[0].name.is_none()
+                    || decl
+                        .item_meta
+                        .attr_info
+                        .attributes
+                        .iter()
+                        .filter_map(|a| a.as_unknown())
+                        .any(|a| a.to_string() == "serde(transparent)")) =>
+        {
+            // Deserialize transparently from inner type - use qualified name for constructor
+            format!("parseJSON = fmap {qualified_ty_name} . parseJSON")
         }
         TypeDeclKind::Struct(fields) if fields.iter().all(|f| f.name.is_none()) => {
             // Tuple struct - parse as array
-            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
             let field_parsers = fields
                 .iter()
                 .enumerate()
@@ -464,15 +498,11 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .map(|(i, _)| format!("v{i}"))
                 .join(" ");
             format!(
-                "parseJSON = withArray \"{ty_name}\" $ \\v -> do\n{field_parsers}\n    pure ({ty_name} {field_vars})",
-                ty_name = ty_name,
-                field_parsers = field_parsers,
-                field_vars = field_vars
+                "parseJSON = withArray \"{ty_name}\" $ \\v -> do\n{field_parsers}\n    pure ({qualified_ty_name} {field_vars})"
             )
         }
         TypeDeclKind::Struct(fields) => {
             // Record struct - parse as object
-            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
             let field_parsers = fields
                 .iter()
                 .filter(|f| !f.is_opaque())
@@ -480,7 +510,11 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                     let rust_name = f.name.as_ref().unwrap();
                     let base_field_name = f.renamed_name().unwrap_or(rust_name);
                     // Prefix field name with type name to match the type definition
-                    let hs_name = make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name));
+                    let hs_name = make_haskell_field_name(&format!(
+                        "{}_{}",
+                        ty_name.to_lowercase(),
+                        base_field_name
+                    ));
                     format!("    {hs_name} <- o .: \"{rust_name}\"")
                 })
                 .join("\n");
@@ -488,27 +522,30 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
-                    let base_field_name = f.renamed_name().unwrap_or_else(|| f.name.as_deref().unwrap());
+                    let base_field_name = f
+                        .renamed_name()
+                        .unwrap_or_else(|| f.name.as_deref().unwrap());
                     // Prefix field name with type name to match the type definition
-                    make_haskell_field_name(&format!("{}_{}", ty_name.to_lowercase(), base_field_name))
+                    make_haskell_field_name(&format!(
+                        "{}_{}",
+                        ty_name.to_lowercase(),
+                        base_field_name
+                    ))
                 })
                 .join(" ");
             format!(
-                "parseJSON = withObject \"{ty_name}\" $ \\o -> do\n{field_parsers}\n    pure ({ty_name} {field_list})",
-                ty_name = ty_name,
-                field_parsers = field_parsers,
-                field_list = field_list
+                "parseJSON = withObject \"{ty_name}\" $ \\o -> do\n{field_parsers}\n    pure ({qualified_ty_name} {field_list})"
             )
         }
         TypeDeclKind::Enum(variants) => {
             // List of enum variant constructors that conflict with struct names from other modules
             // TraitImpl (in TraitRefKind) and TraitMethod (in FnPtrKind) conflict with GAst structs
             let types_variant_conflicts = ["TraitImpl", "TraitMethod"];
-            // Meta variants that conflict with GAst structs  
+            // Meta variants that conflict with GAst structs
             let meta_variant_conflicts = ["Local"];
             // Expressions variants that conflict with Types structs
             let expressions_variant_conflicts = ["Field"];
-            
+
             let variant_parsers = variants
                 .iter()
                 .filter(|v| !v.is_opaque())
@@ -533,7 +570,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                         let field_count = variant.fields.iter().filter(|f| !f.is_opaque()).count();
                         // Check if this is a tuple variant (all fields have no name) or struct variant (fields have names)
                         let is_tuple_variant = variant.fields.iter().all(|f| f.name.is_none());
-                        
+
                         if field_count == 1 && is_tuple_variant {
                             // Single unnamed field variant
                             let lines = vec![
@@ -558,7 +595,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 .filter(|(_, f)| !f.is_opaque())
                                 .map(|(i, _)| format!("v{i}"))
                                 .join(" ");
-                            
+
                             let mut lines = vec![
                                 format!("Object o | H.lookup \"{rust_name}\" o /= Nothing -> do"),
                             ];
@@ -585,7 +622,7 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                                 })
                                 .collect();
                             lines.extend(field_parsers);
-                            
+
                             let field_vars = variant
                                 .fields
                                 .iter()
@@ -598,14 +635,14 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                     }
                 })
                 .collect_vec();
-            
+
             // Join variant parsers with proper indentation
             // Each variant pattern should be indented 4 spaces from "parseJSON v = case v of"
             let formatted_parsers = variant_parsers
                 .iter()
                 .map(|p| format!("    {}", p.replace("\n      ", "\n    ")))
                 .join("\n");
-            
+
             format!(
                 "parseJSON v = case v of\n{}\n    _ -> fail \"Unknown variant\"",
                 formatted_parsers
@@ -751,12 +788,8 @@ fn generate_hs(
             ),
         ),
     ];
-    
-    let ctx = GenerateCtx::new(
-        &crate_data,
-        manual_type_impls,
-        manual_json_impls,
-    );
+
+    let ctx = GenerateCtx::new(&crate_data, manual_type_impls, manual_json_impls);
 
     // Compute the sets of types to be put in each module (similar to generate-ml).
     let manually_implemented: HashSet<_> = [
@@ -766,17 +799,8 @@ fn generate_hs(
         "Opaque",
         "Body",
         "FunDecl",
-        "TranslatedCrate",  // Too complex with LLBC/ULLBC dependencies - manually implement
-        "Vector",  // Type alias for [v] with phantom type parameter - don't generate instance (would conflict with list instance)
-        "Field",  // Conflicts with Field variant in ProjectionElem - manually implement FromJSON
-        // These have name conflicts between GAst structs and Types variants/fields
-        // Manual instances in GAstOfJson.hs template and type defs in GAst.hs template
-        "TraitImpl",
-        "TraitMethod",
-        "Local",
-        "Assert",  // Renamed to "Assertion" in JSON
-        "Call",
-        "CopyNonOverlapping",
+        "TranslatedCrate", // Too complex with LLBC/ULLBC dependencies - manually implement
+        "Vector", // Type alias for [v] with phantom type parameter - don't generate instance (would conflict with list instance)
     ]
     .iter()
     .map(|name| ctx.id_from_name(name))
@@ -819,21 +843,14 @@ fn generate_hs(
         "TraitTypeConstraintId",
         "Ty",
         "Vector",
-        "TargetInfo",  // Manually defined in GAst.hs template
-        // These have name conflicts and are manually defined in GAst.hs template
-        "TraitImpl",
-        "TraitMethod",
-        "Local",
-        "Assert",  // Renamed to "Assertion" in JSON
-        "Call",
-        "CopyNonOverlapping",
+        "TargetInfo", // Manually defined in GAst.hs template
     ];
 
     let mut processed_tys: HashSet<TypeDeclId> = dont_generate_ty
         .iter()
         .map(|name| ctx.id_from_name(name))
         .collect();
-    
+
     // Helper to get children of types that haven't been processed yet
     let mut markers_from_children = |ctx: &GenerateCtx, markers: &[_]| {
         markers
@@ -958,10 +975,10 @@ fn generate_hs(
             markers: vec![(GenerationKind::FromJson, ullbc_types)],
         },
     ];
-    
+
     // Create output directory if it doesn't exist
     fs::create_dir_all(&output_dir)?;
-    
+
     for file in generate_code_for {
         file.generate(&ctx)?;
     }
