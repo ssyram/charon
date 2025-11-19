@@ -108,19 +108,20 @@ instance FromJSON Terminator where
 instance FromJSON TerminatorKind where
   parseJSON v = case v of
     Object o | H.lookup "Goto" o /= Nothing -> do
-      v <- o .: "Goto"
-      Goto <$> parseJSON v
+      obj <- o .: "Goto"
+      target <- obj .: "target"
+      pure (Goto target)
     Object o | H.lookup "Switch" o /= Nothing -> do
-      withArray "Switch" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (Switch v0 v1)) =<< o .: "Switch"
+      obj <- o .: "Switch"
+      discr <- obj .: "discr"
+      targets <- obj .: "targets"
+      pure (Switch discr targets)
     Object o | H.lookup "Call" o /= Nothing -> do
-      withArray "Call" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (Call v0 v1 v2)) =<< o .: "Call"
+      obj <- o .: "Call"
+      call <- obj .: "call"
+      target <- obj .: "target"
+      onUnwind <- obj .: "on_unwind"
+      pure (Call call target onUnwind)
     Object o | H.lookup "Abort" o /= Nothing -> do
       v <- o .: "Abort"
       Abort <$> parseJSON v

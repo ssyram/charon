@@ -22,51 +22,26 @@ data TargetInfo = TargetInfo
   }
   deriving (Show, Eq, Ord)
 
--- Types with name conflicts - defined manually to avoid issues with Types module
-data Local = Local
-  { localIndex :: LocalId
-  , localName :: (Maybe String)
-  , localLocalTy :: Ty
-  }
-  deriving (Show, Eq, Ord)
-
-data TraitImpl = TraitImpl
-  { traitimplDefId :: TraitImplId
-  , traitimplItemMeta :: ItemMeta
-  , traitimplImplTrait :: TraitDeclRef
-  , traitimplGenerics :: GenericParams
-  , traitimplImpliedTraitRefs :: Vector TraitClauseId TraitRef
-  , traitimplConsts :: [(TraitItemName, GlobalDeclRef)]
-  , traitimplTypes :: [(TraitItemName, (Binder TraitAssocTyImpl))]
-  , traitimplMethods :: [(TraitItemName, (Binder FunDeclRef))]
-  , traitimplVtable :: (Maybe GlobalDeclRef)
-  }
-  deriving (Show, Eq, Ord)
-
-data TraitMethod = TraitMethod
-  { traitmethodName :: TraitItemName
-  , traitmethodItem :: FunDeclRef
-  }
-  deriving (Show, Eq, Ord)
-
+-- | Check the value of an operand and abort if the value is not expected. This is introduced to
+-- | avoid a lot of small branches.
+-- | 
+-- | We translate MIR asserts (introduced for out-of-bounds accesses or divisions by zero for
+-- | instance) to this. We then eliminate them in [crate::transform::resugar::reconstruct_fallible_operations],
+-- | because they're implicit in the semantics of our array accesses etc. Finally we introduce new asserts in
+-- | [crate::transform::resugar::reconstruct_asserts].
 data Assertion = Assertion
   { assertionCond :: Operand
-  , assertionExpected :: Bool
+  ,   -- | The value that the operand should evaluate to for the assert to succeed.
+  assertionExpected :: Bool
+  ,   -- | What kind of abort happens on assert failure.
+  assertionOnFailure :: AbortKind
   }
   deriving (Show, Eq, Ord)
 
 data Call = Call
   { callFunc :: FnOperand
-  , callGenerics :: GenericArgs
   , callArgs :: [Operand]
   , callDest :: Place
-  }
-  deriving (Show, Eq, Ord)
-
-data CopyNonOverlapping = CopyNonOverlapping
-  { copysrc :: Operand
-  , copydst :: Operand
-  , copycount :: Operand
   }
   deriving (Show, Eq, Ord)
 
@@ -168,6 +143,13 @@ data CliOptions = CliOptions
   }
   deriving (Show, Eq, Ord)
 
+data CopyNonOverlapping = CopyNonOverlapping
+  { copynonoverlappingSrc :: Operand
+  , copynonoverlappingDst :: Operand
+  , copynonoverlappingCount :: Operand
+  }
+  deriving (Show, Eq, Ord)
+
 -- | A (group of) top-level declaration(s), properly reordered.
 data DeclarationGroup = TypeGroup ((GDeclarationGroup TypeDeclId))
   | FunGroup ((GDeclarationGroup FunDeclId))
@@ -231,6 +213,18 @@ data GlobalDecl = GlobalDecl
 data GlobalKind = Static
   | NamedConst
   | AnonConst
+  deriving (Show, Eq, Ord)
+
+-- | A variable
+data Local = Local
+  {   -- | Unique index identifying the variable
+  localIndex :: LocalId
+  ,   -- | Variable name - may be `None` if the variable was introduced by Rust
+  -- | through desugaring.
+  localName :: Maybe String
+  ,   -- | The variable type
+  localLocalTy :: Ty
+  }
   deriving (Show, Eq, Ord)
 
 -- | The local variables of a body.
@@ -351,5 +345,47 @@ data TraitDecl = TraitDecl
   ,   -- | The virtual table struct for this trait, if it has one.
   -- | It is guaranteed that the trait has a vtable iff it is dyn-compatible.
   traitdeclVtable :: Maybe TypeDeclRef
+  }
+  deriving (Show, Eq, Ord)
+
+-- | A trait **implementation**.
+-- | 
+-- | For instance:
+-- | ```text
+-- | impl Foo for List {
+-- |   type Bar = ...
+-- | 
+-- |   fn baz(...) { ... }
+-- | }
+-- | ```
+data TraitImpl = TraitImpl
+  { traitimplDefId :: TraitImplId
+  , traitimplItemMeta :: ItemMeta
+  ,   -- | The information about the implemented trait.
+  -- | Note that this contains the instantiation of the "parent"
+  -- | clauses.
+  traitimplImplTrait :: TraitDeclRef
+  , traitimplGenerics :: GenericParams
+  ,   -- | The trait references for the parent clauses (see [TraitDecl]).
+  traitimplImpliedTraitRefs :: (Vector TraitClauseId TraitRef)
+  ,   -- | The implemented associated constants.
+  traitimplConsts :: [(TraitItemName, GlobalDeclRef)]
+  ,   -- | The implemented associated types.
+  traitimplTypes :: [(TraitItemName, (Binder TraitAssocTyImpl))]
+  ,   -- | The implemented methods
+  traitimplMethods :: [(TraitItemName, (Binder FunDeclRef))]
+  ,   -- | The virtual table instance for this trait implementation. This is `Some` iff the trait is
+  -- | dyn-compatible.
+  traitimplVtable :: Maybe GlobalDeclRef
+  }
+  deriving (Show, Eq, Ord)
+
+-- | A trait method.
+data TraitMethod = TraitMethod
+  { traitmethodName :: TraitItemName
+  ,   -- | Each method declaration is represented by a function item. That function contains the
+  -- | signature of the method as well as information like attributes. It has a body iff the
+  -- | method declaration has a default implementation; otherwise it has an `Opaque` body.
+  traitmethodItem :: FunDeclRef
   }
   deriving (Show, Eq, Ord)

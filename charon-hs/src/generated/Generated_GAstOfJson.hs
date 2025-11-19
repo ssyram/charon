@@ -19,70 +19,15 @@ import qualified Generated_Meta as M
 import Generated_Meta
 import Generated_Values
 import qualified Generated_Types as T
-import Generated_Types hiding (TraitImpl, TraitMethod, Local)
+import Generated_Types
 import qualified Generated_Expressions as E
 import Generated_Expressions
-import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
+-- Import specific types from Generated_GAst that we need for TranslatedCrate
+-- TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping will be qualified with G.
+import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
 -- Vector newtype is defined in Generated_Meta to avoid circular dependencies
-
--- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
-instance FromJSON G.TraitImpl where
-  parseJSON = withObject "TraitImpl" $ \o -> do
-    traitimplDefId <- o .: "def_id"
-    traitimplItemMeta <- o .: "item_meta"
-    traitimplImplTrait <- o .: "impl_trait"
-    traitimplGenerics <- o .: "generics"
-    traitimplImpliedTraitRefs <- o .: "implied_trait_refs"
-    traitimplConsts <- o .: "consts"
-    traitimplTypes <- o .: "types"
-    traitimplMethods <- o .: "methods"
-    traitimplVtable <- o .: "vtable"
-    pure $ G.TraitImpl traitimplDefId traitimplItemMeta traitimplImplTrait traitimplGenerics traitimplImpliedTraitRefs traitimplConsts traitimplTypes traitimplMethods traitimplVtable
-
-instance FromJSON G.TraitMethod where
-  parseJSON = withObject "TraitMethod" $ \o -> do
-    traitmethodName <- o .: "name"
-    traitmethodItem <- o .: "item"
-    pure $ G.TraitMethod traitmethodName traitmethodItem
-
--- Field struct conflicts with Field variant in ProjectionElem, need to qualify
-instance FromJSON T.Field where
-  parseJSON = withObject "Field" $ \o -> do
-    fieldSpan <- o .: "span"
-    fieldAttrInfo <- o .: "attr_info"
-    fieldFieldName <- o .: "name"
-    fieldFieldTy <- o .: "ty"
-    pure $ T.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
-
-instance FromJSON G.Local where
-  parseJSON = withObject "Local" $ \o -> do
-    localIndex <- o .: "index"
-    localName <- o .: "name"
-    localLocalTy <- o .: "ty"
-    pure $ G.Local localIndex localName localLocalTy
-
-instance FromJSON G.Assertion where
-  parseJSON = withObject "Assertion" $ \o -> do
-    assertionCond <- o .: "cond"
-    assertionExpected <- o .: "expected"
-    pure $ G.Assertion assertionCond assertionExpected
-
-instance FromJSON G.Call where
-  parseJSON = withObject "Call" $ \o -> do
-    callFunc <- o .: "func"
-    callGenerics <- o .: "generics"
-    callArgs <- o .: "args"
-    callDest <- o .: "dest"
-    pure $ G.Call callFunc callGenerics callArgs callDest
-
-instance FromJSON G.CopyNonOverlapping where
-  parseJSON = withObject "CopyNonOverlapping" $ \o -> do
-    copysrc <- o .: "src"
-    copydst <- o .: "dst"
-    copycount <- o .: "count"
-    pure $ G.CopyNonOverlapping copysrc copydst copycount
 
 -- Manual instance for TranslatedCrate - simplified version that parses the key fields
 -- Full deserialization would require FunDecl and Body instances which have complex dependencies
@@ -158,6 +103,14 @@ instance FromJSON AlignmentModifier where
       v <- o .: "Pack"
       Pack <$> parseJSON v
     _ -> fail "Unknown variant"
+
+
+instance FromJSON G.Assertion where
+  parseJSON = withObject "Assertion" $ \o -> do
+    assertionCond <- o .: "cond"
+    assertionExpected <- o .: "expected"
+    assertionOnFailure <- o .: "on_failure"
+    pure (G.Assertion assertionCond assertionExpected assertionOnFailure)
 
 
 instance FromJSON AttrInfo where
@@ -318,6 +271,14 @@ instance FromJSON BuiltinTy where
     _ -> fail "Unknown variant"
 
 
+instance FromJSON G.Call where
+  parseJSON = withObject "Call" $ \o -> do
+    callFunc <- o .: "func"
+    callArgs <- o .: "args"
+    callDest <- o .: "dest"
+    pure (G.Call callFunc callArgs callDest)
+
+
 instance FromJSON CastKind where
   parseJSON v = case v of
     Object o | H.lookup "Scalar" o /= Nothing -> do
@@ -475,10 +436,16 @@ instance FromJSON ConstantExprKind where
     _ -> fail "Unknown variant"
 
 
+instance FromJSON G.CopyNonOverlapping where
+  parseJSON = withObject "CopyNonOverlapping" $ \o -> do
+    copynonoverlappingSrc <- o .: "src"
+    copynonoverlappingDst <- o .: "dst"
+    copynonoverlappingCount <- o .: "count"
+    pure (G.CopyNonOverlapping copynonoverlappingSrc copynonoverlappingDst copynonoverlappingCount)
+
+
 instance FromJSON DeBruijnId where
-  parseJSON v = do
-    index <- parseJSON v
-    pure (DeBruijnId index)
+  parseJSON = fmap DeBruijnId . parseJSON
 
 
 instance (FromJSON a0) => FromJSON (DeBruijnVar a0) where
@@ -533,6 +500,15 @@ instance FromJSON DynPredicate where
   parseJSON = withObject "DynPredicate" $ \o -> do
     dynpredicateBinder <- o .: "binder"
     pure (DynPredicate dynpredicateBinder)
+
+
+instance FromJSON T.Field where
+  parseJSON = withObject "Field" $ \o -> do
+    fieldSpan <- o .: "span"
+    fieldAttrInfo <- o .: "attr_info"
+    fieldFieldName <- o .: "name"
+    fieldFieldTy <- o .: "ty"
+    pure (T.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy)
 
 
 instance FromJSON FieldId where
@@ -806,25 +782,25 @@ instance FromJSON ItemSource where
       pure (ClosureItem info)
     Object o | H.lookup "TraitDecl" o /= Nothing -> do
       obj <- o .: "TraitDecl"
-      trait_ref <- obj .: "trait_ref"
-      item_name <- obj .: "item_name"
-      has_default <- obj .: "has_default"
-      pure (TraitDeclItem trait_ref item_name has_default)
+      traitRef <- obj .: "trait_ref"
+      itemName <- obj .: "item_name"
+      hasDefault <- obj .: "has_default"
+      pure (TraitDeclItem traitRef itemName hasDefault)
     Object o | H.lookup "TraitImpl" o /= Nothing -> do
       obj <- o .: "TraitImpl"
-      impl_ref <- obj .: "impl_ref"
-      trait_ref <- obj .: "trait_ref"
-      item_name <- obj .: "item_name"
-      reuses_default <- obj .: "reuses_default"
-      pure (TraitImplItem impl_ref trait_ref item_name reuses_default)
+      implRef <- obj .: "impl_ref"
+      traitRef <- obj .: "trait_ref"
+      itemName <- obj .: "item_name"
+      reusesDefault <- obj .: "reuses_default"
+      pure (TraitImplItem implRef traitRef itemName reusesDefault)
     Object o | H.lookup "VTableTy" o /= Nothing -> do
       obj <- o .: "VTableTy"
-      dyn_pred <- obj .: "dyn_predicate"
-      pure (VTableTyItem dyn_pred)
+      dynPredicate <- obj .: "dyn_predicate"
+      pure (VTableTyItem dynPredicate)
     Object o | H.lookup "VTableInstance" o /= Nothing -> do
       obj <- o .: "VTableInstance"
-      impl_ref <- obj .: "impl_ref"
-      pure (VTableInstanceItem impl_ref)
+      implRef <- obj .: "impl_ref"
+      pure (VTableInstanceItem implRef)
     String "VTableMethodShim" -> pure VTableMethodShimItem
     _ -> fail "Unknown variant"
 
@@ -883,6 +859,14 @@ instance FromJSON Loc where
     locLine <- o .: "line"
     locCol <- o .: "col"
     pure (Loc locLine locCol)
+
+
+instance FromJSON G.Local where
+  parseJSON = withObject "Local" $ \o -> do
+    localIndex <- o .: "index"
+    localName <- o .: "name"
+    localLocalTy <- o .: "ty"
+    pure (G.Local localIndex localName localLocalTy)
 
 
 instance FromJSON LocalId where
@@ -1015,16 +999,16 @@ instance FromJSON ProjectionElem where
         pure (E.Field v0 v1)) =<< o .: "Field"
     String "PtrMetadata" -> pure PtrMetadata
     Object o | H.lookup "Index" o /= Nothing -> do
-      withArray "ProjIndex" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (ProjIndex v0 v1)) =<< o .: "Index"
+      obj <- o .: "Index"
+      offset <- obj .: "offset"
+      fromEnd <- obj .: "from_end"
+      pure (ProjIndex offset fromEnd)
     Object o | H.lookup "Subslice" o /= Nothing -> do
-      withArray "Subslice" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (Subslice v0 v1 v2)) =<< o .: "Subslice"
+      obj <- o .: "Subslice"
+      from <- obj .: "from"
+      to <- obj .: "to"
+      fromEnd <- obj .: "from_end"
+      pure (Subslice from to fromEnd)
     _ -> fail "Unknown variant"
 
 
@@ -1105,17 +1089,17 @@ instance FromJSON Rvalue where
       v <- o .: "Use"
       Use <$> parseJSON v
     Object o | H.lookup "Ref" o /= Nothing -> do
-      withArray "RvRef" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (RvRef v0 v1 v2)) =<< o .: "Ref"
+      obj <- o .: "Ref"
+      place <- obj .: "place"
+      kind <- obj .: "kind"
+      ptrMetadata <- obj .: "ptr_metadata"
+      pure (RvRef place kind ptrMetadata)
     Object o | H.lookup "RawPtr" o /= Nothing -> do
-      withArray "RawPtr" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (RawPtr v0 v1 v2)) =<< o .: "RawPtr"
+      obj <- o .: "RawPtr"
+      place <- obj .: "place"
+      kind <- obj .: "kind"
+      ptrMetadata <- obj .: "ptr_metadata"
+      pure (RawPtr place kind ptrMetadata)
     Object o | H.lookup "BinaryOp" o /= Nothing -> do
       withArray "BinaryOp" (\v -> do
         v0 <- parseJSON (v V.! 0)
@@ -1195,8 +1179,8 @@ instance FromJSON TagEncoding where
     String "Direct" -> pure Direct
     Object o | H.lookup "Niche" o /= Nothing -> do
       obj <- o .: "Niche"
-      untagged_variant <- obj .: "untagged_variant"
-      pure (Niche untagged_variant)
+      untaggedVariant <- obj .: "untagged_variant"
+      pure (Niche untaggedVariant)
     _ -> fail "Unknown variant"
 
 
@@ -1257,6 +1241,20 @@ instance FromJSON TraitDeclRef where
     pure (TraitDeclRef traitdeclrefId traitdeclrefGenerics)
 
 
+instance FromJSON G.TraitImpl where
+  parseJSON = withObject "TraitImpl" $ \o -> do
+    traitimplDefId <- o .: "def_id"
+    traitimplItemMeta <- o .: "item_meta"
+    traitimplImplTrait <- o .: "impl_trait"
+    traitimplGenerics <- o .: "generics"
+    traitimplImpliedTraitRefs <- o .: "implied_trait_refs"
+    traitimplConsts <- o .: "consts"
+    traitimplTypes <- o .: "types"
+    traitimplMethods <- o .: "methods"
+    traitimplVtable <- o .: "vtable"
+    pure (G.TraitImpl traitimplDefId traitimplItemMeta traitimplImplTrait traitimplGenerics traitimplImpliedTraitRefs traitimplConsts traitimplTypes traitimplMethods traitimplVtable)
+
+
 instance FromJSON TraitImplId where
   parseJSON = fmap TraitImplId . parseJSON
 
@@ -1270,6 +1268,13 @@ instance FromJSON TraitImplRef where
 
 instance FromJSON TraitItemName where
   parseJSON = fmap TraitItemName . parseJSON
+
+
+instance FromJSON G.TraitMethod where
+  parseJSON = withObject "TraitMethod" $ \o -> do
+    traitmethodName <- o .: "name"
+    traitmethodItem <- o .: "item"
+    pure (G.TraitMethod traitmethodName traitmethodItem)
 
 
 instance FromJSON TraitParam where
@@ -1309,10 +1314,10 @@ instance FromJSON TraitRefKind where
     String "SelfId" -> pure Self
     Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
       obj <- o .: "BuiltinOrAuto"
-      builtin_data <- obj .: "builtin_data"
-      parent_trait_refs <- obj .: "parent_trait_refs"
+      builtinData <- obj .: "builtin_data"
+      parentTraitRefs <- obj .: "parent_trait_refs"
       types <- obj .: "types"
-      pure (BuiltinOrAuto builtin_data parent_trait_refs types)
+      pure (BuiltinOrAuto builtinData parentTraitRefs types)
     String "Dyn" -> pure Dyn
     Object o | H.lookup "Unknown" o /= Nothing -> do
       v <- o .: "Unknown"
