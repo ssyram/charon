@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Meta.hs`
 by hand. Edit `templates/Meta.hs` instead, or improve the code
@@ -13,6 +16,7 @@ module Generated_Meta where
 
 import Data.Aeson
 import Data.Text (Text)
+import Data.Maybe (catMaybes)
 import qualified Data.HashMap.Strict as H
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
@@ -22,11 +26,13 @@ newtype PathBuf = PathBuf Text
 instance FromJSON PathBuf where
   parseJSON v = PathBuf <$> parseJSON v
 
-newtype FileId = FileId Text
-  deriving (Show, Eq, Ord)
+-- Vector is used for indexed sequences in Rust (IndexVec in charon)
+-- Defined here to avoid circular dependencies
+newtype Vector k v = Vector [v]
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
-instance FromJSON FileId where
-  parseJSON v = FileId <$> parseJSON v
+instance FromJSON b => FromJSON (Vector a b) where
+  parseJSON = fmap (Vector . catMaybes) . parseJSON
 
 -- | Information about the attributes and visibility of an item, field or variant..
 data AttrInfo = AttrInfo
@@ -77,6 +83,11 @@ data File = File
   ,   -- | The contents of the source file, as seen by rustc at the time of translation.
   -- | Some files don't have contents.
   fileContents :: Maybe String
+  }
+  deriving (Show, Eq, Ord)
+
+data FileId = FileId
+  { fileidRaw :: Int
   }
   deriving (Show, Eq, Ord)
 

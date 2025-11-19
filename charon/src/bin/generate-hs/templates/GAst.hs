@@ -16,9 +16,6 @@ import Generated_Expressions
 
 -- Manually defined types
 
--- Vector is used for mappings in Rust (IndexVec in charon)
-type Vector k v = [(k, v)]
-
 data TargetInfo = TargetInfo
   { targetinfoTargetPointerSize :: Int
   , targetinfoIsLittleEndian :: Bool
@@ -26,14 +23,6 @@ data TargetInfo = TargetInfo
   deriving (Show, Eq, Ord)
 
 -- Types with name conflicts - defined manually to avoid issues with Types module
-data Field = Field
-  { fieldSpan :: Span
-  , fieldAttrInfo :: AttrInfo
-  , fieldFieldName :: (Maybe String)
-  , fieldFieldTy :: Ty
-  }
-  deriving (Show, Eq, Ord)
-
 data Local = Local
   { localIndex :: LocalId
   , localName :: (Maybe String)

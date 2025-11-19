@@ -199,7 +199,8 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                         return "Text".to_string();
                     }
                     if base_ty == "Vector" {
-                        return format!("[{}]", args[0]);
+                        // Vector<K, V> in Rust becomes (Vector K V) in Haskell
+                        return format!("(Vector {} {})", args[0], args[1]);
                     }
                     if base_ty == "Option" {
                         return format!("Maybe {}", args[0]);
@@ -423,6 +424,15 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                 parseJSON _ = fail "Expected null"
             "#}.to_string()
         }
+        // Special case for ID types: single field named "_raw" of type Int
+        // These are serialized as plain numbers in JSON
+        TypeDeclKind::Struct(fields) if fields.elem_count() == 1 
+            && fields.iter().next().and_then(|f| f.name.as_deref()) == Some("_raw") 
+            && fields.iter().next().is_some_and(|f| matches!(f.ty.kind(), TyKind::Literal(LiteralTy::Int(_) | LiteralTy::UInt(_)))) => {
+            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
+            // Deserialize from a plain number
+            format!("parseJSON = fmap {ty_name} . parseJSON", ty_name = ty_name)
+        }
         TypeDeclKind::Struct(fields) if fields.iter().all(|f| f.name.is_none()) => {
             // Tuple struct - parse as array
             let ty_name = type_name_to_haskell_ident(&decl.item_meta);
@@ -481,6 +491,8 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
             let types_variant_conflicts = ["TraitImpl", "TraitMethod"];
             // Meta variants that conflict with GAst structs  
             let meta_variant_conflicts = ["Local"];
+            // Expressions variants that conflict with Types structs
+            let expressions_variant_conflicts = ["Field"];
             
             let variant_parsers = variants
                 .iter()
@@ -492,6 +504,8 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
                         format!("T.{}", variant_name)
                     } else if meta_variant_conflicts.contains(&variant_name.as_str()) {
                         format!("M.{}", variant_name)
+                    } else if expressions_variant_conflicts.contains(&variant_name.as_str()) {
+                        format!("E.{}", variant_name)
                     } else {
                         variant_name.clone()
                     };
@@ -669,25 +683,146 @@ fn generate_hs(
     output_dir: PathBuf,
 ) -> anyhow::Result<()> {
     let manual_type_impls = &[
-        // Hand-written because we replace the `FileId` with the corresponding file.
-        ("FileId", "Text"),
+        // None currently needed
     ];
     let manual_json_impls = &[
-        // Hand-written because we filter out `None` values.
+        // Vector has a custom FromJSON in GAstOfJson.hs that filters out Nones
+        // Name is transparent in Rust (serializes as just the inner vec)
         (
-            "Vector",
+            "Name",
             indoc!(
                 r#"
-                parseJSON = fmap catMaybes . parseJSON
-                "#
+                parseJSON = fmap Name . parseJSON
+                "#,
             ),
         ),
-        // Hand-written because we replace the `FileId` with the corresponding file name.
+        // TraitItemName is a single-field tuple struct that serializes transparently
         (
-            "FileId",
+            "TraitItemName",
             indoc!(
                 r#"
-                parseJSON v = parseJSON v
+                parseJSON = fmap TraitItemName . parseJSON
+                "#,
+            ),
+        ),
+        // DeBruijnId is transparent (just the index number)
+        (
+            "DeBruijnId",
+            indoc!(
+                r#"
+                parseJSON v = do
+                    index <- parseJSON v
+                    pure (DeBruijnId index)
+                "#,
+            ),
+        ),
+        // ItemSource has struct variants with named fields
+        (
+            "ItemSource",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    String "TopLevel" -> pure TopLevelItem
+                    Object o | H.lookup "Closure" o /= Nothing -> do
+                      obj <- o .: "Closure"
+                      info <- obj .: "info"
+                      pure (ClosureItem info)
+                    Object o | H.lookup "TraitDecl" o /= Nothing -> do
+                      obj <- o .: "TraitDecl"
+                      trait_ref <- obj .: "trait_ref"
+                      item_name <- obj .: "item_name"
+                      has_default <- obj .: "has_default"
+                      pure (TraitDeclItem trait_ref item_name has_default)
+                    Object o | H.lookup "TraitImpl" o /= Nothing -> do
+                      obj <- o .: "TraitImpl"
+                      impl_ref <- obj .: "impl_ref"
+                      trait_ref <- obj .: "trait_ref"
+                      item_name <- obj .: "item_name"
+                      reuses_default <- obj .: "reuses_default"
+                      pure (TraitImplItem impl_ref trait_ref item_name reuses_default)
+                    Object o | H.lookup "VTableTy" o /= Nothing -> do
+                      obj <- o .: "VTableTy"
+                      dyn_pred <- obj .: "dyn_predicate"
+                      pure (VTableTyItem dyn_pred)
+                    Object o | H.lookup "VTableInstance" o /= Nothing -> do
+                      obj <- o .: "VTableInstance"
+                      impl_ref <- obj .: "impl_ref"
+                      pure (VTableInstanceItem impl_ref)
+                    String "VTableMethodShim" -> pure VTableMethodShimItem
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
+        // TraitRefKind has BuiltinOrAuto as struct variant with named fields
+        (
+            "TraitRefKind",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    Object o | H.lookup "TraitImpl" o /= Nothing -> do
+                      v <- o .: "TraitImpl"
+                      T.TraitImpl <$> parseJSON v
+                    Object o | H.lookup "Clause" o /= Nothing -> do
+                      v <- o .: "Clause"
+                      Clause <$> parseJSON v
+                    Object o | H.lookup "ParentClause" o /= Nothing -> do
+                      withArray "ParentClause" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseJSON (v V.! 1)
+                        pure (ParentClause v0 v1)) =<< o .: "ParentClause"
+                    Object o | H.lookup "ItemClause" o /= Nothing -> do
+                      withArray "ItemClause" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseJSON (v V.! 1)
+                        v2 <- parseJSON (v V.! 2)
+                        pure (ItemClause v0 v1 v2)) =<< o .: "ItemClause"
+                    String "SelfId" -> pure Self
+                    Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
+                      obj <- o .: "BuiltinOrAuto"
+                      builtin_data <- obj .: "builtin_data"
+                      parent_trait_refs <- obj .: "parent_trait_refs"
+                      types <- obj .: "types"
+                      pure (BuiltinOrAuto builtin_data parent_trait_refs types)
+                    String "Dyn" -> pure Dyn
+                    Object o | H.lookup "Unknown" o /= Nothing -> do
+                      v <- o .: "Unknown"
+                      UnknownTrait <$> parseJSON v
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
+        // TagEncoding has Niche as struct variant with named field
+        (
+            "TagEncoding",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    String "Direct" -> pure Direct
+                    Object o | H.lookup "Niche" o /= Nothing -> do
+                      obj <- o .: "Niche"
+                      untagged_variant <- obj .: "untagged_variant"
+                      pure (Niche untagged_variant)
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
+        // ScalarValue contains Integer that may be serialized as String for large values
+        (
+            "ScalarValue",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    Object o | H.lookup "Unsigned" o /= Nothing -> do
+                      withArray "UnsignedScalar" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseIntegerValue (v V.! 1)
+                        pure (UnsignedScalar v0 v1)) =<< o .: "Unsigned"
+                    Object o | H.lookup "Signed" o /= Nothing -> do
+                      withArray "SignedScalar" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseIntegerValue (v V.! 1)
+                        pure (SignedScalar v0 v1)) =<< o .: "Signed"
+                    _ -> fail "Unknown variant"
                 "#,
             ),
         ),
@@ -708,13 +843,12 @@ fn generate_hs(
         "Body",
         "FunDecl",
         "TranslatedCrate",  // Too complex with LLBC/ULLBC dependencies - manually implement
-        "FileId",  // Manually implemented in Meta.hs template
-        "Vector",  // Type alias for [(a, b)] - don't generate instance (would conflict with list instance)
+        "Vector",  // Type alias for [v] with phantom type parameter - don't generate instance (would conflict with list instance)
+        "Field",  // Conflicts with Field variant in ProjectionElem - manually implement FromJSON
         // These have name conflicts between GAst structs and Types variants/fields
         // Manual instances in GAstOfJson.hs template and type defs in GAst.hs template
         "TraitImpl",
         "TraitMethod",
-        "Field",
         "Local",
         "Assert",  // Renamed to "Assertion" in JSON
         "Call",
@@ -761,12 +895,10 @@ fn generate_hs(
         "TraitTypeConstraintId",
         "Ty",
         "Vector",
-        "FileId",  // Manually defined in template
         "TargetInfo",  // Manually defined in GAst.hs template
         // These have name conflicts and are manually defined in GAst.hs template
         "TraitImpl",
         "TraitMethod",
-        "Field",
         "Local",
         "Assert",  // Renamed to "Assertion" in JSON
         "Call",

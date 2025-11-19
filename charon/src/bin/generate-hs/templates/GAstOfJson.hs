@@ -15,17 +15,17 @@ import Data.Text (Text)
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta hiding (Local)
 import qualified Generated_Meta as M
+import Generated_Meta
 import Generated_Values
 import qualified Generated_Types as T
-import Generated_Types hiding (TraitImpl, TraitMethod, Field, Local)
+import Generated_Types hiding (TraitImpl, TraitMethod, Local)
+import qualified Generated_Expressions as E
 import Generated_Expressions
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), TraitImpl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
--- Vector is manually defined here since it's excluded from generation
-type Vector a b = [(a, b)]
+-- Vector newtype is defined in Generated_Meta to avoid circular dependencies
 
 -- Manual instances for types that have name conflicts between GAst structs and Types variants/fields
 instance FromJSON G.TraitImpl where
@@ -47,13 +47,14 @@ instance FromJSON G.TraitMethod where
     traitmethodItem <- o .: "item"
     pure $ G.TraitMethod traitmethodName traitmethodItem
 
-instance FromJSON G.Field where
+-- Field struct conflicts with Field variant in ProjectionElem, need to qualify
+instance FromJSON T.Field where
   parseJSON = withObject "Field" $ \o -> do
     fieldSpan <- o .: "span"
     fieldAttrInfo <- o .: "attr_info"
     fieldFieldName <- o .: "name"
     fieldFieldTy <- o .: "ty"
-    pure $ G.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
+    pure $ T.Field fieldSpan fieldAttrInfo fieldFieldName fieldFieldTy
 
 instance FromJSON G.Local where
   parseJSON = withObject "Local" $ \o -> do
@@ -94,6 +95,13 @@ data TranslatedCrate = TranslatedCrate
   }
   deriving (Show, Eq, Ord)
 
+-- Wrapper type for the top-level LLBC file structure
+data LlbcFile = LlbcFile
+  { llbcfileCharon_version :: String
+  , llbcfileTranslated :: TranslatedCrate
+  }
+  deriving (Show, Eq, Ord)
+
 instance FromJSON TranslatedCrate where
   parseJSON = withObject "TranslatedCrate" $ \o -> do
     crateName <- o .: "crate_name"
@@ -103,5 +111,11 @@ instance FromJSON TranslatedCrate where
     traitImpls <- o .: "trait_impls"
     -- We skip fields that we can't deserialize yet (options, target_information, fun_decls, etc.)
     pure $ TranslatedCrate crateName typeDecls globalDecls traitDecls traitImpls
+
+instance FromJSON LlbcFile where
+  parseJSON = withObject "LlbcFile" $ \o -> do
+    charonVersion <- o .: "charon_version"
+    translated <- o .: "translated"
+    pure $ LlbcFile charonVersion translated
 
 {- __REPLACE0__ -}

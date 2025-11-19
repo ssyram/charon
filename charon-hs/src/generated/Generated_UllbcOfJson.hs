@@ -32,9 +32,7 @@ instance FromJSON Block where
 
 
 instance FromJSON BlockId where
-  parseJSON = withObject "BlockId" $ \o -> do
-    blockidRaw <- o .: "_raw"
-    pure (BlockId blockidRaw)
+  parseJSON = fmap BlockId . parseJSON
 
 
 
