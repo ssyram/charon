@@ -433,21 +433,6 @@ fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String 
             // Deserialize from a plain number
             format!("parseJSON = fmap {ty_name} . parseJSON", ty_name = ty_name)
         }
-        // Single-field structs with serde(transparent) or tuple structs
-        // These serialize transparently as their inner value
-        TypeDeclKind::Struct(fields) if fields.elem_count() == 1
-            && (fields[0].name.is_none()
-                || decl
-                    .item_meta
-                    .attr_info
-                    .attributes
-                    .iter()
-                    .filter_map(|a| a.as_unknown())
-                    .any(|a| a.to_string() == "serde(transparent)")) => {
-            let ty_name = type_name_to_haskell_ident(&decl.item_meta);
-            // Deserialize transparently from inner type
-            format!("parseJSON = fmap {ty_name} . parseJSON", ty_name = ty_name)
-        }
         TypeDeclKind::Struct(fields) if fields.iter().all(|f| f.name.is_none()) => {
             // Tuple struct - parse as array
             let ty_name = type_name_to_haskell_ident(&decl.item_meta);
@@ -701,6 +686,36 @@ fn generate_hs(
         // None currently needed
     ];
     let manual_json_impls = &[
+        // Vector has a custom FromJSON in GAstOfJson.hs that filters out Nones
+        // Name is transparent in Rust (serializes as just the inner vec)
+        (
+            "Name",
+            indoc!(
+                r#"
+                parseJSON = fmap Name . parseJSON
+                "#,
+            ),
+        ),
+        // TraitItemName is a single-field tuple struct that serializes transparently
+        (
+            "TraitItemName",
+            indoc!(
+                r#"
+                parseJSON = fmap TraitItemName . parseJSON
+                "#,
+            ),
+        ),
+        // DeBruijnId is transparent (just the index number)
+        (
+            "DeBruijnId",
+            indoc!(
+                r#"
+                parseJSON v = do
+                    index <- parseJSON v
+                    pure (DeBruijnId index)
+                "#,
+            ),
+        ),
         // ItemSource has struct variants with named fields
         (
             "ItemSource",

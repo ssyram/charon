@@ -476,9 +476,7 @@ instance FromJSON ConstantExprKind where
 
 
 instance FromJSON DeBruijnId where
-  parseJSON v = do
-    index <- parseJSON v
-    pure (DeBruijnId index)
+  parseJSON = fmap DeBruijnId . parseJSON
 
 
 instance (FromJSON a0) => FromJSON (DeBruijnVar a0) where
