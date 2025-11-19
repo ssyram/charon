@@ -1,6 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Expressions.hs`
 by hand. Edit `templates/Expressions.hs` instead, or improve the code

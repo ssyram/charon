@@ -1,6 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_LlbcAst.hs`
 by hand. Edit `templates/LlbcAst.hs` instead, or improve the code

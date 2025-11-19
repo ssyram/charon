@@ -1,7 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_UllbcAst.hs`
 by hand. Edit `templates/UllbcAst.hs` instead, or improve the code

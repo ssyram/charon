@@ -1,8 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_GAst.hs`
 by hand. Edit `templates/GAst.hs` instead, or improve the code
