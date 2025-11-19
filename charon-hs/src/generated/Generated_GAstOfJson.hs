@@ -23,7 +23,7 @@ import Generated_Types
 import qualified Generated_Expressions as E
 import Generated_Expressions
 -- Import specific types from Generated_GAst that we need for TranslatedCrate
--- TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping will be qualified with G.
+-- Other GAst types (not in this import list) will be auto-qualified with G.
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
@@ -105,12 +105,12 @@ instance FromJSON AlignmentModifier where
     _ -> fail "Unknown variant"
 
 
-instance FromJSON Assertion where
+instance FromJSON G.Assertion where
   parseJSON = withObject "Assertion" $ \o -> do
     assertionCond <- o .: "cond"
     assertionExpected <- o .: "expected"
     assertionOnFailure <- o .: "on_failure"
-    pure (Assertion assertionCond assertionExpected assertionOnFailure)
+    pure (G.Assertion assertionCond assertionExpected assertionOnFailure)
 
 
 instance FromJSON AttrInfo where
@@ -271,12 +271,12 @@ instance FromJSON BuiltinTy where
     _ -> fail "Unknown variant"
 
 
-instance FromJSON Call where
+instance FromJSON G.Call where
   parseJSON = withObject "Call" $ \o -> do
     callFunc <- o .: "func"
     callArgs <- o .: "args"
     callDest <- o .: "dest"
-    pure (Call callFunc callArgs callDest)
+    pure (G.Call callFunc callArgs callDest)
 
 
 instance FromJSON CastKind where
@@ -436,12 +436,12 @@ instance FromJSON ConstantExprKind where
     _ -> fail "Unknown variant"
 
 
-instance FromJSON CopyNonOverlapping where
+instance FromJSON G.CopyNonOverlapping where
   parseJSON = withObject "CopyNonOverlapping" $ \o -> do
     copynonoverlappingSrc <- o .: "src"
     copynonoverlappingDst <- o .: "dst"
     copynonoverlappingCount <- o .: "count"
-    pure (CopyNonOverlapping copynonoverlappingSrc copynonoverlappingDst copynonoverlappingCount)
+    pure (G.CopyNonOverlapping copynonoverlappingSrc copynonoverlappingDst copynonoverlappingCount)
 
 
 instance FromJSON DeBruijnId where
@@ -553,10 +553,10 @@ instance FromJSON FileName where
 
 instance FromJSON FloatType where
   parseJSON v = case v of
-    String "F16" -> pure T.F16
-    String "F32" -> pure T.F32
-    String "F64" -> pure T.F64
-    String "F128" -> pure T.F128
+    String "F16" -> pure F16
+    String "F32" -> pure F32
+    String "F64" -> pure F64
+    String "F128" -> pure F128
     _ -> fail "Unknown variant"
 
 
@@ -722,12 +722,12 @@ instance FromJSON InlineAttr where
 
 instance FromJSON IntTy where
   parseJSON v = case v of
-    String "Isize" -> pure T.Isize
-    String "I8" -> pure T.I8
-    String "I16" -> pure T.I16
-    String "I32" -> pure T.I32
-    String "I64" -> pure T.I64
-    String "I128" -> pure T.I128
+    String "Isize" -> pure Isize
+    String "I8" -> pure I8
+    String "I16" -> pure I16
+    String "I32" -> pure I32
+    String "I64" -> pure I64
+    String "I128" -> pure I128
     _ -> fail "Unknown variant"
 
 
@@ -735,10 +735,10 @@ instance FromJSON IntegerType where
   parseJSON v = case v of
     Object o | H.lookup "Signed" o /= Nothing -> do
       v <- o .: "Signed"
-      T.Signed <$> parseJSON v
+      Signed <$> parseJSON v
     Object o | H.lookup "Unsigned" o /= Nothing -> do
       v <- o .: "Unsigned"
-      T.Unsigned <$> parseJSON v
+      Unsigned <$> parseJSON v
     _ -> fail "Unknown variant"
 
 
@@ -819,22 +819,22 @@ instance FromJSON Literal where
   parseJSON v = case v of
     Object o | H.lookup "Scalar" o /= Nothing -> do
       v <- o .: "Scalar"
-      T.VScalar <$> parseJSON v
+      VScalar <$> parseJSON v
     Object o | H.lookup "Float" o /= Nothing -> do
       v <- o .: "Float"
-      T.VFloat <$> parseJSON v
+      VFloat <$> parseJSON v
     Object o | H.lookup "Bool" o /= Nothing -> do
       v <- o .: "Bool"
-      T.VBool <$> parseJSON v
+      VBool <$> parseJSON v
     Object o | H.lookup "Char" o /= Nothing -> do
       v <- o .: "Char"
-      T.VChar <$> parseJSON v
+      VChar <$> parseJSON v
     Object o | H.lookup "ByteStr" o /= Nothing -> do
       v <- o .: "ByteStr"
-      T.VByteStr <$> parseJSON v
+      VByteStr <$> parseJSON v
     Object o | H.lookup "Str" o /= Nothing -> do
       v <- o .: "Str"
-      T.VStr <$> parseJSON v
+      VStr <$> parseJSON v
     _ -> fail "Unknown variant"
 
 
@@ -842,15 +842,15 @@ instance FromJSON LiteralType where
   parseJSON v = case v of
     Object o | H.lookup "Int" o /= Nothing -> do
       v <- o .: "Int"
-      T.TInt <$> parseJSON v
+      TInt <$> parseJSON v
     Object o | H.lookup "UInt" o /= Nothing -> do
       v <- o .: "UInt"
-      T.TuInt <$> parseJSON v
+      TuInt <$> parseJSON v
     Object o | H.lookup "Float" o /= Nothing -> do
       v <- o .: "Float"
-      T.TFloat <$> parseJSON v
-    String "Bool" -> pure T.TBool
-    String "Char" -> pure T.TChar
+      TFloat <$> parseJSON v
+    String "Bool" -> pure TBool
+    String "Char" -> pure TChar
     _ -> fail "Unknown variant"
 
 
@@ -1453,12 +1453,12 @@ instance FromJSON TypeVarId where
 
 instance FromJSON UIntTy where
   parseJSON v = case v of
-    String "Usize" -> pure T.Usize
-    String "U8" -> pure T.U8
-    String "U16" -> pure T.U16
-    String "U32" -> pure T.U32
-    String "U64" -> pure T.U64
-    String "U128" -> pure T.U128
+    String "Usize" -> pure Usize
+    String "U8" -> pure U8
+    String "U16" -> pure U16
+    String "U32" -> pure U32
+    String "U64" -> pure U64
+    String "U128" -> pure U128
     _ -> fail "Unknown variant"
 
 

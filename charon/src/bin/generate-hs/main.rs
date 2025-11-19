@@ -1032,7 +1032,8 @@ fn generate_hs(
     };
     
     meta_types = extract_types(&ctx, &mut temp_processed, &["File", "Span", "AttrInfo"]);
-    // Skip Values module - it doesn't cause conflicts
+    // Extract Values module types first to exclude them from types_types
+    let _values_types = extract_types(&ctx, &mut temp_processed, &["Literal", "IntegerTy", "LiteralTy"]);
     types_types = extract_types(&ctx, &mut temp_processed, &[
         "TypeVarId", "ConstGeneric", "TraitClauseId", "DeBruijnVar", "ItemId", "TyKind",
         "TraitImplRef", "FunDeclRef", "GlobalDeclRef", "Binder", "AbortKind", "TypeDecl",
@@ -1053,13 +1054,31 @@ fn generate_hs(
     let types_type_names = ctx.collect_type_names(&types_types);
     let expressions_type_names = ctx.collect_type_names(&expressions_types);
     
-    // Compute GAst types that need qualification (conflict with variant names in other modules)
+    // Compute GAst types that need qualification
+    // These are GAst types that either:
+    // 1. Conflict with variant names in Types/Expressions/Meta modules, OR
+    // 2. Are not in the hardcoded import list in GAstOfJson template
+    //
+    // The following GAst types are directly imported in the template and should NOT be qualified:
+    // Preset, TargetInfo, TraitAssocConst, TraitAssocTy, TraitDecl, MirLevel, MonomorphizeMut,
+    // GlobalKind, Locals, GDeclarationGroup, GexprBody, GlobalDecl, CliOptions, DeclarationGroup,
+    // FnOperand, FunSig
+    let gast_directly_imported: HashSet<&str> = [
+        "Preset", "TargetInfo", "TraitAssocConst", "TraitAssocTy", "TraitDecl", "MirLevel",
+        "MonomorphizeMut", "GlobalKind", "Locals", "GDeclarationGroup", "GexprBody",
+        "GlobalDecl", "CliOptions", "DeclarationGroup", "FnOperand", "FunSig"
+    ].iter().copied().collect();
+    
     ctx.gast_needs_qualification = gast_type_names
         .iter()
         .filter(|name| {
-            ctx.types_variant_names.contains(*name)
+            // Qualify if it conflicts with variant names in other modules
+            let has_conflict = ctx.types_variant_names.contains(*name)
                 || ctx.meta_variant_names.contains(*name)
-                || ctx.expressions_variant_names.contains(*name)
+                || ctx.expressions_variant_names.contains(*name);
+            // OR if it's not in the direct import list
+            let not_imported = !gast_directly_imported.contains(name.as_str());
+            has_conflict || not_imported
         })
         .cloned()
         .collect();

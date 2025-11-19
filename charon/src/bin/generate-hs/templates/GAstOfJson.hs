@@ -23,7 +23,7 @@ import Generated_Types
 import qualified Generated_Expressions as E
 import Generated_Expressions
 -- Import specific types from Generated_GAst that we need for TranslatedCrate
--- TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping will be qualified with G.
+-- Other GAst types (not in this import list) will be auto-qualified with G.
 import Generated_GAst (Preset(..), TargetInfo(..), TraitAssocConst(..), TraitAssocTy(..), TraitDecl(..), MirLevel(..), MonomorphizeMut(..), GlobalKind(..), Locals(..), GDeclarationGroup(..), GexprBody(..), GlobalDecl(..), CliOptions(..), DeclarationGroup(..), FnOperand(..), FunSig(..))
 import qualified Generated_GAst as G
 
