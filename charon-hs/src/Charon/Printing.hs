@@ -30,7 +30,6 @@ import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
 import Generated_GAst
 import Generated_Types
-import Generated_Meta
 import Generated_Values
 import Generated_Expressions
 
@@ -199,7 +198,7 @@ instance BuildWithCtx CastKind where
     "cast<" <> buildWithCtx ctx src <> ", " <> buildWithCtx ctx tgt <> ">"
   buildWithCtx ctx (CastFnPtr src tgt) =
     "cast<" <> buildWithCtx ctx src <> ", " <> buildWithCtx ctx tgt <> ">"
-  buildWithCtx ctx (CastUnsize src tgt meta) =
+  buildWithCtx ctx (CastUnsize src tgt _meta) =
     "unsize_cast<" <> buildWithCtx ctx src <> ", " <> buildWithCtx ctx tgt <> ">"
   buildWithCtx ctx (CastTransmute src tgt) =
     "transmute<" <> buildWithCtx ctx src <> ", " <> buildWithCtx ctx tgt <> ">"
@@ -246,9 +245,9 @@ instance BuildWithCtx BorrowKind where
 
 -- LocalId
 instance BuildWithCtx LocalId where
-  buildWithCtx ctx lid@(LocalId i) =
+  buildWithCtx ctx (LocalId i) =
     case locals ctx of
-      Just (Locals _ locs) -> 
+      Just (Locals _ _locs) -> 
         -- Try to get the variable name from the locals vector
         -- For now, just show the ID
         "@" <> B.decimal i
@@ -264,9 +263,9 @@ instance BuildWithCtx VariantId where
 
 -- TypeDeclId
 instance BuildWithCtx TypeDeclId where
-  buildWithCtx ctx tid@(TypeDeclId i) =
+  buildWithCtx ctx (TypeDeclId i) =
     case translated ctx of
-      Just crate -> 
+      Just _crate -> 
         -- Try to look up the type name in the crate
         -- For now, show as TypeDeclId
         "TypeDeclId(" <> B.decimal i <> ")"
@@ -290,7 +289,7 @@ instance BuildWithCtx TraitImplId where
 
 -- Assertion
 instance BuildWithCtx Assertion where
-  buildWithCtx ctx (Assertion cond expected onFailure) =
+  buildWithCtx ctx (Assertion cond expected _onFailure) =
     "assert(" <> buildWithCtx ctx cond <> " == " <> buildWithCtx ctx expected <> ")"
 
 -- Call
@@ -307,7 +306,7 @@ instance BuildWithCtx BuiltinFunId where
   buildWithCtx _ ArrayToSliceShared = "ArrayToSliceShared"
   buildWithCtx _ ArrayToSliceMut = "ArrayToSliceMut"
   buildWithCtx _ ArrayRepeat = "ArrayRepeat"
-  buildWithCtx ctx (Index (BuiltinIndexOp isArray mutability isRange)) =
+  buildWithCtx _ctx (Index (BuiltinIndexOp isArray mutability isRange)) =
     let ty = if isArray then "Array" else "Slice"
         op = if isRange then "SubSlice" else "Index"
         mut = case mutability of
