@@ -67,15 +67,6 @@ fn type_name_to_haskell_ident(item_meta: &ItemMeta) -> String {
 
 /// Check if a type name conflicts with Types/Expressions/Meta module types
 /// and needs to be qualified in GAstOfJson
-fn needs_gast_qualification(ctx: &GenerateCtx, ty_name: &str) -> bool {
-    ctx.gast_needs_qualification.contains(ty_name)
-}
-
-/// Check if a type name needs T. qualification (for Types module types that conflict)
-fn needs_types_qualification(ctx: &GenerateCtx, ty_name: &str) -> bool {
-    ctx.types_needs_qualification.contains(ty_name)
-}
-
 struct GenerateCtx<'a> {
     crate_data: &'a TranslatedCrate,
     name_to_type: HashMap<String, &'a TypeDecl>,
@@ -158,6 +149,7 @@ impl<'a> GenerateCtx<'a> {
     }
 
     /// List the (recursive) children of this type.
+    #[allow(dead_code)]
     fn children_of(&self, name: &str) -> HashSet<TypeDeclId> {
         let start_id = self.id_from_name(name);
         self.children_of_inner(vec![start_id])
@@ -818,52 +810,6 @@ fn generate_hs(
     ];
 
     let mut ctx = GenerateCtx::new(&crate_data, manual_type_impls, manual_json_impls);
-
-    // Compute the sets of types to be put in each module (similar to generate-ml).
-    let manually_implemented: HashSet<_> = [
-        "ItemOpacity",
-        "PredicateOrigin",
-        "Ty",
-        "Opaque",
-        "Body",
-        "FunDecl",
-        "TranslatedCrate", // Too complex with LLBC/ULLBC dependencies - manually implement
-        "Vector", // Type alias for [v] with phantom type parameter - don't generate instance (would conflict with list instance)
-    ]
-    .iter()
-    .map(|name| ctx.id_from_name(name))
-    .collect();
-
-    // Compute type sets for json deserializers.
-    let (gast_types, llbc_types, ullbc_types) = {
-        let llbc_types: HashSet<_> = ctx.children_of("charon_lib::ast::llbc_ast::Statement");
-        let ullbc_types: HashSet<_> = ctx.children_of("charon_lib::ast::ullbc_ast::BodyContents");
-        let all_types: HashSet<_> = ctx.children_of("TranslatedCrate");
-
-        let shared_types: HashSet<_> = llbc_types.intersection(&ullbc_types).copied().collect();
-        let llbc_types: HashSet<_> = llbc_types.difference(&shared_types).copied().collect();
-        let ullbc_types: HashSet<_> = ullbc_types.difference(&shared_types).copied().collect();
-
-        let body_specific_types: HashSet<_> = llbc_types.union(&ullbc_types).copied().collect();
-        let gast_types: HashSet<_> = all_types
-            .difference(&body_specific_types)
-            .copied()
-            .collect();
-
-        let gast_types: HashSet<_> = gast_types
-            .difference(&manually_implemented)
-            .copied()
-            .collect();
-        let llbc_types: HashSet<_> = llbc_types
-            .difference(&manually_implemented)
-            .copied()
-            .collect();
-        let ullbc_types: HashSet<_> = ullbc_types
-            .difference(&manually_implemented)
-            .copied()
-            .collect();
-        (gast_types, llbc_types, ullbc_types)
-    };
 
     let dont_generate_ty = &[
         "ItemOpacity",
