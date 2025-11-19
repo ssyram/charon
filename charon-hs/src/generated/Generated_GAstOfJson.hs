@@ -1305,11 +1305,11 @@ instance FromJSON TraitRefKind where
         pure (ItemClause v0 v1 v2)) =<< o .: "ItemClause"
     String "SelfId" -> pure Self
     Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
-      withArray "BuiltinOrAuto" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (BuiltinOrAuto v0 v1 v2)) =<< o .: "BuiltinOrAuto"
+      obj <- o .: "BuiltinOrAuto"
+      builtin_data <- obj .: "builtin_data"
+      parent_trait_refs <- obj .: "parent_trait_refs"
+      types <- obj .: "types"
+      pure (BuiltinOrAuto builtin_data parent_trait_refs types)
     String "Dyn" -> pure Dyn
     Object o | H.lookup "Unknown" o /= Nothing -> do
       v <- o .: "Unknown"

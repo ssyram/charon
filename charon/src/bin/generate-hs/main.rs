@@ -751,6 +751,44 @@ fn generate_hs(
                 "#,
             ),
         ),
+        // TraitRefKind has BuiltinOrAuto as struct variant with named fields
+        (
+            "TraitRefKind",
+            indoc!(
+                r#"
+                parseJSON v = case v of
+                    Object o | H.lookup "TraitImpl" o /= Nothing -> do
+                      v <- o .: "TraitImpl"
+                      T.TraitImpl <$> parseJSON v
+                    Object o | H.lookup "Clause" o /= Nothing -> do
+                      v <- o .: "Clause"
+                      Clause <$> parseJSON v
+                    Object o | H.lookup "ParentClause" o /= Nothing -> do
+                      withArray "ParentClause" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseJSON (v V.! 1)
+                        pure (ParentClause v0 v1)) =<< o .: "ParentClause"
+                    Object o | H.lookup "ItemClause" o /= Nothing -> do
+                      withArray "ItemClause" (\v -> do
+                        v0 <- parseJSON (v V.! 0)
+                        v1 <- parseJSON (v V.! 1)
+                        v2 <- parseJSON (v V.! 2)
+                        pure (ItemClause v0 v1 v2)) =<< o .: "ItemClause"
+                    String "SelfId" -> pure Self
+                    Object o | H.lookup "BuiltinOrAuto" o /= Nothing -> do
+                      obj <- o .: "BuiltinOrAuto"
+                      builtin_data <- obj .: "builtin_data"
+                      parent_trait_refs <- obj .: "parent_trait_refs"
+                      types <- obj .: "types"
+                      pure (BuiltinOrAuto builtin_data parent_trait_refs types)
+                    String "Dyn" -> pure Dyn
+                    Object o | H.lookup "Unknown" o /= Nothing -> do
+                      v <- o .: "Unknown"
+                      UnknownTrait <$> parseJSON v
+                    _ -> fail "Unknown variant"
+                "#,
+            ),
+        ),
         // ScalarValue contains Integer that may be serialized as String for large values
         (
             "ScalarValue",
