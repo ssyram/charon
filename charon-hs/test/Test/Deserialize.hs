@@ -2,29 +2,19 @@
 
 module Test.Deserialize (tests, getAllLlbcTests) where
 
-import Data.Aeson (eitherDecodeFileStrict, eitherDecodeStrict, Value(..), Object)
-import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.KeyMap as KM
-import qualified Data.ByteString as BS
+import Data.Aeson (eitherDecodeFileStrict, eitherDecodeStrict)
 import qualified Data.ByteString.Char8 as BS8
-import qualified Data.Text as T
 import System.Directory (doesFileExist, listDirectory, doesDirectoryExist)
 import System.FilePath ((</>), takeExtension)
 import Control.Monad (filterM, when)
-import Test.Tasty
+import Test.Tasty ( testGroup, TestTree )
 import Test.Tasty.HUnit
+    ( testCase, assertBool, assertEqual, assertFailure, Assertion )
 
 -- Import generated modules
 import Generated_Meta
 import Generated_Values
-import Generated_Types
-import Generated_Expressions
-import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
-import Generated_LlbcAst
-import Generated_UllbcAst
-import Generated_GAstOfJson (TranslatedCrate(..), LlbcFile(..))  -- For TranslatedCrate and FromJSON instances
-import Generated_LlbcOfJson ()
-import Generated_UllbcOfJson ()
+import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion; TranslatedCrate and LlbcFile are here too
 
 tests :: TestTree
 tests = testGroup "Deserialization Tests"

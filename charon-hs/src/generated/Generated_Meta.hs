@@ -1,6 +1,7 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Meta.hs`
 by hand. Edit `templates/Meta.hs` instead, or improve the code
@@ -17,7 +18,7 @@ module Generated_Meta where
 import Data.Aeson
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
-import qualified Data.HashMap.Strict as H
+import qualified Data.Aeson.KeyMap as H
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -153,3 +154,93 @@ data SpanData = SpanData
   , spandataEndLoc :: Loc
   }
   deriving (Show, Eq, Ord)
+
+instance FromJSON AttrInfo where
+  parseJSON = withObject "AttrInfo" $ \o -> do
+    attrinfoAttributes <- o .: "attributes"
+    attrinfoInline <- o .: "inline"
+    attrinfoRename <- o .: "rename"
+    attrinfoPublic <- o .: "public"
+    pure (AttrInfo attrinfoAttributes attrinfoInline attrinfoRename attrinfoPublic)
+
+
+instance FromJSON Attribute where
+  parseJSON v = case v of
+    String "Opaque" -> pure AttrOpaque
+    Object o | H.lookup "Rename" o /= Nothing -> do
+      v <- o .: "Rename"
+      AttrRename <$> parseJSON v
+    Object o | H.lookup "VariantsPrefix" o /= Nothing -> do
+      v <- o .: "VariantsPrefix"
+      AttrVariantsPrefix <$> parseJSON v
+    Object o | H.lookup "VariantsSuffix" o /= Nothing -> do
+      v <- o .: "VariantsSuffix"
+      AttrVariantsSuffix <$> parseJSON v
+    Object o | H.lookup "DocComment" o /= Nothing -> do
+      v <- o .: "DocComment"
+      AttrDocComment <$> parseJSON v
+    Object o | H.lookup "Unknown" o /= Nothing -> do
+      v <- o .: "Unknown"
+      AttrUnknown <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON File where
+  parseJSON = withObject "File" $ \o -> do
+    fileName <- o .: "name"
+    fileCrateName <- o .: "crate_name"
+    fileContents <- o .: "contents"
+    pure (File fileName fileCrateName fileContents)
+
+
+instance FromJSON FileId where
+  parseJSON = fmap FileId . parseJSON
+
+
+instance FromJSON FileName where
+  parseJSON v = case v of
+    Object o | H.lookup "Virtual" o /= Nothing -> do
+      v <- o .: "Virtual"
+      Virtual <$> parseJSON v
+    Object o | H.lookup "Local" o /= Nothing -> do
+      v <- o .: "Local"
+      Local <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON InlineAttr where
+  parseJSON v = case v of
+    String "Hint" -> pure Hint
+    String "Never" -> pure Never
+    String "Always" -> pure Always
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON Loc where
+  parseJSON = withObject "Loc" $ \o -> do
+    locLine <- o .: "line"
+    locCol <- o .: "col"
+    pure (Loc locLine locCol)
+
+
+instance FromJSON RawAttribute where
+  parseJSON = withObject "RawAttribute" $ \o -> do
+    rawattributePath <- o .: "path"
+    rawattributeArgs <- o .: "args"
+    pure (RawAttribute rawattributePath rawattributeArgs)
+
+
+instance FromJSON Span where
+  parseJSON = withObject "Span" $ \o -> do
+    spanData <- o .: "data"
+    spanGeneratedFromSpan <- o .: "generated_from_span"
+    pure (Span spanData spanGeneratedFromSpan)
+
+
+instance FromJSON SpanData where
+  parseJSON = withObject "SpanData" $ \o -> do
+    spandataFile <- o .: "file_id"
+    spandataBegLoc <- o .: "beg"
+    spandataEndLoc <- o .: "end"
+    pure (SpanData spandataFile spandataBegLoc spandataEndLoc)
+

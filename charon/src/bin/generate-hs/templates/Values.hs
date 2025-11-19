@@ -1,3 +1,6 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Values.hs`
 by hand. Edit `templates/Values.hs` instead, or improve the code
@@ -8,8 +11,8 @@ module Generated_Values where
 
 import Data.Aeson
 import Data.Aeson.Types (Parser)
-import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 
 -- Helper to parse Integer from either String or Number
@@ -21,3 +24,5 @@ parseIntegerValue (Number n) = parseJSON (Number n)
 parseIntegerValue v = fail $ "Expected String or Number for Integer, got: " ++ show v
 
 {- __REPLACE0__ -}
+
+{- __REPLACE1__ -}
