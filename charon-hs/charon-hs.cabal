@@ -24,6 +24,7 @@ library
       Generated_LlbcAst
       Generated_UllbcAst
   other-modules:
+      Generated_Crate
       Paths_charon_hs
   hs-source-dirs:
       src/generated

@@ -819,6 +819,8 @@ fn generate_hs(
         "Vector",
         "TargetInfo", // Manually defined in GAst.hs template
         "Body", // Manually defined in Crate.hs template to properly qualify LLBC/ULLBC types
+        "TranslatedCrate", // Manually defined in Crate.hs template to fix HashMap type parameters
+        "Error", // Manually defined in GAst.hs template to avoid name collision with Body variant
     ];
 
     // Compute conflict sets for auto-qualification

@@ -10,7 +10,7 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson
+import Data.Aeson hiding (Error)
 import qualified Data.Aeson.KeyMap as H
 import Generated_Meta hiding (Local)
 import Generated_Types hiding (Field, TraitImpl, TraitMethod)
@@ -23,6 +23,27 @@ data TargetInfo = TargetInfo
   , targetinfoIsLittleEndian :: Bool
   }
   deriving (Show, Eq, Ord)
+
+instance FromJSON TargetInfo where
+  parseJSON = withObject "TargetInfo" $ \o -> do
+    targetPointerSize <- o .: "target_pointer_size"
+    isLittleEndian <- o .: "is_little_endian"
+    pure (TargetInfo targetPointerSize isLittleEndian)
+
+-- Common error used during the translation.
+-- This is defined here instead of in Crate module to avoid name collision
+-- with the Body::Error variant constructor
+data Error = Error
+  { errorSpan :: Span
+  , errorMsg :: String
+  }
+  deriving (Show, Eq, Ord)
+
+instance FromJSON Error where
+  parseJSON = withObject "Error" $ \o -> do
+    errorSpan <- o .: "span"
+    errorMsg <- o .: "msg"
+    pure (Error errorSpan errorMsg)
 
 {- __REPLACE0__ -}
 
