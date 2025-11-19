@@ -243,7 +243,14 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
             match tref.id {
                 TypeId::Adt(id) => {
                     let base_ty = if let Some(tdecl) = ctx.crate_data.type_decls.get(id) {
-                        type_name_to_haskell_ident(&tdecl.item_meta)
+                        let ty_name = type_name_to_haskell_ident(&tdecl.item_meta);
+                        // Qualify GAst types that conflict with Llbc/Ullbc variant constructors
+                        // These types need G. qualification when used in Llbc/Ullbc modules
+                        if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
+                            format!("G.{}", ty_name)
+                        } else {
+                            ty_name
+                        }
                     } else {
                         format!("MissingType{id}")
                     };

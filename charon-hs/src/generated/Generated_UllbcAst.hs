@@ -18,6 +18,8 @@ import Generated_Meta
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
+import qualified Generated_GAst as G
+-- Import everything from GAst except the data constructors that conflict with our variant constructors
 import Generated_GAst hiding (Call, CopyNonOverlapping)
 
 data Block = Block
@@ -44,7 +46,7 @@ data Statement = Statement
 -- | A raw statement: a statement without meta data.
 data StatementKind = Assign Place Rvalue
   | SetDiscriminant Place VariantId
-  | CopyNonOverlapping CopyNonOverlapping
+  | CopyNonOverlapping G.CopyNonOverlapping
   | StorageLive LocalId
   | StorageDead LocalId
   | Deinit Place
@@ -68,7 +70,7 @@ data Terminator = Terminator
 -- | A raw terminator: a terminator without meta data.
 data TerminatorKind = Goto BlockId
   | Switch Operand Switch
-  | Call Call BlockId BlockId
+  | Call G.Call BlockId BlockId
   | Abort AbortKind
   | Return
   | UnwindResume
