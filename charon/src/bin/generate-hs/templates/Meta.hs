@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_Meta.hs`

@@ -1,6 +1,4 @@
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-|
 WARNING: this file is partially auto-generated. Do not edit `Generated_GAst.hs`
 by hand. Edit `templates/GAst.hs` instead, or improve the code
