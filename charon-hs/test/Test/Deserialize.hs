@@ -100,17 +100,17 @@ createLlbcTest filepath = testCase filepath $ do
       let crate = llbcfileTranslated llbcFile
       -- Successfully deserialized the entire crate!
       -- We can validate that it has the expected structure
-      let typeDeclCount = length (translatedCrateType_decls crate)
-          globalDeclCount = length (translatedCrateGlobal_decls crate)
-          traitDeclCount = length (translatedCrateTrait_decls crate)
-          traitImplCount = length (translatedCrateTrait_impls crate)
+      let typeDeclCount = length (translatedcrateTypeDecls crate)
+          globalDeclCount = length (translatedcrateGlobalDecls crate)
+          traitDeclCount = length (translatedcrateTraitDecls crate)
+          traitImplCount = length (translatedcrateTraitImpls crate)
       
       -- The test passes if we successfully deserialized the TranslatedCrate
       assertBool (concat
         [ "Successfully deserialized LLBC file with charon version "
-        , llbcfileCharon_version llbcFile
+        , llbcfileCharonVersion llbcFile
         , ": crate '"
-        , translatedCrateCrate_name crate
+        , translatedcrateCrateName crate
         , "' with "
         , show typeDeclCount, " type decls, "
         , show globalDeclCount, " global decls, "

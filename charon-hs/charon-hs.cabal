@@ -23,8 +23,8 @@ library
       Generated_GAst
       Generated_LlbcAst
       Generated_UllbcAst
-  other-modules:
       Generated_Crate
+  other-modules:
       Paths_charon_hs
   hs-source-dirs:
       src/generated

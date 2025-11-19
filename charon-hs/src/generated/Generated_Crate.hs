@@ -10,6 +10,7 @@ generation tool to avoid the need for hand-writing things.
 module Generated_Crate where
 
 import Data.Aeson hiding (Error)
+import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import Data.Text (Text, unpack)
@@ -94,8 +95,25 @@ instance FromJSON TranslatedCrate where
     translatedcrateCrateName <- o .: "crate_name"
     translatedcrateOptions <- o .: "options"
     translatedcrateTargetInformation <- o .: "target_information"
-    translatedcrateItemNames <- o .: "item_names"
-    translatedcrateShortNames <- o .: "short_names"
+    -- Parse item_names and short_names from HashMapToArray format (array of {key, value} objects)
+    itemNamesArray <- o .: "item_names"
+    let translatedcrateItemNames = map (\obj -> case obj of
+                                          Object o -> case (H.lookup "key" o, H.lookup "value" o) of
+                                            (Just k, Just v) -> case (fromJSON k, fromJSON v) of
+                                              (Success key, Success value) -> (key, value)
+                                              _ -> error "Failed to parse item_names entry"
+                                            _ -> error "Missing key or value in item_names entry"
+                                          _ -> error "Expected object in item_names array"
+                                      ) itemNamesArray
+    shortNamesArray <- o .: "short_names"
+    let translatedcrateShortNames = map (\obj -> case obj of
+                                          Object o -> case (H.lookup "key" o, H.lookup "value" o) of
+                                            (Just k, Just v) -> case (fromJSON k, fromJSON v) of
+                                              (Success key, Success value) -> (key, value)
+                                              _ -> error "Failed to parse short_names entry"
+                                            _ -> error "Missing key or value in short_names entry"
+                                          _ -> error "Expected object in short_names array"
+                                        ) shortNamesArray
     translatedcrateFiles <- o .: "files"
     translatedcrateTypeDecls <- o .: "type_decls"
     translatedcrateFunDecls <- o .: "fun_decls"
