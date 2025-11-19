@@ -187,7 +187,7 @@ pub struct CliOpts {
     /// A list of item paths to use as starting points for the translation. We will translate these
     /// items and any items they refer to, according to the opacity rules. When absent, we start
     /// from the path `crate` (which translates the whole crate).
-    #[clap(long = "start-from")]
+    #[clap(long = "start-from", value_delimiter = ',')]
     #[serde(default)]
     pub start_from: Vec<String>,
     /// Do not run cargo; instead, run the driver directly.
@@ -266,16 +266,20 @@ pub struct CliOpts {
     #[clap(long = "preset")]
     #[arg(value_enum)]
     pub preset: Option<Preset>,
+
+    #[clap(
+        long = "desugar-drops",
+        help = "If activated, transform `Drop(p)` to `Call drop_in_place(&raw mut p)`"
+    )]
+    #[serde(default)]
+    pub desugar_drops: bool,
 }
 
 /// The MIR stage to use. This is only relevant for the current crate: for dependencies, only mir
 /// optimized is available (or mir elaborated for consts).
-#[derive(
-    Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Serialize, Deserialize,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Serialize, Deserialize)]
 pub enum MirLevel {
     /// The MIR just after MIR lowering.
-    #[default]
     Built,
     /// The MIR after const promotion. This is the MIR used by the borrow-checker.
     Promoted,
@@ -475,6 +479,8 @@ pub struct TranslateOptions {
     pub item_opacities: Vec<(NamePattern, ItemOpacity)>,
     /// List of traits for which we transform associated types to type parameters.
     pub remove_associated_types: Vec<NamePattern>,
+    /// Transform Drop to Call drop_in_place
+    pub desugar_drops: bool,
 }
 
 impl TranslateOptions {
@@ -493,10 +499,8 @@ impl TranslateOptions {
 
         let mir_level = if options.mir_optimized {
             MirLevel::Optimized
-        } else if options.mir_promoted {
-            MirLevel::Promoted
         } else {
-            options.mir.unwrap_or_default()
+            options.mir.unwrap_or(MirLevel::Promoted)
         };
 
         let item_opacities = {
@@ -558,6 +562,7 @@ impl TranslateOptions {
             raw_boxes: options.raw_boxes,
             remove_associated_types,
             translate_all_methods: options.translate_all_methods,
+            desugar_drops: options.desugar_drops,
         }
     }
 

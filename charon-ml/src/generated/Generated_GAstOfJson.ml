@@ -365,6 +365,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
           ("no_ops_to_function_calls", no_ops_to_function_calls);
           ("raw_boxes", raw_boxes);
           ("preset", preset);
+          ("desugar_drops", desugar_drops);
         ] ->
         let* ullbc = bool_of_json ctx ullbc in
         let* lib = bool_of_json ctx lib in
@@ -414,6 +415,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
         in
         let* raw_boxes = bool_of_json ctx raw_boxes in
         let* preset = option_of_json preset_of_json ctx preset in
+        let* desugar_drops = bool_of_json ctx desugar_drops in
         Ok
           ({
              ullbc;
@@ -456,6 +458,7 @@ and cli_options_of_json (ctx : of_json_ctx) (js : json) :
              no_ops_to_function_calls;
              raw_boxes;
              preset;
+             desugar_drops;
            }
             : cli_options)
     | _ -> Error "")
@@ -667,6 +670,15 @@ and dyn_predicate_of_json (ctx : of_json_ctx) (js : json) :
     | `Assoc [ ("binder", binder) ] ->
         let* binder = binder_of_json ty_of_json ctx binder in
         Ok ({ binder } : dyn_predicate)
+    | _ -> Error "")
+
+and error_of_json (ctx : of_json_ctx) (js : json) : (error, string) result =
+  combine_error_msgs js __FUNCTION__
+    (match js with
+    | `Assoc [ ("span", span); ("msg", msg) ] ->
+        let* span = span_of_json ctx span in
+        let* msg = string_of_json ctx msg in
+        Ok ({ span; msg } : error)
     | _ -> Error "")
 
 and field_of_json (ctx : of_json_ctx) (js : json) : (field, string) result =

@@ -215,9 +215,21 @@ impl<C: AstFormatter> FmtWithCtx<C> for ullbc::BlockData {
 
 impl<C: AstFormatter> FmtWithCtx<C> for gast::Body {
     fn fmt_with_ctx(&self, ctx: &C, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let tab = ctx.indent();
+        write!(f, "\n{tab}")?;
         match self {
-            Body::Unstructured(b) => write!(f, "{}", b.with_ctx(ctx)),
-            Body::Structured(b) => write!(f, "{}", b.with_ctx(ctx)),
+            Body::Unstructured(body) => {
+                let body = body.with_ctx(ctx);
+                write!(f, "{{\n{body}{tab}}}")
+            }
+            Body::Structured(body) => {
+                let body = body.with_ctx(ctx);
+                write!(f, "{{\n{body}{tab}}}")
+            }
+            Body::TraitMethodWithoutDefault => write!(f, "= <method_without_default_body>"),
+            Body::Opaque => write!(f, "= <opaque>"),
+            Body::Missing => write!(f, "= <missing>"),
+            Body::Error(error) => write!(f, "= error(\"{}\")", error.msg),
         }
     }
 }
@@ -467,16 +479,7 @@ impl<C: AstFormatter> FmtWithCtx<C> for FunDecl {
             write!(f, " -> {}", self.signature.output.with_ctx(ctx))?;
         };
         write!(f, "{preds}")?;
-
-        // Body
-        match &self.body {
-            Ok(body) => {
-                let tab = ctx.indent();
-                let body = body.with_ctx(ctx);
-                write!(f, "\n{tab}{{\n{body}{tab}}}")?;
-            }
-            Err(Opaque) => {}
-        }
+        write!(f, "{}", self.body.with_ctx(ctx))?;
 
         Ok(())
     }
@@ -1407,14 +1410,6 @@ impl<C: AstFormatter> FmtWithCtx<C> for ullbc::Statement {
             StatementKind::Deinit(place) => {
                 write!(f, "{tab}deinit({})", place.with_ctx(ctx))
             }
-            StatementKind::Drop(place, tref) => {
-                write!(
-                    f,
-                    "{tab}drop[{}] {}",
-                    tref.with_ctx(ctx),
-                    place.with_ctx(ctx),
-                )
-            }
             StatementKind::Assert(assert) => write!(f, "{tab}{}", assert.with_ctx(ctx)),
             StatementKind::Nop => write!(f, "{tab}nop"),
             StatementKind::Error(s) => write!(f, "{tab}@Error({})", s),
@@ -1582,6 +1577,19 @@ impl<C: AstFormatter> FmtWithCtx<C> for Terminator {
             } => {
                 let call = call.with_ctx(ctx);
                 write!(f, "{call} -> bb{target} (unwind: bb{on_unwind})",)
+            }
+            TerminatorKind::Drop {
+                place,
+                tref,
+                target,
+                on_unwind,
+            } => {
+                write!(
+                    f,
+                    "drop[{}] {} -> bb{target} (unwind: bb{on_unwind})",
+                    tref.with_ctx(ctx),
+                    place.with_ctx(ctx),
+                )
             }
             TerminatorKind::Abort(kind) => write!(f, "{}", kind.with_ctx(ctx)),
             TerminatorKind::Return => write!(f, "return"),

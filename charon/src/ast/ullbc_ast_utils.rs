@@ -42,6 +42,16 @@ impl Terminator {
     pub fn goto(span: Span, target: BlockId) -> Self {
         Self::new(span, TerminatorKind::Goto { target })
     }
+    /// Whether this terminator is an unconditional error (panic).
+    pub fn is_error(&self) -> bool {
+        use TerminatorKind::*;
+        match &self.kind {
+            Abort(..) => true,
+            Goto { .. } | Switch { .. } | Return | Call { .. } | Drop { .. } | UnwindResume => {
+                false
+            }
+        }
+    }
 
     pub fn into_block(self) -> BlockData {
         BlockData {
@@ -67,10 +77,26 @@ impl BlockData {
             }
             TerminatorKind::Switch { targets, .. } => targets.get_targets(),
             TerminatorKind::Call {
-                call: _,
-                target,
-                on_unwind,
+                target, on_unwind, ..
+            }
+            | TerminatorKind::Drop {
+                target, on_unwind, ..
             } => vec![*target, *on_unwind],
+            TerminatorKind::Abort(..) | TerminatorKind::Return | TerminatorKind::UnwindResume => {
+                vec![]
+            }
+        }
+    }
+
+    pub fn targets_ignoring_unwind(&self) -> Vec<BlockId> {
+        match &self.terminator.kind {
+            TerminatorKind::Goto { target } => {
+                vec![*target]
+            }
+            TerminatorKind::Switch { targets, .. } => targets.get_targets(),
+            TerminatorKind::Call { target, .. } | TerminatorKind::Drop { target, .. } => {
+                vec![*target]
+            }
             TerminatorKind::Abort(..) | TerminatorKind::Return | TerminatorKind::UnwindResume => {
                 vec![]
             }
@@ -291,6 +317,21 @@ impl BodyBuilder {
         let term = TerminatorKind::Call {
             target: next_block,
             call,
+            on_unwind: self.unwind_block(),
+        };
+        self.current_block().terminator.kind = term;
+        self.current_block = next_block;
+    }
+
+    pub fn insert_drop(&mut self, place: Place, tref: TraitRef) {
+        let next_block = self
+            .body
+            .body
+            .push(mk_block(self.span, TerminatorKind::Return));
+        let term = TerminatorKind::Drop {
+            place: place,
+            tref: tref,
+            target: next_block,
             on_unwind: self.unwind_block(),
         };
         self.current_block().terminator.kind = term;

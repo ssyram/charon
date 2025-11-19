@@ -78,6 +78,8 @@ pub enum TransItemSourceKind {
     /// this takes a `Ptr<dyn Trait>` and forwards to the method. The `DefId` refers to the method
     /// implementation.
     VTableMethod,
+    /// The drop shim function to be used in the vtable as a field, the ID is an `impl`.
+    VTableDropShim,
 }
 
 /// The kind of a [`TransItemSourceKind::TraitImpl`].
@@ -292,7 +294,8 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
                     | ClosureAsFnCast
                     | DropInPlaceMethod(..)
                     | VTableInstanceInitializer(..)
-                    | VTableMethod => ItemId::Fun(self.translated.fun_decls.reserve_slot()),
+                    | VTableMethod
+                    | VTableDropShim => ItemId::Fun(self.translated.fun_decls.reserve_slot()),
                     InherentImpl | Module => return None,
                 };
                 // Add the id to the queue of declarations to translate
@@ -420,13 +423,19 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
     ) -> Result<T, Error> {
         let id: ItemId = self.register_item_maybe_enqueue(span, enqueue, item, kind);
         let generics = if self.monomorphize() {
-            Ok(GenericArgs::empty())
+            GenericArgs::empty()
         } else {
-            self.translate_generic_args(span, &item.generic_args, &item.impl_exprs)
-        }?;
+            self.translate_generic_args(span, &item.generic_args, &item.impl_exprs)?
+        };
+        let trait_ref = item
+            .in_trait
+            .as_ref()
+            .map(|impl_expr| self.translate_trait_impl_expr(span, impl_expr))
+            .transpose()?;
         let item = DeclRef {
             id,
             generics: Box::new(generics),
+            trait_ref,
         };
         Ok(item.try_into().ok().unwrap())
     }
@@ -489,6 +498,7 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
                 Ok(MaybeBuiltinFunDeclRef {
                     id: FunId::Builtin(id),
                     generics: Box::new(generics),
+                    trait_ref: None,
                 })
             }
             None => self.translate_item(span, item, kind),
@@ -513,12 +523,11 @@ impl<'tcx, 'ctx> ItemTransCtx<'tcx, 'ctx> {
         };
         let bound_generics =
             self.append_late_bound_to_generics(span, *fun_item.generics, late_bound)?;
-        let fun_id = match &item.in_trait {
+        let fun_id = match fun_item.trait_ref {
             // Direct function call
             None => FnPtrKind::Fun(fun_item.id),
             // Trait method
-            Some(impl_expr) => {
-                let trait_ref = self.translate_trait_impl_expr(span, impl_expr)?;
+            Some(trait_ref) => {
                 let name = self.t_ctx.translate_trait_item_name(&item.def_id)?;
                 let method_decl_id = *fun_item
                     .id
