@@ -28,6 +28,9 @@ tests = testGroup "Deserialization Tests"
       [ testCase "Find test LLBC files" test_find_llbc_files
       -- Note: The comprehensive LLBC tests will be added dynamically below
       ]
+  , testGroup "ULLBC File Deserialization"
+      [ testCase "Parse ULLBC file with Drop terminator" test_ullbc_drop_file
+      ]
   ]
 
 -- Test parsing basic types from JSON
@@ -62,6 +65,31 @@ test_uIntTy_parse = do
   case result of
     Left err -> assertFailure $ "Failed to parse UIntTy: " ++ err
     Right uIntTy -> assertEqual "UIntTy value" U8 uIntTy
+
+-- Test parsing a ULLBC file with Drop terminator
+-- This test should FAIL with the current generated code because Drop is in StatementKind, not TerminatorKind
+test_ullbc_drop_file :: Assertion
+test_ullbc_drop_file = do
+  let testFile = "test/data/test_ullbc_drop.ullbc"
+  fileExists <- doesFileExist testFile
+  when (not fileExists) $ do
+    assertFailure $ "ULLBC test file not found: " ++ testFile ++ 
+                   ". This file should be generated during repository setup. " ++
+                   "Run: cd ../charon && cargo run --release --bin charon -- rustc --ullbc --dest-file ../charon-hs/test/data/test_ullbc_drop.ullbc -- ../charon-hs/test/data/test_ullbc_drop.rs --crate-name=test_crate --crate-type=rlib"
+  
+  result <- eitherDecodeFileStrict testFile :: IO (Either String LlbcFile)
+  case result of
+    Left err -> assertFailure $ "Failed to deserialize ULLBC file: " ++ err ++ 
+                                "\nThis failure indicates that the generated Haskell AST is out of sync with the Rust definitions. " ++
+                                "Run 'make generate-hs' to regenerate the Haskell AST."
+    Right file -> do
+      let crate = llbcfileTranslated file
+      let funDeclCount = length (translatedCrateFun_decls crate)
+      -- Force evaluation of all function declarations to ensure Drop parsing is triggered
+      let allFunDecls = translatedCrateFun_decls crate
+      -- This will force parsing of the function bodies which contain the Drop terminators
+      let _ = show allFunDecls
+      assertBool ("Successfully deserialized ULLBC file with " ++ show funDeclCount ++ " function declarations") True
 
 -- Test that we can find LLBC files (optional - files not checked in)
 test_find_llbc_files :: Assertion
