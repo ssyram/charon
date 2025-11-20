@@ -4,6 +4,7 @@ module Generated_Krate where
 
 import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import Data.Text (Text)
+import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import qualified Generated_Meta as M
 import qualified Generated_Types as T
@@ -14,7 +15,7 @@ import qualified Generated_LlbcAst as L
 import qualified Generated_UllbcAst as U
 
 -- | The body of a function.
-data Body = Unstructured ((G.GexprBody (M.Vector T.BlockId U.Block)))
+data Body = Unstructured ((G.GexprBody (M.Vector U.BlockId U.Block)))
   | Structured ((G.GexprBody L.Block))
   | TraitMethodWithoutDefault
   | Opaque
@@ -29,7 +30,7 @@ data FunDecl = FunDecl
   fundeclItemMeta :: T.ItemMeta
   ,   -- | The signature contains the inputs/output types *with* non-erased regions.
   -- | It also contains the list of region and type parameters.
-  fundeclSignature :: T.FunSig
+  fundeclSignature :: G.FunSig
   ,   -- | The function kind: "regular" function, trait method declaration, etc.
   fundeclSrc :: T.ItemSource
   ,   -- | Whether this function is in fact the body of a constant/static that we turned into an
@@ -49,18 +50,18 @@ data TranslatedCrate = TranslatedCrate
   ,   -- | The options used when calling Charon. It is useful for the applications
   -- | which consumed the serialized code, to check that Charon was called with
   -- | the proper options.
-  translatedcrateOptions :: CliOptions
+  translatedcrateOptions :: G.CliOptions
   ,   -- | Information about the target platform for which rustc is called on for the crate.
   translatedcrateTargetInformation :: G.TargetInfo
   ,   -- | The names of all registered items. Available so we can know the names even of items that
   -- | failed to translate.
   -- | Invariant: after translation, any existing `ItemId` must have an associated name, even
   -- | if the corresponding item wasn't translated.
-  translatedcrateItemNames :: [M.KVPair T.ItemId Name]
+  translatedcrateItemNames :: [M.KVPair T.ItemId T.Name]
   ,   -- | Short names, for items whose last PathElem is unique.
-  translatedcrateShortNames :: [M.KVPair T.ItemId Name]
+  translatedcrateShortNames :: [M.KVPair T.ItemId T.Name]
   ,   -- | The translated files.
-  translatedcrateFiles :: (M.Vector T.FileId M.File)
+  translatedcrateFiles :: (M.Vector M.FileId M.File)
   ,   -- | The translated type definitions
   translatedcrateTypeDecls :: (M.Vector T.TypeDeclId T.TypeDecl)
   ,   -- | The translated function definitions

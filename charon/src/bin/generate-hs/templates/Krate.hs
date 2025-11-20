@@ -4,6 +4,7 @@ module Generated_Krate where
 
 import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import Data.Text (Text)
+import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import qualified Generated_Meta as M
 import qualified Generated_Types as T

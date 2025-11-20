@@ -250,12 +250,24 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule,
                             // Type is from another module, determine which one and add prefix
                             // Special handling for ID types and basic types that are in Types module
                             // even though they come from gast/meta Rust modules (following ML pattern)
-                            let type_module = if ty_name == "LocalId" {
+                            let type_module = if ty_name == "FileId" {
+                                // FileId is in Meta module  
+                                TargetModule::Meta
+                            } else if ty_name == "LocalId" {
                                 // LocalId is in Expressions module (following ML)
                                 TargetModule::Expressions
+                            } else if ty_name == "BlockId" {
+                                // BlockId is in UllbcAst module
+                                TargetModule::UllbcAst
                             } else if ty_name == "Error" {
                                 // Error is in GAst module (following ML)
                                 TargetModule::GAst
+                            } else if ty_name == "FunSig" || ty_name == "CliOptions" || ty_name == "GlobalDecl" || ty_name == "TraitDecl" || ty_name == "TraitImpl" {
+                                // These are in GAst module
+                                TargetModule::GAst
+                            } else if ty_name == "Name" {
+                                // Name is in Types module
+                                TargetModule::Types
                             } else if ty_name.ends_with("Id") || 
                                                ty_name == "TraitItemName" ||
                                                ty_name == "FnPtr" ||
