@@ -49,7 +49,7 @@ test_fileId_parse = do
 
 test_intTy_parse :: Assertion
 test_intTy_parse = do
-  let json = BS8.pack "\"T.I32\""
+  let json = BS8.pack "\"I32\""
   let result = eitherDecodeStrict json :: Either String IntTy
   case result of
     Left err -> assertFailure $ "Failed to parse IntTy: " ++ err
@@ -61,7 +61,7 @@ test_floatType_parse = do
   let result = eitherDecodeStrict json :: Either String FloatType
   case result of
     Left err -> assertFailure $ "Failed to parse FloatType: " ++ err
-    Right floatType -> assertEqual "FloatType value" F64 floatType
+    Right floatType -> assertEqual "FloatType value" T.F64 floatType
 
 test_uIntTy_parse :: Assertion
 test_uIntTy_parse = do
@@ -69,7 +69,7 @@ test_uIntTy_parse = do
   let result = eitherDecodeStrict json :: Either String UIntTy
   case result of
     Left err -> assertFailure $ "Failed to parse UIntTy: " ++ err
-    Right uIntTy -> assertEqual "UIntTy value" U8 uIntTy
+    Right uIntTy -> assertEqual "UIntTy value" T.U8 uIntTy
 
 -- Test that we can find LLBC files (optional - files not checked in)
 test_find_llbc_files :: Assertion
