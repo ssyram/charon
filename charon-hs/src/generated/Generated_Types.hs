@@ -9,17 +9,28 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_Types where
 
-import Data.Aeson
+import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
+import Data.Aeson.Types (Parser)
 import Data.Text (Text)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta
-import Generated_Values
+import qualified Generated_Meta as M
+import qualified Generated_Values as Val
+
+-- Re-export commonly used types for convenience
+type Vector = M.Vector
+
+-- Re-export parseIntegerValue helper from Meta
+parseIntegerValue :: Value -> Parser Integer
+parseIntegerValue = M.parseIntegerValue
 
 -- Manually defined type aliases and newtypes
 -- TraitTypeConstraintId is a newtype wrapper around Int
 newtype TraitTypeConstraintId = TraitTypeConstraintId { traittypeconstraintidRaw :: Int }
   deriving (Show, Eq, Ord)
+
+instance FromJSON TraitTypeConstraintId where
+  parseJSON v = TraitTypeConstraintId <$> parseJSON v
 
 -- | (U)LLBC is a language with side-effects: a statement may abort in a way that isn't tracked by
 -- | control-flow. The two kinds of abort are:
@@ -229,8 +240,8 @@ data DynPredicate = DynPredicate
   deriving (Show, Eq, Ord)
 
 data Field = Field
-  { fieldSpan :: Span
-  , fieldAttrInfo :: AttrInfo
+  { fieldSpan :: M.Span
+  , fieldAttrInfo :: M.AttrInfo
   , fieldFieldName :: Maybe String
   , fieldFieldTy :: Ty
   }
@@ -238,6 +249,21 @@ data Field = Field
 
 data FieldId = FieldId
   { fieldidRaw :: Int
+  }
+  deriving (Show, Eq, Ord)
+
+data FloatType = F16
+  | F32
+  | F64
+  | F128
+  deriving (Show, Eq, Ord)
+
+-- | This is simlar to the Scalar value above. However, instead of storing
+-- | the float value itself, we store its String representation. This allows
+-- | to derive the Eq and Ord traits, which are not implemented for floats
+data FloatValue = FloatValue
+  { floatvalueFloatValue :: String
+  , floatvalueFloatTy :: FloatType
   }
   deriving (Show, Eq, Ord)
 
@@ -271,10 +297,10 @@ data FunId = FRegular FunDeclId
 
 -- | A set of generic arguments.
 data GenericArgs = GenericArgs
-  { genericargsRegions :: (Vector RegionId Region)
-  , genericargsTypes :: (Vector TypeVarId Ty)
-  , genericargsConstGenerics :: (Vector ConstGenericVarId ConstGeneric)
-  , genericargsTraitRefs :: (Vector TraitClauseId TraitRef)
+  { genericargsRegions :: (M.Vector RegionId Region)
+  , genericargsTypes :: (M.Vector TypeVarId Ty)
+  , genericargsConstGenerics :: (M.Vector ConstGenericVarId ConstGeneric)
+  , genericargsTraitRefs :: (M.Vector TraitClauseId TraitRef)
   }
   deriving (Show, Eq, Ord)
 
@@ -286,16 +312,16 @@ data GenericArgs = GenericArgs
 -- | trait clauses, because those enforce constraints but do not need to
 -- | be filled with witnesses/instances.
 data GenericParams = GenericParams
-  { genericparamsRegions :: (Vector RegionId RegionParam)
-  , genericparamsTypes :: (Vector TypeVarId TypeParam)
-  , genericparamsConstGenerics :: (Vector ConstGenericVarId ConstGenericParam)
-  , genericparamsTraitClauses :: (Vector TraitClauseId TraitParam)
+  { genericparamsRegions :: (M.Vector RegionId RegionParam)
+  , genericparamsTypes :: (M.Vector TypeVarId TypeParam)
+  , genericparamsConstGenerics :: (M.Vector ConstGenericVarId ConstGenericParam)
+  , genericparamsTraitClauses :: (M.Vector TraitClauseId TraitParam)
   ,   -- | The first region in the pair outlives the second region
   genericparamsRegionsOutlive :: [(RegionBinder (OutlivesPred Region Region))]
   ,   -- | The type outlives the region
   genericparamsTypesOutlive :: [(RegionBinder (OutlivesPred Ty Region))]
   ,   -- | Constraints over trait associated types
-  genericparamsTraitTypeConstraints :: (Vector TraitTypeConstraintId (RegionBinder TraitTypeConstraint))
+  genericparamsTraitTypeConstraints :: (M.Vector TraitTypeConstraintId (RegionBinder TraitTypeConstraint))
   }
   deriving (Show, Eq, Ord)
 
@@ -325,6 +351,18 @@ data ImplElem = ImplElemTy ((Binder Ty))
   | ImplElemTrait TraitImplId
   deriving (Show, Eq, Ord)
 
+data IntTy = Isize
+  | I8
+  | I16
+  | I32
+  | I64
+  | I128
+  deriving (Show, Eq, Ord)
+
+data IntegerType = Signed IntTy
+  | Unsigned UIntTy
+  deriving (Show, Eq, Ord)
+
 -- | The id of a translated item.
 data ItemId = IdType TypeDeclId
   | IdFun FunDeclId
@@ -336,11 +374,11 @@ data ItemId = IdType TypeDeclId
 -- | Meta information about an item (function, trait decl, trait impl, type decl, global).
 data ItemMeta = ItemMeta
   { itemmetaName :: Name
-  , itemmetaSpan :: Span
+  , itemmetaSpan :: M.Span
   ,   -- | The source code that corresponds to this item.
   itemmetaSourceText :: Maybe String
   ,   -- | Attributes and visibility.
-  itemmetaAttrInfo :: AttrInfo
+  itemmetaAttrInfo :: M.AttrInfo
   ,   -- | `true` if the type decl is a local type decl, `false` if it comes from an external crate.
   itemmetaIsLocal :: Bool
   ,   -- | If the item is built-in, record its internal builtin identifier.
@@ -396,8 +434,27 @@ data Layout = Layout
   layoutUninhabited :: Bool
   ,   -- | Map from `VariantId` to the corresponding field layouts. Structs are modeled as having
   -- | exactly one variant, unions as having no variant.
-  layoutVariantLayouts :: (Vector VariantId VariantLayout)
+  layoutVariantLayouts :: (M.Vector VariantId VariantLayout)
   }
+  deriving (Show, Eq, Ord)
+
+-- | A primitive value.
+-- | 
+-- | Those are for instance used for the constant operands [crate::expressions::Operand::Const]
+data Literal = VScalar ScalarValue
+  | VFloat FloatValue
+  | VBool Bool
+  | VChar Char
+  | VByteStr [Int]
+  | VStr String
+  deriving (Show, Eq, Ord)
+
+-- | Types of primitive values. Either an integer, bool, char
+data LiteralType = TInt IntTy
+  | TuInt UIntTy
+  | TFloat FloatType
+  | TBool
+  | TChar
   deriving (Show, Eq, Ord)
 
 -- | An item name/path
@@ -472,7 +529,7 @@ data Region = RVar ((DeBruijnVar RegionId))
 -- | issues in the derived ocaml visitors.
 -- | TODO: merge with `binder`
 data RegionBinder a0 = RegionBinder
-  { regionbinderBinderRegions :: (Vector RegionId RegionParam)
+  { regionbinderBinderRegions :: (M.Vector RegionId RegionParam)
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
   regionbinderBinderValue :: a0
@@ -511,6 +568,11 @@ data ReprOptions = ReprOptions
   , reproptionsTransparent :: Bool
   , reproptionsExplicitDiscrType :: Bool
   }
+  deriving (Show, Eq, Ord)
+
+-- | A scalar value.
+data ScalarValue = UnsignedScalar UIntTy Integer
+  | SignedScalar IntTy Integer
   deriving (Show, Eq, Ord)
 
 -- | Describes how we represent the active enum variant in memory.
@@ -568,7 +630,7 @@ data TraitItemName = TraitItemName Text
 data TraitParam = TraitParam
   {   -- | Index identifying the clause among other clauses bound at the same level.
   traitparamClauseId :: TraitClauseId
-  , traitparamSpan :: Maybe Span
+  , traitparamSpan :: Maybe M.Span
   ,   -- | The trait that is implemented.
   traitparamTrait :: (RegionBinder TraitDeclRef)
   }
@@ -594,7 +656,7 @@ data TraitRefKind = TraitImpl TraitImplRef
   | ParentClause TraitRef TraitClauseId
   | ItemClause TraitRef TraitItemName TraitClauseId
   | Self
-  | BuiltinOrAuto BuiltinImplData ((Vector TraitClauseId TraitRef)) ([(TraitItemName, TraitAssocTyImpl)])
+  | BuiltinOrAuto BuiltinImplData ((M.Vector TraitClauseId TraitRef)) ([(TraitItemName, TraitAssocTyImpl)])
   | Dyn
   | UnknownTrait String
   deriving (Show, Eq, Ord)
@@ -665,9 +727,9 @@ data TypeDeclId = TypeDeclId
   }
   deriving (Show, Eq, Ord)
 
-data TypeDeclKind = Struct ((Vector FieldId Field))
-  | Enum ((Vector VariantId Variant))
-  | Union ((Vector FieldId Field))
+data TypeDeclKind = Struct ((M.Vector FieldId Field))
+  | Enum ((M.Vector VariantId Variant))
+  | Union ((M.Vector FieldId Field))
   | Opaque
   | Alias Ty
   | TDeclError String
@@ -702,11 +764,19 @@ data TypeVarId = TypeVarId
   }
   deriving (Show, Eq, Ord)
 
+data UIntTy = Usize
+  | U8
+  | U16
+  | U32
+  | U64
+  | U128
+  deriving (Show, Eq, Ord)
+
 data Variant = Variant
-  { variantSpan :: Span
-  , variantAttrInfo :: AttrInfo
+  { variantSpan :: M.Span
+  , variantAttrInfo :: M.AttrInfo
   , variantVariantName :: String
-  , variantFields :: (Vector FieldId Field)
+  , variantFields :: (M.Vector FieldId Field)
   ,   -- | The discriminant value outputted by `std::mem::discriminant` for this variant.
   -- | This can be different than the discriminant stored in memory (called `tag`).
   -- | That one is described by [`DiscriminantLayout`] and [`TagEncoding`].
@@ -724,7 +794,7 @@ data VariantId = VariantId
 -- | Maps fields to their offset within the layout.
 data VariantLayout = VariantLayout
   {   -- | The offset of each field.
-  variantlayoutFieldOffsets :: (Vector FieldId Int)
+  variantlayoutFieldOffsets :: (M.Vector FieldId Int)
   ,   -- | Whether the variant is uninhabited, i.e. has any valid possible value.
   -- | Note that uninhabited types can have arbitrary layouts.
   variantlayoutUninhabited :: Bool
@@ -930,6 +1000,22 @@ instance FromJSON FieldId where
   parseJSON = fmap FieldId . parseJSON
 
 
+instance FromJSON FloatType where
+  parseJSON v = case v of
+    String "F16" -> pure F16
+    String "F32" -> pure F32
+    String "F64" -> pure F64
+    String "F128" -> pure F128
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON FloatValue where
+  parseJSON = withObject "FloatValue" $ \o -> do
+    floatvalueFloatValue <- o .: "value"
+    floatvalueFloatTy <- o .: "ty"
+    pure (FloatValue floatvalueFloatValue floatvalueFloatTy)
+
+
 instance FromJSON FnPtr where
   parseJSON = withObject "FnPtr" $ \o -> do
     fnptrKind <- o .: "kind"
@@ -1016,6 +1102,28 @@ instance FromJSON ImplElem where
     _ -> fail "Unknown variant"
 
 
+instance FromJSON IntTy where
+  parseJSON v = case v of
+    String "Isize" -> pure Isize
+    String "I8" -> pure I8
+    String "I16" -> pure I16
+    String "I32" -> pure I32
+    String "I64" -> pure I64
+    String "I128" -> pure I128
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON IntegerType where
+  parseJSON v = case v of
+    Object o | H.lookup "Signed" o /= Nothing -> do
+      v <- o .: "Signed"
+      Signed <$> parseJSON v
+    Object o | H.lookup "Unsigned" o /= Nothing -> do
+      v <- o .: "Unsigned"
+      Unsigned <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
 instance FromJSON ItemId where
   parseJSON v = case v of
     Object o | H.lookup "Type" o /= Nothing -> do
@@ -1087,6 +1195,45 @@ instance FromJSON Layout where
     layoutUninhabited <- o .: "uninhabited"
     layoutVariantLayouts <- o .: "variant_layouts"
     pure (Layout layoutSize layoutAlign layoutDiscriminantLayout layoutUninhabited layoutVariantLayouts)
+
+
+instance FromJSON Literal where
+  parseJSON v = case v of
+    Object o | H.lookup "Scalar" o /= Nothing -> do
+      v <- o .: "Scalar"
+      VScalar <$> parseJSON v
+    Object o | H.lookup "Float" o /= Nothing -> do
+      v <- o .: "Float"
+      VFloat <$> parseJSON v
+    Object o | H.lookup "Bool" o /= Nothing -> do
+      v <- o .: "Bool"
+      VBool <$> parseJSON v
+    Object o | H.lookup "Char" o /= Nothing -> do
+      v <- o .: "Char"
+      VChar <$> parseJSON v
+    Object o | H.lookup "ByteStr" o /= Nothing -> do
+      v <- o .: "ByteStr"
+      VByteStr <$> parseJSON v
+    Object o | H.lookup "Str" o /= Nothing -> do
+      v <- o .: "Str"
+      VStr <$> parseJSON v
+    _ -> fail "Unknown variant"
+
+
+instance FromJSON LiteralType where
+  parseJSON v = case v of
+    Object o | H.lookup "Int" o /= Nothing -> do
+      v <- o .: "Int"
+      TInt <$> parseJSON v
+    Object o | H.lookup "UInt" o /= Nothing -> do
+      v <- o .: "UInt"
+      TuInt <$> parseJSON v
+    Object o | H.lookup "Float" o /= Nothing -> do
+      v <- o .: "Float"
+      TFloat <$> parseJSON v
+    String "Bool" -> pure TBool
+    String "Char" -> pure TChar
+    _ -> fail "Unknown variant"
 
 
 instance FromJSON Name where
@@ -1178,6 +1325,21 @@ instance FromJSON ReprOptions where
     reproptionsTransparent <- o .: "transparent"
     reproptionsExplicitDiscrType <- o .: "explicit_discr_type"
     pure (ReprOptions reproptionsReprAlgo reproptionsAlignModif reproptionsTransparent reproptionsExplicitDiscrType)
+
+
+instance FromJSON ScalarValue where
+  parseJSON v = case v of
+    Object o | H.lookup "Unsigned" o /= Nothing -> do
+      withArray "UnsignedScalar" (\v -> do
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseIntegerValue (v V.! 1)
+        pure (UnsignedScalar v0 v1)) =<< o .: "Unsigned"
+    Object o | H.lookup "Signed" o /= Nothing -> do
+      withArray "SignedScalar" (\v -> do
+        v0 <- parseJSON (v V.! 0)
+        v1 <- parseIntegerValue (v V.! 1)
+        pure (SignedScalar v0 v1)) =<< o .: "Signed"
+    _ -> fail "Unknown variant"
 
 
 instance FromJSON TagEncoding where
@@ -1394,6 +1556,17 @@ instance FromJSON TypeParam where
 
 instance FromJSON TypeVarId where
   parseJSON = fmap TypeVarId . parseJSON
+
+
+instance FromJSON UIntTy where
+  parseJSON v = case v of
+    String "Usize" -> pure Usize
+    String "U8" -> pure U8
+    String "U16" -> pure U16
+    String "U32" -> pure U32
+    String "U64" -> pure U64
+    String "U128" -> pure U128
+    _ -> fail "Unknown variant"
 
 
 instance FromJSON Variant where

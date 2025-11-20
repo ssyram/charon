@@ -9,16 +9,14 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_UllbcAst where
 
-import Data.Aeson
+import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta
-import Generated_Values
-import Generated_Types
-import Generated_Expressions
+import qualified Generated_Meta as M
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
+import qualified Generated_Expressions as E
 import qualified Generated_GAst as G
--- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping)
 
 data Block = Block
   { blockStatements :: [Statement]
@@ -31,10 +29,10 @@ data BlockId = BlockId
   }
   deriving (Show, Eq, Ord)
 
-type Blocks = (Vector BlockId Block)
+type Blocks = (M.Vector BlockId Block)
 
 data Statement = Statement
-  { statementSpan :: Span
+  { statementSpan :: M.Span
   , statementKind :: StatementKind
   ,   -- | Comments that precede this statement.
   statementCommentsBefore :: [String]
@@ -42,23 +40,22 @@ data Statement = Statement
   deriving (Show, Eq, Ord)
 
 -- | A raw statement: a statement without meta data.
-data StatementKind = Assign Place Rvalue
-  | SetDiscriminant Place VariantId
+data StatementKind = Assign E.Place E.Rvalue
+  | SetDiscriminant E.Place T.VariantId
   | CopyNonOverlapping G.CopyNonOverlapping
-  | StorageLive LocalId
-  | StorageDead LocalId
-  | Deinit Place
-  | Drop Place TraitRef
-  | Assert Assertion
+  | StorageLive E.LocalId
+  | StorageDead E.LocalId
+  | Deinit E.Place
+  | Assert G.Assertion
   | Nop
   deriving (Show, Eq, Ord)
 
 data Switch = If BlockId BlockId
-  | SwitchInt LiteralType ([(Literal, BlockId)]) BlockId
+  | SwitchInt T.LiteralType ([(T.Literal, BlockId)]) BlockId
   deriving (Show, Eq, Ord)
 
 data Terminator = Terminator
-  { terminatorSpan :: Span
+  { terminatorSpan :: M.Span
   , terminatorKind :: TerminatorKind
   ,   -- | Comments that precede this terminator.
   terminatorCommentsBefore :: [String]
@@ -67,9 +64,10 @@ data Terminator = Terminator
 
 -- | A raw terminator: a terminator without meta data.
 data TerminatorKind = Goto BlockId
-  | Switch Operand Switch
+  | Switch E.Operand Switch
   | Call G.Call BlockId BlockId
-  | Abort AbortKind
+  | Drop E.Place T.TraitRef BlockId BlockId
+  | Abort T.AbortKind
   | Return
   | UnwindResume
   deriving (Show, Eq, Ord)
@@ -119,11 +117,6 @@ instance FromJSON StatementKind where
     Object o | H.lookup "Deinit" o /= Nothing -> do
       v <- o .: "Deinit"
       Deinit <$> parseJSON v
-    Object o | H.lookup "Drop" o /= Nothing -> do
-      withArray "Drop" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (Drop v0 v1)) =<< o .: "Drop"
     Object o | H.lookup "Assert" o /= Nothing -> do
       v <- o .: "Assert"
       Assert <$> parseJSON v
@@ -172,6 +165,13 @@ instance FromJSON TerminatorKind where
       target <- obj .: "target"
       onUnwind <- obj .: "on_unwind"
       pure (Call call target onUnwind)
+    Object o | H.lookup "Drop" o /= Nothing -> do
+      obj <- o .: "Drop"
+      place <- obj .: "place"
+      tref <- obj .: "tref"
+      target <- obj .: "target"
+      onUnwind <- obj .: "on_unwind"
+      pure (Drop place tref target onUnwind)
     Object o | H.lookup "Abort" o /= Nothing -> do
       v <- o .: "Abort"
       Abort <$> parseJSON v

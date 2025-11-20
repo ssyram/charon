@@ -12,9 +12,17 @@ import Test.Tasty.HUnit
     ( testCase, assertBool, assertEqual, assertFailure, Assertion )
 
 -- Import generated modules
-import Generated_Meta
-import Generated_Values
-import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion; TranslatedCrate and LlbcFile are here too
+import qualified Generated_Meta as M
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
+import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
+import Generated_Krate  -- TranslatedCrate and LlbcFile are here
+
+-- Re-export commonly used types for tests
+type FileId = M.FileId
+type IntTy = T.IntTy
+type FloatType = T.FloatType
+type UIntTy = T.UIntTy
 
 tests :: TestTree
 tests = testGroup "Deserialization Tests"
@@ -37,7 +45,7 @@ test_fileId_parse = do
   let result = eitherDecodeStrict json :: Either String FileId
   case result of
     Left err -> assertFailure $ "Failed to parse FileId: " ++ err
-    Right (FileId fileIdVal) -> assertEqual "FileId value" 0 fileIdVal
+    Right (M.FileId fileIdVal) -> assertEqual "FileId value" 0 fileIdVal
 
 test_intTy_parse :: Assertion
 test_intTy_parse = do
@@ -45,7 +53,7 @@ test_intTy_parse = do
   let result = eitherDecodeStrict json :: Either String IntTy
   case result of
     Left err -> assertFailure $ "Failed to parse IntTy: " ++ err
-    Right intTy -> assertEqual "IntTy value" I32 intTy
+    Right intTy -> assertEqual "IntTy value" T.I32 intTy
 
 test_floatType_parse :: Assertion
 test_floatType_parse = do
@@ -53,7 +61,7 @@ test_floatType_parse = do
   let result = eitherDecodeStrict json :: Either String FloatType
   case result of
     Left err -> assertFailure $ "Failed to parse FloatType: " ++ err
-    Right floatType -> assertEqual "FloatType value" F64 floatType
+    Right floatType -> assertEqual "FloatType value" T.F64 floatType
 
 test_uIntTy_parse :: Assertion
 test_uIntTy_parse = do
@@ -61,7 +69,7 @@ test_uIntTy_parse = do
   let result = eitherDecodeStrict json :: Either String UIntTy
   case result of
     Left err -> assertFailure $ "Failed to parse UIntTy: " ++ err
-    Right uIntTy -> assertEqual "UIntTy value" U8 uIntTy
+    Right uIntTy -> assertEqual "UIntTy value" T.U8 uIntTy
 
 -- Test that we can find LLBC files (optional - files not checked in)
 test_find_llbc_files :: Assertion
@@ -99,17 +107,17 @@ createLlbcTest filepath = testCase filepath $ do
       let crate = llbcfileTranslated llbcFile
       -- Successfully deserialized the entire crate!
       -- We can validate that it has the expected structure
-      let typeDeclCount = length (translatedCrateType_decls crate)
-          globalDeclCount = length (translatedCrateGlobal_decls crate)
-          traitDeclCount = length (translatedCrateTrait_decls crate)
-          traitImplCount = length (translatedCrateTrait_impls crate)
+      let typeDeclCount = length (translatedcrateTypeDecls crate)
+          globalDeclCount = length (translatedcrateGlobalDecls crate)
+          traitDeclCount = length (translatedcrateTraitDecls crate)
+          traitImplCount = length (translatedcrateTraitImpls crate)
       
       -- The test passes if we successfully deserialized the TranslatedCrate
       assertBool (concat
         [ "Successfully deserialized LLBC file with charon version "
-        , llbcfileCharon_version llbcFile
+        , llbcfileCharonVersion llbcFile
         , ": crate '"
-        , translatedCrateCrate_name crate
+        , translatedcrateCrateName crate
         , "' with "
         , show typeDeclCount, " type decls, "
         , show globalDeclCount, " global decls, "

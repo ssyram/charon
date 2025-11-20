@@ -28,6 +28,7 @@ library:
     - Generated_GAst
     - Generated_LlbcAst
     - Generated_UllbcAst
+    - Generated_Krate
   dependencies:
     - base >= 4.14 && < 5
     - aeson >= 2.0
