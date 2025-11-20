@@ -9,7 +9,7 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_Values where
 
-import Data.Aeson
+import Data.Aeson (FromJSON, Value(..), parseJSON)
 import Data.Aeson.Types (Parser)
 import qualified Data.Text as T
 import qualified Data.Aeson.KeyMap as H
@@ -34,7 +34,7 @@ data FloatType = F16
 -- | to derive the Eq and Ord traits, which are not implemented for floats
 data FloatValue = FloatValue
   { floatvalueFloatValue :: String
-  , floatvalueFloatTy :: FloatType
+  , floatvalueFloatTy :: T.FloatType
   }
   deriving (Show, Eq, Ord)
 
@@ -46,8 +46,8 @@ data IntTy = Isize
   | I128
   deriving (Show, Eq, Ord)
 
-data IntegerType = Signed IntTy
-  | Unsigned UIntTy
+data IntegerType = Signed T.IntTy
+  | Unsigned T.UIntTy
   deriving (Show, Eq, Ord)
 
 -- | A primitive value.
@@ -62,16 +62,16 @@ data Literal = VScalar ScalarValue
   deriving (Show, Eq, Ord)
 
 -- | Types of primitive values. Either an integer, bool, char
-data LiteralType = TInt IntTy
-  | TuInt UIntTy
-  | TFloat FloatType
+data LiteralType = TInt T.IntTy
+  | TuInt T.UIntTy
+  | TFloat T.FloatType
   | TBool
   | TChar
   deriving (Show, Eq, Ord)
 
 -- | A scalar value.
-data ScalarValue = UnsignedScalar UIntTy Integer
-  | SignedScalar IntTy Integer
+data ScalarValue = UnsignedScalar T.UIntTy Integer
+  | SignedScalar T.IntTy Integer
   deriving (Show, Eq, Ord)
 
 data UIntTy = Usize

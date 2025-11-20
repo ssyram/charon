@@ -238,55 +238,65 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule)
                         let ty_name = type_name_to_haskell_ident(&tdecl.item_meta);
                         let full_name = repr_name(ctx.crate_data, &tdecl.item_meta.name);
                         
-                        // Qualify types based on their module to avoid conflicts
-                        // Only qualify when generating for GAst module
-                        if target_module == TargetModule::GAst {
-                            if full_name.contains("::llbc_ast::") {
-                                // Type is from LLBC module, qualify with L.
-                                format!("L.{}", ty_name)
-                            } else if full_name.contains("::ullbc_ast::") {
-                                // Type is from ULLBC module, qualify with U.
-                                format!("U.{}", ty_name)
-                            } else if full_name.contains("::errors::") || ty_name == "Error" {
-                                // Error type from errors module needs M. qualification to avoid conflict with variant
-                                format!("M.{}", ty_name)
-                            } else if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
-                                // Qualify GAst types that conflict with Llbc/Ullbc variant constructors
-                                format!("G.{}", ty_name)
-                            } else {
-                                ty_name
-                            }
+                        // Determine which module this type belongs to and qualify appropriately
+                        // Since all imports are now qualified, we need to add module prefixes
+                        // BUT: Don't qualify types that are local to the module being generated
+                        
+                        let type_module = if full_name.contains("::meta::") || full_name.contains("::errors::") {
+                            TargetModule::Meta
+                        } else if full_name.contains("::types::") {
+                            TargetModule::Types
+                        } else if full_name.contains("::values::") {
+                            TargetModule::Values
+                        } else if full_name.contains("::expressions::") {
+                            TargetModule::Expressions
+                        } else if full_name.contains("::llbc_ast::") {
+                            TargetModule::LlbcAst
+                        } else if full_name.contains("::ullbc_ast::") {
+                            TargetModule::UllbcAst
+                        } else if full_name.contains("::gast::") || full_name.contains("::krate::") {
+                            TargetModule::GAst
                         } else {
-                            // For non-GAst modules, don't qualify llbc/ullbc types
-                            // But still qualify Error to avoid conflicts
-                            if full_name.contains("::errors::") || ty_name == "Error" {
-                                format!("M.{}", ty_name)
-                            } else if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
-                                format!("G.{}", ty_name)
-                            } else {
-                                ty_name
+                            // Default - can't determine, assume it's local
+                            target_module
+                        };
+                        
+                        // Only qualify if type is from a different module
+                        let module_prefix = if type_module == target_module {
+                            ""
+                        } else {
+                            match type_module {
+                                TargetModule::Meta => "M.",
+                                TargetModule::Values => "Val.",
+                                TargetModule::Types => "T.",
+                                TargetModule::Expressions => "E.",
+                                TargetModule::GAst => "G.",
+                                TargetModule::LlbcAst => "L.",
+                                TargetModule::UllbcAst => "U.",
                             }
-                        }
+                        };
+                        
+                        format!("{}{}", module_prefix, ty_name)
                     } else {
                         format!("MissingType{id}")
                     };
                     // Convert Rust types to Haskell equivalents
-                    if base_ty == "Vec" {
+                    if base_ty.ends_with("Vec") {
                         return format!("[{}]", args[0]);
                     }
-                    if base_ty == "Ustr" || base_ty == "String_" {
+                    if base_ty.ends_with("Ustr") || base_ty.ends_with("String_") {
                         return "Text".to_string();
                     }
-                    if base_ty == "HashMap" {
+                    if base_ty.ends_with("HashMap") {
                         // HashMap<K, V> in Rust becomes [(K, V)] in Haskell
                         // This handles the case where HashMap is serialized with HashMapToArray
                         return format!("[({}, {})]", args[0], args[1]);
                     }
-                    if base_ty == "Vector" {
-                        // Vector<K, V> in Rust becomes (Vector K V) in Haskell
-                        return format!("(Vector {} {})", args[0], args[1]);
+                    if base_ty.ends_with("Vector") || base_ty == "M.Vector" {
+                        // Vector<K, V> in Rust becomes (M.Vector K V) in Haskell
+                        return format!("(M.Vector {} {})", args[0], args[1]);
                     }
-                    if base_ty == "Option" {
+                    if base_ty.ends_with("Option") {
                         return format!("Maybe {}", args[0]);
                     }
                     if args.is_empty() {
@@ -725,6 +735,7 @@ enum GenerationKind {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum TargetModule {
     Meta,
+    Values,
     Types,
     Expressions,
     GAst,
@@ -895,8 +906,6 @@ fn generate_hs(
         "TraitTypeConstraintId",
         "Ty",
         "Vector",
-        "TargetInfo", // Manually defined in GAst.hs template
-        "Error", // Clashes with Body::Error variant constructor, manually defined in Meta module
     ];
 
     // Compute conflict sets for auto-qualification
@@ -1072,7 +1081,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Values.hs"),
         target: output_dir.join("Generated_Values.hs"),
-        target_module: TargetModule::Meta,  // Values module
+        target_module: TargetModule::Values,
         markers: vec![
             (GenerationKind::TypeDecl, values_type_decl.clone()),
             (GenerationKind::FromJson, values_type_decl),

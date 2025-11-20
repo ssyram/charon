@@ -9,11 +9,11 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_Expressions where
 
-import Data.Aeson
+import Data.Aeson (FromJSON)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Values
-import Generated_Types hiding (Field, PtrMetadata)
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
 
 -- | An aggregated ADT.
 -- | 
@@ -35,9 +35,9 @@ import Generated_Types hiding (Field, PtrMetadata)
 -- | initialization, `ls` is initialized to `⊥`, then this `⊥` is expanded to
 -- | `Cons (⊥, ⊥)` upon the first assignment, at which point we can initialize
 -- | the field 0, etc.).
-data AggregateKind = AggregatedAdt TypeDeclRef (Maybe VariantId) (Maybe FieldId)
-  | AggregatedArray Ty ConstGeneric
-  | AggregatedRawPtr Ty RefKind
+data AggregateKind = AggregatedAdt T.TypeDeclRef (Maybe T.VariantId) (Maybe T.FieldId)
+  | AggregatedArray T.Ty T.ConstGeneric
+  | AggregatedRawPtr T.Ty T.RefKind
   deriving (Show, Eq, Ord)
 
 -- | Binary operations.
@@ -73,17 +73,17 @@ data BorrowKind = BShared
 
 -- | For all the variants: the first type gives the source type, the second one gives
 -- | the destination type.
-data CastKind = CastScalar LiteralType LiteralType
-  | CastRawPtr Ty Ty
-  | CastFnPtr Ty Ty
-  | CastUnsize Ty Ty UnsizingMetadata
-  | CastTransmute Ty Ty
-  | CastConcretize Ty Ty
+data CastKind = CastScalar T.LiteralType T.LiteralType
+  | CastRawPtr T.Ty T.Ty
+  | CastFnPtr T.Ty T.Ty
+  | CastUnsize T.Ty T.Ty UnsizingMetadata
+  | CastTransmute T.Ty T.Ty
+  | CastConcretize T.Ty T.Ty
   deriving (Show, Eq, Ord)
 
 data ConstantExpr = ConstantExpr
   { constantexprKind :: ConstantExprKind
-  , constantexprTy :: Ty
+  , constantexprTy :: T.Ty
   }
   deriving (Show, Eq, Ord)
 
@@ -114,15 +114,15 @@ data ConstantExpr = ConstantExpr
 -- | Remark:
 -- | MIR seems to forbid more complex expressions like paths. For instance,
 -- | reading the constant `a.b` is translated to `{ _1 = const a; _2 = (_1.0) }`.
-data ConstantExprKind = CLiteral Literal
-  | CTraitConst TraitRef TraitItemName
-  | CVar ((DeBruijnVar ConstGenericVarId))
+data ConstantExprKind = CLiteral Val.Literal
+  | CTraitConst T.TraitRef G.TraitItemName
+  | CVar ((T.DeBruijnVar T.ConstGenericVarId))
   | CFnPtr FnPtr
   | CRawMemory [Int]
   | COpaque String
   deriving (Show, Eq, Ord)
 
-data FieldProjKind = ProjAdt TypeDeclId (Maybe VariantId)
+data FieldProjKind = ProjAdt G.TypeDeclId (Maybe T.VariantId)
   | ProjTuple Int
   deriving (Show, Eq, Ord)
 
@@ -134,7 +134,7 @@ data LocalId = LocalId
 -- | Nullary operation
 data Nullop = SizeOf
   | AlignOf
-  | OffsetOf ([(Int, FieldId)])
+  | OffsetOf ([(Int, T.FieldId)])
   | UbChecks
   deriving (Show, Eq, Ord)
 
@@ -150,13 +150,13 @@ data OverflowMode = OPanic
 
 data Place = Place
   { placeKind :: PlaceKind
-  , placeTy :: Ty
+  , placeTy :: T.Ty
   }
   deriving (Show, Eq, Ord)
 
-data PlaceKind = PlaceLocal LocalId
+data PlaceKind = PlaceLocal Val.LocalId
   | PlaceProjection Place ProjectionElem
-  | PlaceGlobal GlobalDeclRef
+  | PlaceGlobal G.GlobalDeclRef
   deriving (Show, Eq, Ord)
 
 -- | Note that we don't have the equivalent of "downcasts".
@@ -168,7 +168,7 @@ data PlaceKind = PlaceLocal LocalId
 -- | In MIR, downcasts always happen before field projections: in our internal
 -- | language, we thus merge downcasts and field projections.
 data ProjectionElem = Deref
-  | Field FieldProjKind FieldId
+  | Field FieldProjKind T.FieldId
   | PtrMetadata
   | ProjIndex Operand Bool
   | Subslice Operand Operand Bool
@@ -180,15 +180,15 @@ data ProjectionElem = Deref
 -- | TODO: we should prefix the type variants with "R" or "Rv", this would avoid collisions
 data Rvalue = Use Operand
   | RvRef Place BorrowKind Operand
-  | RawPtr Place RefKind Operand
+  | RawPtr Place T.RefKind Operand
   | BinaryOp Binop Operand Operand
   | UnaryOp Unop Operand
-  | NullaryOp Nullop Ty
+  | NullaryOp Nullop T.Ty
   | Discriminant Place
   | Aggregate AggregateKind [Operand]
-  | Len Place Ty (Maybe ConstGeneric)
-  | Repeat Operand Ty ConstGeneric
-  | ShallowInitBox Operand Ty
+  | Len Place T.Ty (Maybe T.ConstGeneric)
+  | Repeat Operand T.Ty T.ConstGeneric
+  | ShallowInitBox Operand T.Ty
   deriving (Show, Eq, Ord)
 
 -- | Unary operation
@@ -197,8 +197,8 @@ data Unop = Not
   | Cast CastKind
   deriving (Show, Eq, Ord)
 
-data UnsizingMetadata = MetaLength ConstGeneric
-  | MetaVTablePtr TraitRef
+data UnsizingMetadata = MetaLength T.ConstGeneric
+  | MetaVTablePtr T.TraitRef
   | MetaUnknown
   deriving (Show, Eq, Ord)
 

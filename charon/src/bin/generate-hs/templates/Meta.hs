@@ -15,7 +15,7 @@ comments. These comments are replaced by auto-generated definitions by running
 
 module Generated_Meta where
 
-import Data.Aeson hiding (Error)
+import Data.Aeson
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
@@ -36,18 +36,5 @@ instance FromJSON b => FromJSON (Vector a b) where
   parseJSON = fmap (Vector . catMaybes) . parseJSON
 
 {- __REPLACE0__ -}
-
--- Error type defined here to avoid name collision with Body::Error variant
-data Error = Error
-  { errorSpan :: Span
-  , errorMsg :: String
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON Error where
-  parseJSON = withObject "Error" $ \o -> do
-    errorSpan <- o .: "span"
-    errorMsg <- o .: "msg"
-    pure (Error errorSpan errorMsg)
 
 {- __REPLACE1__ -}

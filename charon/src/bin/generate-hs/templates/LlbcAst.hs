@@ -9,17 +9,14 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_LlbcAst where
 
-import Data.Aeson hiding (Error)
+import Data.Aeson (FromJSON)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta hiding (Error)
 import qualified Generated_Meta as M
-import Generated_Values
-import Generated_Types
-import Generated_Expressions
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
+import qualified Generated_Expressions as E
 import qualified Generated_GAst as G
--- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping, Error)
 
 {- __REPLACE0__ -}
 

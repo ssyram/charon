@@ -9,11 +9,11 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_Expressions where
 
-import Data.Aeson
+import Data.Aeson (FromJSON)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Values
-import Generated_Types hiding (Field, PtrMetadata)
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
 
 {- __REPLACE0__ -}
 

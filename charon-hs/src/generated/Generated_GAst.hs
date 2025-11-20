@@ -10,30 +10,20 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson hiding (Error)
+import Data.Aeson (FromJSON(..), withObject, (.:))
 import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta hiding (Local, Error)
 import qualified Generated_Meta as M
-import Generated_Types hiding (Field, TraitImpl, TraitMethod, Opaque)
-import Generated_Expressions hiding (Field)
+import qualified Generated_Types as T
+import qualified Generated_Expressions as E
 import {-# SOURCE #-} qualified Generated_LlbcAst as L
 import {-# SOURCE #-} qualified Generated_UllbcAst as U
 
--- Manually defined types
-
-data TargetInfo = TargetInfo
-  { targetinfoTargetPointerSize :: Int
-  , targetinfoIsLittleEndian :: Bool
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON TargetInfo where
-  parseJSON = withObject "TargetInfo" $ \o -> do
-    targetPointerSize <- o .: "target_pointer_size"
-    isLittleEndian <- o .: "is_little_endian"
-    pure (TargetInfo targetPointerSize isLittleEndian)
+-- Re-export commonly used types for convenience
+type Vector = M.Vector
+type Span = M.Span
+type PathBuf = M.PathBuf
 
 -- | Check the value of an operand and abort if the value is not expected. This is introduced to
 -- | avoid a lot of small branches.
@@ -43,7 +33,7 @@ instance FromJSON TargetInfo where
 -- | because they're implicit in the semantics of our array accesses etc. Finally we introduce new asserts in
 -- | [crate::transform::resugar::reconstruct_asserts].
 data Assertion = Assertion
-  { assertionCond :: Operand
+  { assertionCond :: E.Operand
   ,   -- | The value that the operand should evaluate to for the assert to succeed.
   assertionExpected :: Bool
   ,   -- | What kind of abort happens on assert failure.
@@ -52,7 +42,7 @@ data Assertion = Assertion
   deriving (Show, Eq, Ord)
 
 -- | The body of a function.
-data Body = Unstructured ((GexprBody (Vector U.BlockId U.Block)))
+data Body = Unstructured ((GexprBody (M.Vector U.BlockId U.Block)))
   | Structured ((GexprBody L.Block))
   | TraitMethodWithoutDefault
   | Opaque
@@ -62,8 +52,8 @@ data Body = Unstructured ((GexprBody (Vector U.BlockId U.Block)))
 
 data Call = Call
   { callFunc :: FnOperand
-  , callArgs :: [Operand]
-  , callDest :: Place
+  , callArgs :: [E.Operand]
+  , callDest :: E.Place
   }
   deriving (Show, Eq, Ord)
 
@@ -167,9 +157,9 @@ data CliOptions = CliOptions
   deriving (Show, Eq, Ord)
 
 data CopyNonOverlapping = CopyNonOverlapping
-  { copynonoverlappingSrc :: Operand
-  , copynonoverlappingDst :: Operand
-  , copynonoverlappingCount :: Operand
+  { copynonoverlappingSrc :: E.Operand
+  , copynonoverlappingDst :: E.Operand
+  , copynonoverlappingCount :: E.Operand
   }
   deriving (Show, Eq, Ord)
 
@@ -182,21 +172,28 @@ data DeclarationGroup = TypeGroup ((GDeclarationGroup TypeDeclId))
   | MixedGroup ((GDeclarationGroup ItemId))
   deriving (Show, Eq, Ord)
 
+-- | Common error used during the translation.
+data Error = Error
+  { errorSpan :: M.Span
+  , errorMsg :: String
+  }
+  deriving (Show, Eq, Ord)
+
 -- | A function operand is used in function calls.
 -- | It either designates a top-level function, or a place in case
 -- | we are using function pointers stored in local variables.
-data FnOperand = FnOpRegular FnPtr
-  | FnOpMove Place
+data FnOperand = FnOpRegular E.FnPtr
+  | FnOpMove E.Place
   deriving (Show, Eq, Ord)
 
 -- | A function definition
 data FunDecl = FunDecl
   { fundeclDefId :: FunDeclId
   ,   -- | The meta data associated with the declaration.
-  fundeclItemMeta :: ItemMeta
+  fundeclItemMeta :: M.ItemMeta
   ,   -- | The signature contains the inputs/output types *with* non-erased regions.
   -- | It also contains the list of region and type parameters.
-  fundeclSignature :: FunSig
+  fundeclSignature :: T.FunSig
   ,   -- | The function kind: "regular" function, trait method declaration, etc.
   fundeclSrc :: ItemSource
   ,   -- | Whether this function is in fact the body of a constant/static that we turned into an
@@ -213,9 +210,9 @@ data FunDecl = FunDecl
 data FunSig = FunSig
   {   -- | Is the function unsafe or not
   funsigIsUnsafe :: Bool
-  , funsigGenerics :: GenericParams
-  , funsigInputs :: [Ty]
-  , funsigOutput :: Ty
+  , funsigGenerics :: T.GenericParams
+  , funsigInputs :: [T.Ty]
+  , funsigOutput :: T.Ty
   }
   deriving (Show, Eq, Ord)
 
@@ -229,7 +226,7 @@ data GDeclarationGroup a0 = NonRecGroup a0
 -- | TODO: arg_count should be stored in GFunDecl below. But then,
 -- |       the print is obfuscated and Aeneas may need some refactoring.
 data GexprBody a0 = GexprBody
-  { gexprbodySpan :: Span
+  { gexprbodySpan :: M.Span
   ,   -- | The local variables.
   gexprbodyLocals :: Locals
   , gexprbodyBody :: a0
@@ -240,9 +237,9 @@ data GexprBody a0 = GexprBody
 data GlobalDecl = GlobalDecl
   { globaldeclDefId :: GlobalDeclId
   ,   -- | The meta data associated with the declaration.
-  globaldeclItemMeta :: ItemMeta
-  , globaldeclGenerics :: GenericParams
-  , globaldeclTy :: Ty
+  globaldeclItemMeta :: M.ItemMeta
+  , globaldeclGenerics :: T.GenericParams
+  , globaldeclTy :: T.Ty
   ,   -- | The context of the global: distinguishes top-level items from trait-associated items.
   globaldeclSrc :: ItemSource
   ,   -- | The kind of global (static or const).
@@ -261,12 +258,12 @@ data GlobalKind = Static
 -- | A variable
 data Local = Local
   {   -- | Unique index identifying the variable
-  localIndex :: LocalId
+  localIndex :: Val.LocalId
   ,   -- | Variable name - may be `None` if the variable was introduced by Rust
   -- | through desugaring.
   localName :: Maybe String
   ,   -- | The variable type
-  localLocalTy :: Ty
+  localLocalTy :: T.Ty
   }
   deriving (Show, Eq, Ord)
 
@@ -279,7 +276,7 @@ data Locals = Locals
   -- | - the local used for the return value (index 0)
   -- | - the `arg_count` input arguments
   -- | - the remaining locals, used for the intermediate computations
-  localsLocals :: (Vector LocalId Local)
+  localsLocals :: (M.Vector Val.LocalId Local)
   }
   deriving (Show, Eq, Ord)
 
@@ -304,10 +301,18 @@ data Preset = OldDefaults
   | Tests
   deriving (Show, Eq, Ord)
 
+data TargetInfo = TargetInfo
+  {   -- | The pointer size of the target in bytes.
+  targetinfoTargetPointerSize :: Int
+  ,   -- | Whether the target platform uses little endian byte order.
+  targetinfoIsLittleEndian :: Bool
+  }
+  deriving (Show, Eq, Ord)
+
 -- | An associated constant in a trait.
 data TraitAssocConst = TraitAssocConst
   { traitassocconstName :: TraitItemName
-  , traitassocconstTy :: Ty
+  , traitassocconstTy :: T.Ty
   , traitassocconstDefault :: Maybe GlobalDeclRef
   }
   deriving (Show, Eq, Ord)
@@ -315,9 +320,9 @@ data TraitAssocConst = TraitAssocConst
 -- | An associated type in a trait.
 data TraitAssocTy = TraitAssocTy
   { traitassoctyName :: TraitItemName
-  , traitassoctyDefault :: Maybe Ty
+  , traitassoctyDefault :: Maybe T.Ty
   ,   -- | List of trait clauses that apply to this type.
-  traitassoctyImpliedClauses :: (Vector TraitClauseId TraitParam)
+  traitassoctyImpliedClauses :: (M.Vector T.TraitClauseId T.TraitParam)
   }
   deriving (Show, Eq, Ord)
 
@@ -355,8 +360,8 @@ data TraitAssocTy = TraitAssocTy
 -- | by means of traits.
 data TraitDecl = TraitDecl
   { traitdeclDefId :: TraitDeclId
-  , traitdeclItemMeta :: ItemMeta
-  , traitdeclGenerics :: GenericParams
+  , traitdeclItemMeta :: M.ItemMeta
+  , traitdeclGenerics :: T.GenericParams
   ,   -- | The "parent" clauses: the supertraits.
   -- | 
   -- | Supertraits are actually regular where clauses, but we decided to have
@@ -369,13 +374,13 @@ data TraitDecl = TraitDecl
   -- | ```
   -- | TODO: actually, as of today, we consider that all trait clauses of
   -- | trait declarations are parent clauses.
-  traitdeclImpliedClauses :: (Vector TraitClauseId TraitParam)
+  traitdeclImpliedClauses :: (M.Vector T.TraitClauseId T.TraitParam)
   ,   -- | The associated constants declared in the trait.
   traitdeclConsts :: [TraitAssocConst]
   ,   -- | The associated types declared in the trait. The binder binds the generic parameters of the
   -- | type if it is a GAT (Generic Associated Type). For a plain associated type the binder binds
   -- | nothing.
-  traitdeclTypes :: [(Binder TraitAssocTy)]
+  traitdeclTypes :: [(T.Binder TraitAssocTy)]
   ,   -- | The methods declared by the trait. The binder binds the generic parameters of the method.
   -- | 
   -- | ```rust
@@ -384,10 +389,10 @@ data TraitDecl = TraitDecl
   -- |   fn method<'a, U>(x: &'a U);
   -- | }
   -- | ```
-  traitdeclMethods :: [(Binder TraitMethod)]
+  traitdeclMethods :: [(T.Binder TraitMethod)]
   ,   -- | The virtual table struct for this trait, if it has one.
   -- | It is guaranteed that the trait has a vtable iff it is dyn-compatible.
-  traitdeclVtable :: Maybe TypeDeclRef
+  traitdeclVtable :: Maybe T.TypeDeclRef
   }
   deriving (Show, Eq, Ord)
 
@@ -403,20 +408,20 @@ data TraitDecl = TraitDecl
 -- | ```
 data TraitImpl = TraitImpl
   { traitimplDefId :: TraitImplId
-  , traitimplItemMeta :: ItemMeta
+  , traitimplItemMeta :: M.ItemMeta
   ,   -- | The information about the implemented trait.
   -- | Note that this contains the instantiation of the "parent"
   -- | clauses.
-  traitimplImplTrait :: TraitDeclRef
-  , traitimplGenerics :: GenericParams
+  traitimplImplTrait :: T.TraitDeclRef
+  , traitimplGenerics :: T.GenericParams
   ,   -- | The trait references for the parent clauses (see [TraitDecl]).
-  traitimplImpliedTraitRefs :: (Vector TraitClauseId TraitRef)
+  traitimplImpliedTraitRefs :: (M.Vector T.TraitClauseId T.TraitRef)
   ,   -- | The implemented associated constants.
   traitimplConsts :: [(TraitItemName, GlobalDeclRef)]
   ,   -- | The implemented associated types.
-  traitimplTypes :: [(TraitItemName, (Binder TraitAssocTyImpl))]
+  traitimplTypes :: [(TraitItemName, (T.Binder TraitAssocTyImpl))]
   ,   -- | The implemented methods
-  traitimplMethods :: [(TraitItemName, (Binder FunDeclRef))]
+  traitimplMethods :: [(TraitItemName, (T.Binder FunDeclRef))]
   ,   -- | The virtual table instance for this trait implementation. This is `Some` iff the trait is
   -- | dyn-compatible.
   traitimplVtable :: Maybe GlobalDeclRef
@@ -451,17 +456,17 @@ data TranslatedCrate = TranslatedCrate
   ,   -- | Short names, for items whose last PathElem is unique.
   translatedcrateShortNames :: [(ItemId, Name)]
   ,   -- | The translated files.
-  translatedcrateFiles :: (Vector FileId File)
+  translatedcrateFiles :: (M.Vector M.FileId M.File)
   ,   -- | The translated type definitions
-  translatedcrateTypeDecls :: (Vector TypeDeclId TypeDecl)
+  translatedcrateTypeDecls :: (M.Vector TypeDeclId T.TypeDecl)
   ,   -- | The translated function definitions
-  translatedcrateFunDecls :: (Vector FunDeclId FunDecl)
+  translatedcrateFunDecls :: (M.Vector FunDeclId FunDecl)
   ,   -- | The translated global definitions
-  translatedcrateGlobalDecls :: (Vector GlobalDeclId GlobalDecl)
+  translatedcrateGlobalDecls :: (M.Vector GlobalDeclId GlobalDecl)
   ,   -- | The translated trait declarations
-  translatedcrateTraitDecls :: (Vector TraitDeclId TraitDecl)
+  translatedcrateTraitDecls :: (M.Vector TraitDeclId TraitDecl)
   ,   -- | The translated trait declarations
-  translatedcrateTraitImpls :: (Vector TraitImplId TraitImpl)
+  translatedcrateTraitImpls :: (M.Vector TraitImplId TraitImpl)
   ,   -- | A `const UNIT: () = ();` used whenever we make a thin pointer/reference to avoid creating a
   -- | local `let unit = ();` variable. It is always `Some`.
   translatedcrateUnitMetadata :: Maybe GlobalDeclRef
@@ -580,6 +585,13 @@ instance FromJSON DeclarationGroup where
     _ -> fail "Unknown variant"
 
 
+instance FromJSON Error where
+  parseJSON = withObject "Error" $ \o -> do
+    errorSpan <- o .: "span"
+    errorMsg <- o .: "msg"
+    pure (Error errorSpan errorMsg)
+
+
 instance FromJSON FnOperand where
   parseJSON v = case v of
     Object o | H.lookup "Regular" o /= Nothing -> do
@@ -689,6 +701,13 @@ instance FromJSON Preset where
     String "Soteria" -> pure Soteria
     String "Tests" -> pure Tests
     _ -> fail "Unknown variant"
+
+
+instance FromJSON TargetInfo where
+  parseJSON = withObject "TargetInfo" $ \o -> do
+    targetinfoTargetPointerSize <- o .: "target_pointer_size"
+    targetinfoIsLittleEndian <- o .: "is_little_endian"
+    pure (TargetInfo targetinfoTargetPointerSize targetinfoIsLittleEndian)
 
 
 instance FromJSON TraitAssocConst where
