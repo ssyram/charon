@@ -236,9 +236,20 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                 TypeId::Adt(id) => {
                     let base_ty = if let Some(tdecl) = ctx.crate_data.type_decls.get(id) {
                         let ty_name = type_name_to_haskell_ident(&tdecl.item_meta);
-                        // Qualify GAst types that conflict with Llbc/Ullbc variant constructors
-                        // These types need G. qualification when used in Llbc/Ullbc modules
-                        if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
+                        let full_name = repr_name(ctx.crate_data, &tdecl.item_meta.name);
+                        
+                        // Qualify types based on their module to avoid conflicts
+                        if full_name.contains("::llbc_ast::") {
+                            // Type is from LLBC module, qualify with L.
+                            format!("L.{}", ty_name)
+                        } else if full_name.contains("::ullbc_ast::") {
+                            // Type is from ULLBC module, qualify with U.
+                            format!("U.{}", ty_name)
+                        } else if full_name.contains("::errors::") || ty_name == "Error" {
+                            // Error type from errors module needs M. qualification to avoid conflict with variant
+                            format!("M.{}", ty_name)
+                        } else if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
+                            // Qualify GAst types that conflict with Llbc/Ullbc variant constructors
                             format!("G.{}", ty_name)
                         } else {
                             ty_name
@@ -812,6 +823,42 @@ fn generate_hs(
                 "#,
             ),
         ),
+        // TranslatedCrate has HashMap fields serialized with HashMapToArray
+        // which creates array of {key, value} objects instead of tuples
+        (
+            "TranslatedCrate",
+            indoc!(
+                r#"
+                parseJSON = withObject "TranslatedCrate" $ \o -> do
+                    translatedcrateCrateName <- o .: "crate_name"
+                    translatedcrateOptions <- o .: "options"
+                    translatedcrateTargetInformation <- o .: "target_information"
+                    itemNamesArray <- o .: "item_names"
+                    let translatedcrateItemNames = map (\(Object obj) -> 
+                          let Just k = H.lookup "key" obj
+                              Just v = H.lookup "value" obj
+                              Success key = fromJSON k
+                              Success value = fromJSON v
+                          in (key, value)) itemNamesArray
+                    shortNamesArray <- o .: "short_names"
+                    let translatedcrateShortNames = map (\(Object obj) ->
+                          let Just k = H.lookup "key" obj
+                              Just v = H.lookup "value" obj
+                              Success key = fromJSON k
+                              Success value = fromJSON v
+                          in (key, value)) shortNamesArray
+                    translatedcrateFiles <- o .: "files"
+                    translatedcrateTypeDecls <- o .: "type_decls"
+                    translatedcrateFunDecls <- o .: "fun_decls"
+                    translatedcrateGlobalDecls <- o .: "global_decls"
+                    translatedcrateTraitDecls <- o .: "trait_decls"
+                    translatedcrateTraitImpls <- o .: "trait_impls"
+                    translatedcrateUnitMetadata <- o .: "unit_metadata"
+                    translatedcrateOrderedDecls <- o .: "ordered_decls"
+                    pure (TranslatedCrate translatedcrateCrateName translatedcrateOptions translatedcrateTargetInformation translatedcrateItemNames translatedcrateShortNames translatedcrateFiles translatedcrateTypeDecls translatedcrateFunDecls translatedcrateGlobalDecls translatedcrateTraitDecls translatedcrateTraitImpls translatedcrateUnitMetadata translatedcrateOrderedDecls)
+                "#,
+            ),
+        ),
     ];
 
     let mut ctx = GenerateCtx::new(&crate_data, manual_type_impls, manual_json_impls);
@@ -823,6 +870,7 @@ fn generate_hs(
         "Ty",
         "Vector",
         "TargetInfo", // Manually defined in GAst.hs template
+        "Error", // Clashes with Body::Error variant constructor, manually defined in Meta module
     ];
 
     // Compute conflict sets for auto-qualification
@@ -1042,8 +1090,9 @@ fn generate_hs(
         ],
     });
 
-    // GAst - use same types for both TypeDecl and FromJson
-    let gast_type_decl = extract_types2(
+    // GAst (part 1) - extract types that don't depend on LLBC/ULLBC
+    // This prevents them from being pulled into LLBC/ULLBC modules
+    let gast_base_types = extract_types2(
         &ctx,
         &mut temp_processed2,
         &[
@@ -1059,21 +1108,10 @@ fn generate_hs(
             "CliOpts",
             "GExprBody",
             "DeclarationGroup",
-            "Body",
-            "FunDecl",
-            "TranslatedCrate",
         ],
     );
-    generate_code_for_with_json.push(GenerateCodeFor {
-        template: template_dir.join("GAst.hs"),
-        target: output_dir.join("Generated_GAst.hs"),
-        markers: vec![
-            (GenerationKind::TypeDecl, gast_type_decl.clone()),
-            (GenerationKind::FromJson, gast_type_decl),
-        ],
-    });
 
-    // LlbcAst
+    // LlbcAst - extract AFTER base GAst types so they don't get duplicated
     let llbc_type_decl = extract_types2(
         &ctx,
         &mut temp_processed2,
@@ -1088,7 +1126,7 @@ fn generate_hs(
         ],
     });
 
-    // UllbcAst
+    // UllbcAst - extract AFTER LLBC
     let ullbc_type_decl = extract_types2(
         &ctx,
         &mut temp_processed2,
@@ -1104,6 +1142,27 @@ fn generate_hs(
         markers: vec![
             (GenerationKind::TypeDecl, ullbc_type_decl.clone()),
             (GenerationKind::FromJson, ullbc_type_decl),
+        ],
+    });
+
+    // GAst (part 2) - extract types that depend on LLBC/ULLBC (like Body, FunDecl, TranslatedCrate)
+    // Combine with base types for a complete GAst module
+    let gast_cross_module_types = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &[
+            "Body",
+            "FunDecl",
+            "TranslatedCrate",
+        ],
+    );
+    let gast_type_decl: HashSet<TypeDeclId> = gast_base_types.union(&gast_cross_module_types).copied().collect();
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("GAst.hs"),
+        target: output_dir.join("Generated_GAst.hs"),
+        markers: vec![
+            (GenerationKind::TypeDecl, gast_type_decl.clone()),
+            (GenerationKind::FromJson, gast_type_decl),
         ],
     });
 

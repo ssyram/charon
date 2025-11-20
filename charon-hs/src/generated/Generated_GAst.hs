@@ -10,11 +10,16 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson
+import Data.Aeson hiding (Error)
+import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
-import Generated_Meta hiding (Local)
-import Generated_Types hiding (Field, TraitImpl, TraitMethod)
+import qualified Data.Vector as V
+import Generated_Meta hiding (Local, Error)
+import qualified Generated_Meta as M
+import Generated_Types hiding (Field, TraitImpl, TraitMethod, Opaque)
 import Generated_Expressions hiding (Field)
+import {-# SOURCE #-} qualified Generated_LlbcAst as L
+import {-# SOURCE #-} qualified Generated_UllbcAst as U
 
 -- Manually defined types
 
@@ -23,6 +28,12 @@ data TargetInfo = TargetInfo
   , targetinfoIsLittleEndian :: Bool
   }
   deriving (Show, Eq, Ord)
+
+instance FromJSON TargetInfo where
+  parseJSON = withObject "TargetInfo" $ \o -> do
+    targetPointerSize <- o .: "target_pointer_size"
+    isLittleEndian <- o .: "is_little_endian"
+    pure (TargetInfo targetPointerSize isLittleEndian)
 
 -- | Check the value of an operand and abort if the value is not expected. This is introduced to
 -- | avoid a lot of small branches.
@@ -40,30 +51,13 @@ data Assertion = Assertion
   }
   deriving (Show, Eq, Ord)
 
-data Block = Block
-  { blockSpan :: Span
-  , blockStatements :: [Statement]
-  }
-  deriving (Show, Eq, Ord)
-
-data Block = Block
-  { blockStatements :: [Statement]
-  , blockTerminator :: Terminator
-  }
-  deriving (Show, Eq, Ord)
-
-data BlockId = BlockId
-  { blockidRaw :: Int
-  }
-  deriving (Show, Eq, Ord)
-
 -- | The body of a function.
-data Body = Unstructured ((GexprBody (Vector BlockId Block)))
-  | Structured ((GexprBody Block))
+data Body = Unstructured ((GexprBody (Vector U.BlockId U.Block)))
+  | Structured ((GexprBody L.Block))
   | TraitMethodWithoutDefault
   | Opaque
   | Missing
-  | Error Error
+  | Error M.Error
   deriving (Show, Eq, Ord)
 
 data Call = Call
@@ -188,13 +182,6 @@ data DeclarationGroup = TypeGroup ((GDeclarationGroup TypeDeclId))
   | MixedGroup ((GDeclarationGroup ItemId))
   deriving (Show, Eq, Ord)
 
--- | Common error used during the translation.
-data Error = Error
-  { errorSpan :: Span
-  , errorMsg :: String
-  }
-  deriving (Show, Eq, Ord)
-
 -- | A function operand is used in function calls.
 -- | It either designates a top-level function, or a place in case
 -- | we are using function pointers stored in local variables.
@@ -315,88 +302,6 @@ data Preset = OldDefaults
   | Eurydice
   | Soteria
   | Tests
-  deriving (Show, Eq, Ord)
-
-data Statement = Statement
-  { statementSpan :: Span
-  , statementKind :: StatementKind
-  ,   -- | Comments that precede this statement.
-  statementCommentsBefore :: [String]
-  }
-  deriving (Show, Eq, Ord)
-
-data Statement = Statement
-  { statementSpan :: Span
-  ,   -- | Integer uniquely identifying this statement among the statmeents in the current body. To
-  -- | simplify things we generate globally-fresh ids when creating a new `Statement`.
-  statementStatementId :: StatementId
-  , statementKind :: StatementKind
-  ,   -- | Comments that precede this statement.
-  statementCommentsBefore :: [String]
-  }
-  deriving (Show, Eq, Ord)
-
-data StatementId = StatementId
-  { statementidRaw :: Int
-  }
-  deriving (Show, Eq, Ord)
-
--- | A raw statement: a statement without meta data.
-data StatementKind = Assign Place Rvalue
-  | SetDiscriminant Place VariantId
-  | CopyNonOverlapping G.CopyNonOverlapping
-  | StorageLive LocalId
-  | StorageDead LocalId
-  | Deinit Place
-  | Drop Place TraitRef
-  | Assert Assertion
-  | Call G.Call
-  | Abort AbortKind
-  | Return
-  | Break Int
-  | Continue Int
-  | Nop
-  | Switch Switch
-  | Loop Block
-  | Error String
-  deriving (Show, Eq, Ord)
-
--- | A raw statement: a statement without meta data.
-data StatementKind = Assign Place Rvalue
-  | SetDiscriminant Place VariantId
-  | CopyNonOverlapping G.CopyNonOverlapping
-  | StorageLive LocalId
-  | StorageDead LocalId
-  | Deinit Place
-  | Assert Assertion
-  | Nop
-  deriving (Show, Eq, Ord)
-
-data Switch = If Operand Block Block
-  | SwitchInt Operand LiteralType ([([Literal], Block)]) Block
-  | Match Place ([([VariantId], Block)]) (Maybe Block)
-  deriving (Show, Eq, Ord)
-
-data Switch = If BlockId BlockId
-  | SwitchInt LiteralType ([(Literal, BlockId)]) BlockId
-  deriving (Show, Eq, Ord)
-
-data Terminator = Terminator
-  { terminatorSpan :: Span
-  , terminatorKind :: TerminatorKind
-  ,   -- | Comments that precede this terminator.
-  terminatorCommentsBefore :: [String]
-  }
-  deriving (Show, Eq, Ord)
-
--- | A raw terminator: a terminator without meta data.
-data TerminatorKind = Goto BlockId
-  | Switch Operand Switch
-  | Call G.Call BlockId BlockId
-  | Drop Place TraitRef BlockId BlockId
-  | Abort AbortKind
-  | Return
-  | UnwindResume
   deriving (Show, Eq, Ord)
 
 -- | An associated constant in a trait.
@@ -565,64 +470,12 @@ data TranslatedCrate = TranslatedCrate
   }
   deriving (Show, Eq, Ord)
 
--- Manual instance for TranslatedCrate - simplified version that parses the key fields
--- Full deserialization would require FunDecl and Body instances which have complex dependencies
-data TranslatedCrate = TranslatedCrate
-  { translatedCrateCrate_name :: String
-  , translatedCrateType_decls :: Vector TypeDeclId TypeDecl
-  , translatedCrateGlobal_decls :: Vector GlobalDeclId GlobalDecl
-  , translatedCrateTrait_decls :: Vector TraitDeclId TraitDecl
-  , translatedCrateTrait_impls :: Vector TraitImplId TraitImpl
-  }
-  deriving (Show, Eq, Ord)
-
--- Wrapper type for the top-level LLBC file structure
-data LlbcFile = LlbcFile
-  { llbcfileCharon_version :: String
-  , llbcfileTranslated :: TranslatedCrate
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON TranslatedCrate where
-  parseJSON = withObject "TranslatedCrate" $ \o -> do
-    crateName <- o .: "crate_name"
-    typeDecls <- o .: "type_decls"
-    globalDecls <- o .: "global_decls"
-    traitDecls <- o .: "trait_decls"
-    traitImpls <- o .: "trait_impls"
-    -- We skip fields that we can't deserialize yet (options, target_information, fun_decls, etc.)
-    pure $ TranslatedCrate crateName typeDecls globalDecls traitDecls traitImpls
-
-instance FromJSON LlbcFile where
-  parseJSON = withObject "LlbcFile" $ \o -> do
-    charonVersion <- o .: "charon_version"
-    translated <- o .: "translated"
-    pure $ LlbcFile charonVersion translated
-
 instance FromJSON Assertion where
   parseJSON = withObject "Assertion" $ \o -> do
     assertionCond <- o .: "cond"
     assertionExpected <- o .: "expected"
     assertionOnFailure <- o .: "on_failure"
     pure (Assertion assertionCond assertionExpected assertionOnFailure)
-
-
-instance FromJSON Block where
-  parseJSON = withObject "Block" $ \o -> do
-    blockSpan <- o .: "span"
-    blockStatements <- o .: "statements"
-    pure (Block blockSpan blockStatements)
-
-
-instance FromJSON Block where
-  parseJSON = withObject "Block" $ \o -> do
-    blockStatements <- o .: "statements"
-    blockTerminator <- o .: "terminator"
-    pure (Block blockStatements blockTerminator)
-
-
-instance FromJSON BlockId where
-  parseJSON = fmap BlockId . parseJSON
 
 
 instance FromJSON Body where
@@ -725,13 +578,6 @@ instance FromJSON DeclarationGroup where
       v <- o .: "Mixed"
       MixedGroup <$> parseJSON v
     _ -> fail "Unknown variant"
-
-
-instance FromJSON Error where
-  parseJSON = withObject "Error" $ \o -> do
-    errorSpan <- o .: "span"
-    errorMsg <- o .: "msg"
-    pure (Error errorSpan errorMsg)
 
 
 instance FromJSON FnOperand where
@@ -845,196 +691,6 @@ instance FromJSON Preset where
     _ -> fail "Unknown variant"
 
 
-instance FromJSON Statement where
-  parseJSON = withObject "Statement" $ \o -> do
-    statementSpan <- o .: "span"
-    statementKind <- o .: "kind"
-    statementCommentsBefore <- o .: "comments_before"
-    pure (Statement statementSpan statementKind statementCommentsBefore)
-
-
-instance FromJSON Statement where
-  parseJSON = withObject "Statement" $ \o -> do
-    statementSpan <- o .: "span"
-    statementStatementId <- o .: "id"
-    statementKind <- o .: "kind"
-    statementCommentsBefore <- o .: "comments_before"
-    pure (Statement statementSpan statementStatementId statementKind statementCommentsBefore)
-
-
-instance FromJSON StatementId where
-  parseJSON = fmap StatementId . parseJSON
-
-
-instance FromJSON StatementKind where
-  parseJSON v = case v of
-    Object o | H.lookup "Assign" o /= Nothing -> do
-      withArray "Assign" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (Assign v0 v1)) =<< o .: "Assign"
-    Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
-      withArray "SetDiscriminant" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (SetDiscriminant v0 v1)) =<< o .: "SetDiscriminant"
-    Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
-      v <- o .: "CopyNonOverlapping"
-      CopyNonOverlapping <$> parseJSON v
-    Object o | H.lookup "StorageLive" o /= Nothing -> do
-      v <- o .: "StorageLive"
-      StorageLive <$> parseJSON v
-    Object o | H.lookup "StorageDead" o /= Nothing -> do
-      v <- o .: "StorageDead"
-      StorageDead <$> parseJSON v
-    Object o | H.lookup "Deinit" o /= Nothing -> do
-      v <- o .: "Deinit"
-      Deinit <$> parseJSON v
-    Object o | H.lookup "Drop" o /= Nothing -> do
-      withArray "Drop" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (Drop v0 v1)) =<< o .: "Drop"
-    Object o | H.lookup "Assert" o /= Nothing -> do
-      v <- o .: "Assert"
-      Assert <$> parseJSON v
-    Object o | H.lookup "Call" o /= Nothing -> do
-      v <- o .: "Call"
-      Call <$> parseJSON v
-    Object o | H.lookup "Abort" o /= Nothing -> do
-      v <- o .: "Abort"
-      Abort <$> parseJSON v
-    String "Return" -> pure Return
-    Object o | H.lookup "Break" o /= Nothing -> do
-      v <- o .: "Break"
-      Break <$> parseJSON v
-    Object o | H.lookup "Continue" o /= Nothing -> do
-      v <- o .: "Continue"
-      Continue <$> parseJSON v
-    String "Nop" -> pure Nop
-    Object o | H.lookup "Switch" o /= Nothing -> do
-      v <- o .: "Switch"
-      Switch <$> parseJSON v
-    Object o | H.lookup "Loop" o /= Nothing -> do
-      v <- o .: "Loop"
-      Loop <$> parseJSON v
-    Object o | H.lookup "Error" o /= Nothing -> do
-      v <- o .: "Error"
-      Error <$> parseJSON v
-    _ -> fail "Unknown variant"
-
-
-instance FromJSON StatementKind where
-  parseJSON v = case v of
-    Object o | H.lookup "Assign" o /= Nothing -> do
-      withArray "Assign" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (Assign v0 v1)) =<< o .: "Assign"
-    Object o | H.lookup "SetDiscriminant" o /= Nothing -> do
-      withArray "SetDiscriminant" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (SetDiscriminant v0 v1)) =<< o .: "SetDiscriminant"
-    Object o | H.lookup "CopyNonOverlapping" o /= Nothing -> do
-      v <- o .: "CopyNonOverlapping"
-      CopyNonOverlapping <$> parseJSON v
-    Object o | H.lookup "StorageLive" o /= Nothing -> do
-      v <- o .: "StorageLive"
-      StorageLive <$> parseJSON v
-    Object o | H.lookup "StorageDead" o /= Nothing -> do
-      v <- o .: "StorageDead"
-      StorageDead <$> parseJSON v
-    Object o | H.lookup "Deinit" o /= Nothing -> do
-      v <- o .: "Deinit"
-      Deinit <$> parseJSON v
-    Object o | H.lookup "Assert" o /= Nothing -> do
-      v <- o .: "Assert"
-      Assert <$> parseJSON v
-    String "Nop" -> pure Nop
-    _ -> fail "Unknown variant"
-
-
-instance FromJSON Switch where
-  parseJSON v = case v of
-    Object o | H.lookup "If" o /= Nothing -> do
-      withArray "If" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (If v0 v1 v2)) =<< o .: "If"
-    Object o | H.lookup "SwitchInt" o /= Nothing -> do
-      withArray "SwitchInt" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        v3 <- parseJSON (v V.! 3)
-        pure (SwitchInt v0 v1 v2 v3)) =<< o .: "SwitchInt"
-    Object o | H.lookup "Match" o /= Nothing -> do
-      withArray "Match" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (Match v0 v1 v2)) =<< o .: "Match"
-    _ -> fail "Unknown variant"
-
-
-instance FromJSON Switch where
-  parseJSON v = case v of
-    Object o | H.lookup "If" o /= Nothing -> do
-      withArray "If" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        pure (If v0 v1)) =<< o .: "If"
-    Object o | H.lookup "SwitchInt" o /= Nothing -> do
-      withArray "SwitchInt" (\v -> do
-        v0 <- parseJSON (v V.! 0)
-        v1 <- parseJSON (v V.! 1)
-        v2 <- parseJSON (v V.! 2)
-        pure (SwitchInt v0 v1 v2)) =<< o .: "SwitchInt"
-    _ -> fail "Unknown variant"
-
-
-instance FromJSON Terminator where
-  parseJSON = withObject "Terminator" $ \o -> do
-    terminatorSpan <- o .: "span"
-    terminatorKind <- o .: "kind"
-    terminatorCommentsBefore <- o .: "comments_before"
-    pure (Terminator terminatorSpan terminatorKind terminatorCommentsBefore)
-
-
-instance FromJSON TerminatorKind where
-  parseJSON v = case v of
-    Object o | H.lookup "Goto" o /= Nothing -> do
-      obj <- o .: "Goto"
-      target <- obj .: "target"
-      pure (Goto target)
-    Object o | H.lookup "Switch" o /= Nothing -> do
-      obj <- o .: "Switch"
-      discr <- obj .: "discr"
-      targets <- obj .: "targets"
-      pure (Switch discr targets)
-    Object o | H.lookup "Call" o /= Nothing -> do
-      obj <- o .: "Call"
-      call <- obj .: "call"
-      target <- obj .: "target"
-      onUnwind <- obj .: "on_unwind"
-      pure (Call call target onUnwind)
-    Object o | H.lookup "Drop" o /= Nothing -> do
-      obj <- o .: "Drop"
-      place <- obj .: "place"
-      tref <- obj .: "tref"
-      target <- obj .: "target"
-      onUnwind <- obj .: "on_unwind"
-      pure (Drop place tref target onUnwind)
-    Object o | H.lookup "Abort" o /= Nothing -> do
-      v <- o .: "Abort"
-      Abort <$> parseJSON v
-    String "Return" -> pure Return
-    String "UnwindResume" -> pure UnwindResume
-    _ -> fail "Unknown variant"
-
-
 instance FromJSON TraitAssocConst where
   parseJSON = withObject "TraitAssocConst" $ \o -> do
     traitassocconstName <- o .: "name"
@@ -1090,8 +746,20 @@ instance FromJSON TranslatedCrate where
     translatedcrateCrateName <- o .: "crate_name"
     translatedcrateOptions <- o .: "options"
     translatedcrateTargetInformation <- o .: "target_information"
-    translatedcrateItemNames <- o .: "item_names"
-    translatedcrateShortNames <- o .: "short_names"
+    itemNamesArray <- o .: "item_names"
+    let translatedcrateItemNames = map (\(Object obj) -> 
+          let Just k = H.lookup "key" obj
+              Just v = H.lookup "value" obj
+              Success key = fromJSON k
+              Success value = fromJSON v
+          in (key, value)) itemNamesArray
+    shortNamesArray <- o .: "short_names"
+    let translatedcrateShortNames = map (\(Object obj) ->
+          let Just k = H.lookup "key" obj
+              Just v = H.lookup "value" obj
+              Success key = fromJSON k
+              Success value = fromJSON v
+          in (key, value)) shortNamesArray
     translatedcrateFiles <- o .: "files"
     translatedcrateTypeDecls <- o .: "type_decls"
     translatedcrateFunDecls <- o .: "fun_decls"
@@ -1102,3 +770,17 @@ instance FromJSON TranslatedCrate where
     translatedcrateOrderedDecls <- o .: "ordered_decls"
     pure (TranslatedCrate translatedcrateCrateName translatedcrateOptions translatedcrateTargetInformation translatedcrateItemNames translatedcrateShortNames translatedcrateFiles translatedcrateTypeDecls translatedcrateFunDecls translatedcrateGlobalDecls translatedcrateTraitDecls translatedcrateTraitImpls translatedcrateUnitMetadata translatedcrateOrderedDecls)
 
+
+-- Wrapper type for the top-level LLBC file structure
+-- This is a Haskell-specific convenience type, not from Rust
+data LlbcFile = LlbcFile
+  { llbcfileCharonVersion :: String
+  , llbcfileTranslated :: TranslatedCrate
+  }
+  deriving (Show, Eq, Ord)
+
+instance FromJSON LlbcFile where
+  parseJSON = withObject "LlbcFile" $ \o -> do
+    charonVersion <- o .: "charon_version"
+    translated <- o .: "translated"
+    pure $ LlbcFile charonVersion translated

@@ -10,13 +10,16 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson
+import Data.Aeson hiding (Error)
 import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta hiding (Local)
-import Generated_Types hiding (Field, TraitImpl, TraitMethod)
+import Generated_Meta hiding (Local, Error)
+import qualified Generated_Meta as M
+import Generated_Types hiding (Field, TraitImpl, TraitMethod, Opaque)
 import Generated_Expressions hiding (Field)
+import {-# SOURCE #-} qualified Generated_LlbcAst as L
+import {-# SOURCE #-} qualified Generated_UllbcAst as U
 
 -- Manually defined types
 
