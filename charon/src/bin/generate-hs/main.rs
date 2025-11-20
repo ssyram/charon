@@ -1039,7 +1039,7 @@ fn generate_hs(
     };
 
     // Meta
-    let meta_type_decl = extract_types2(&ctx, &mut temp_processed2, &["File", "Span", "AttrInfo", "ItemMeta"]);
+    let meta_type_decl = extract_types2(&ctx, &mut temp_processed2, &["File", "Span", "AttrInfo"]);
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Meta.hs"),
         target: output_dir.join("Generated_Meta.hs"),
@@ -1062,10 +1062,14 @@ fn generate_hs(
             "ItemId",
             "TyKind",  // TyKind is renamed to Ty via #[charon::rename("Ty")]
             "TraitImplRef",
+            "TraitDeclRef",
+            "TypeDeclRef",
             "FunDeclRef",
             "GlobalDeclRef",
             "Binder",
             "AbortKind",
+            "GenericParams",
+            "DynPredicate",
             "TypeDecl",
         ],
     );
@@ -1117,6 +1121,7 @@ fn generate_hs(
             "Call",
             "Assert",
             "ItemSource",
+            "ItemMeta",
             "Locals",
             "FunSig",
             "CopyNonOverlapping",

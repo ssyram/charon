@@ -17,8 +17,6 @@ import qualified Data.Vector as V
 import qualified Generated_Meta as M
 import qualified Generated_Types as T
 import qualified Generated_Expressions as E
-import {-# SOURCE #-} qualified Generated_LlbcAst as L
-import {-# SOURCE #-} qualified Generated_UllbcAst as U
 
 -- Re-export commonly used types for convenience
 type Vector = M.Vector
