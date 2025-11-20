@@ -26,6 +26,9 @@ type Vector = M.Vector
 newtype TraitTypeConstraintId = TraitTypeConstraintId { traittypeconstraintidRaw :: Int }
   deriving (Show, Eq, Ord)
 
+instance FromJSON TraitTypeConstraintId where
+  parseJSON v = TraitTypeConstraintId <$> parseJSON v
+
 -- | (U)LLBC is a language with side-effects: a statement may abort in a way that isn't tracked by
 -- | control-flow. The two kinds of abort are:
 -- | - Panic (may unwind or not depending on compilation setting);

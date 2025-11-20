@@ -19,17 +19,11 @@ import qualified Generated_Types as T
 import qualified Generated_Expressions as E
 import {-# SOURCE #-} qualified Generated_LlbcAst as L
 import {-# SOURCE #-} qualified Generated_UllbcAst as U
-import qualified Generated_Krate as K
 
 -- Re-export commonly used types for convenience
 type Vector = M.Vector
 type Span = M.Span
 type PathBuf = M.PathBuf
-
--- Re-export Krate types for backward compatibility
-type Body = K.Body
-type FunDecl = K.FunDecl
-type TranslatedCrate = K.TranslatedCrate
 
 -- | Check the value of an operand and abort if the value is not expected. This is introduced to
 -- | avoid a lot of small branches.
@@ -657,17 +651,3 @@ instance FromJSON TraitMethod where
     traitmethodItem <- o .: "item"
     pure (TraitMethod traitmethodName traitmethodItem)
 
-
--- Wrapper type for the top-level LLBC file structure
--- This is a Haskell-specific convenience type, not from Rust
-data LlbcFile = LlbcFile
-  { llbcfileCharonVersion :: String
-  , llbcfileTranslated :: TranslatedCrate
-  }
-  deriving (Show, Eq, Ord)
-
-instance FromJSON LlbcFile where
-  parseJSON = withObject "LlbcFile" $ \o -> do
-    charonVersion <- o .: "charon_version"
-    translated <- o .: "translated"
-    pure $ LlbcFile charonVersion translated

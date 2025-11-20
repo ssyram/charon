@@ -16,3 +16,17 @@ import qualified Generated_UllbcAst as U
 {- __REPLACE0__ -}
 
 {- __REPLACE1__ -}
+
+-- Wrapper type for the top-level LLBC file structure
+-- This is a Haskell-specific convenience type, not from Rust
+data LlbcFile = LlbcFile
+  { llbcfileCharonVersion :: String
+  , llbcfileTranslated :: TranslatedCrate
+  }
+  deriving (Show, Eq, Ord)
+
+instance FromJSON LlbcFile where
+  parseJSON = withObject "LlbcFile" $ \o -> do
+    charonVersion <- o .: "charon_version"
+    translated <- o .: "translated"
+    pure $ LlbcFile charonVersion translated

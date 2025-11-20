@@ -26,6 +26,9 @@ type Vector = M.Vector
 newtype TraitTypeConstraintId = TraitTypeConstraintId { traittypeconstraintidRaw :: Int }
   deriving (Show, Eq, Ord)
 
+instance FromJSON TraitTypeConstraintId where
+  parseJSON v = TraitTypeConstraintId <$> parseJSON v
+
 {- __REPLACE0__ -}
 
 {- __REPLACE1__ -}
