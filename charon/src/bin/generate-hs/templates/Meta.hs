@@ -16,9 +16,13 @@ comments. These comments are replaced by auto-generated definitions by running
 module Generated_Meta where
 
 import Data.Aeson
+import Data.Aeson.Types (Parser)
 import Data.Text (Text)
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
+import {-# SOURCE #-} qualified Generated_Types as T
+import {-# SOURCE #-} qualified Generated_GAst as G
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -34,6 +38,17 @@ newtype Vector k v = Vector [v]
 
 instance FromJSON b => FromJSON (Vector a b) where
   parseJSON = fmap (Vector . catMaybes) . parseJSON
+
+-- KVPair is used to deserialize HashMap serialized with HashMapToArray
+-- which creates array of {key, value} objects instead of tuples
+data KVPair k v = KVPair { kvpairKey :: k, kvpairValue :: v }
+  deriving (Show, Eq, Ord)
+
+instance (FromJSON k, FromJSON v) => FromJSON (KVPair k v) where
+  parseJSON = withObject "KVPair" $ \o -> do
+    key <- o .: "key"
+    value <- o .: "value"
+    pure (KVPair key value)
 
 {- __REPLACE0__ -}
 

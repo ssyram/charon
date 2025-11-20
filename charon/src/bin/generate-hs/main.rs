@@ -288,9 +288,10 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule)
                         return "Text".to_string();
                     }
                     if base_ty.ends_with("HashMap") {
-                        // HashMap<K, V> in Rust becomes [(K, V)] in Haskell
+                        // HashMap<K, V> in Rust becomes [M.KVPair K V] in Haskell
                         // This handles the case where HashMap is serialized with HashMapToArray
-                        return format!("[({}, {})]", args[0], args[1]);
+                        // KVPair has FromJSON that parses {key, value} objects
+                        return format!("[M.KVPair {} {}]", args[0], args[1]);
                     }
                     if base_ty.ends_with("Vector") || base_ty == "M.Vector" {
                         // Vector<K, V> in Rust becomes (M.Vector K V) in Haskell
@@ -860,42 +861,6 @@ fn generate_hs(
                 "#,
             ),
         ),
-        // TranslatedCrate has HashMap fields serialized with HashMapToArray
-        // which creates array of {key, value} objects instead of tuples
-        (
-            "TranslatedCrate",
-            indoc!(
-                r#"
-                parseJSON = withObject "TranslatedCrate" $ \o -> do
-                    translatedcrateCrateName <- o .: "crate_name"
-                    translatedcrateOptions <- o .: "options"
-                    translatedcrateTargetInformation <- o .: "target_information"
-                    itemNamesArray <- o .: "item_names"
-                    let translatedcrateItemNames = map (\(Object obj) -> 
-                          let Just k = H.lookup "key" obj
-                              Just v = H.lookup "value" obj
-                              Success key = fromJSON k
-                              Success value = fromJSON v
-                          in (key, value)) itemNamesArray
-                    shortNamesArray <- o .: "short_names"
-                    let translatedcrateShortNames = map (\(Object obj) ->
-                          let Just k = H.lookup "key" obj
-                              Just v = H.lookup "value" obj
-                              Success key = fromJSON k
-                              Success value = fromJSON v
-                          in (key, value)) shortNamesArray
-                    translatedcrateFiles <- o .: "files"
-                    translatedcrateTypeDecls <- o .: "type_decls"
-                    translatedcrateFunDecls <- o .: "fun_decls"
-                    translatedcrateGlobalDecls <- o .: "global_decls"
-                    translatedcrateTraitDecls <- o .: "trait_decls"
-                    translatedcrateTraitImpls <- o .: "trait_impls"
-                    translatedcrateUnitMetadata <- o .: "unit_metadata"
-                    translatedcrateOrderedDecls <- o .: "ordered_decls"
-                    pure (TranslatedCrate translatedcrateCrateName translatedcrateOptions translatedcrateTargetInformation translatedcrateItemNames translatedcrateShortNames translatedcrateFiles translatedcrateTypeDecls translatedcrateFunDecls translatedcrateGlobalDecls translatedcrateTraitDecls translatedcrateTraitImpls translatedcrateUnitMetadata translatedcrateOrderedDecls)
-                "#,
-            ),
-        ),
     ];
 
     let mut ctx = GenerateCtx::new(&crate_data, manual_type_impls, manual_json_impls);
@@ -1061,7 +1026,7 @@ fn generate_hs(
     };
 
     // Meta
-    let meta_type_decl = extract_types2(&ctx, &mut temp_processed2, &["File", "Span", "AttrInfo"]);
+    let meta_type_decl = extract_types2(&ctx, &mut temp_processed2, &["File", "Span", "AttrInfo", "ItemMeta"]);
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Meta.hs"),
         target: output_dir.join("Generated_Meta.hs"),

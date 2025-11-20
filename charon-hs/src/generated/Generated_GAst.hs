@@ -452,9 +452,9 @@ data TranslatedCrate = TranslatedCrate
   -- | failed to translate.
   -- | Invariant: after translation, any existing `ItemId` must have an associated name, even
   -- | if the corresponding item wasn't translated.
-  translatedcrateItemNames :: [(ItemId, Name)]
+  translatedcrateItemNames :: [M.KVPair ItemId Name]
   ,   -- | Short names, for items whose last PathElem is unique.
-  translatedcrateShortNames :: [(ItemId, Name)]
+  translatedcrateShortNames :: [M.KVPair ItemId Name]
   ,   -- | The translated files.
   translatedcrateFiles :: (M.Vector M.FileId M.File)
   ,   -- | The translated type definitions
@@ -765,20 +765,8 @@ instance FromJSON TranslatedCrate where
     translatedcrateCrateName <- o .: "crate_name"
     translatedcrateOptions <- o .: "options"
     translatedcrateTargetInformation <- o .: "target_information"
-    itemNamesArray <- o .: "item_names"
-    let translatedcrateItemNames = map (\(Object obj) -> 
-          let Just k = H.lookup "key" obj
-              Just v = H.lookup "value" obj
-              Success key = fromJSON k
-              Success value = fromJSON v
-          in (key, value)) itemNamesArray
-    shortNamesArray <- o .: "short_names"
-    let translatedcrateShortNames = map (\(Object obj) ->
-          let Just k = H.lookup "key" obj
-              Just v = H.lookup "value" obj
-              Success key = fromJSON k
-              Success value = fromJSON v
-          in (key, value)) shortNamesArray
+    translatedcrateItemNames <- o .: "item_names"
+    translatedcrateShortNames <- o .: "short_names"
     translatedcrateFiles <- o .: "files"
     translatedcrateTypeDecls <- o .: "type_decls"
     translatedcrateFunDecls <- o .: "fun_decls"
