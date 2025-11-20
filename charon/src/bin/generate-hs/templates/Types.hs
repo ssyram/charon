@@ -9,12 +9,12 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_Types where
 
-import Data.Aeson (FromJSON)
+import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import Data.Text (Text)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import qualified Generated_Meta as M
-import qualified Generated_Values as Val
+import {-# SOURCE #-} qualified Generated_Values as Val
 
 -- Re-export commonly used types for convenience
 type Vector = M.Vector

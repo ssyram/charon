@@ -9,7 +9,7 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_LlbcAst where
 
-import Data.Aeson (FromJSON)
+import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import qualified Generated_Meta as M

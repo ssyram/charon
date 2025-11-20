@@ -9,7 +9,7 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_Values where
 
-import Data.Aeson (FromJSON, Value(..), parseJSON)
+import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, parseJSON, (.:), (.!=))
 import Data.Aeson.Types (Parser)
 import qualified Data.Text as Text
 import qualified Data.Aeson.KeyMap as H

@@ -1072,23 +1072,7 @@ fn generate_hs(
         ],
     });
 
-    // Values
-    let values_type_decl = extract_types2(
-        &ctx,
-        &mut temp_processed2,
-        &["Literal", "IntegerTy", "LiteralTy"],
-    );
-    generate_code_for_with_json.push(GenerateCodeFor {
-        template: template_dir.join("Values.hs"),
-        target: output_dir.join("Generated_Values.hs"),
-        target_module: TargetModule::Values,
-        markers: vec![
-            (GenerationKind::TypeDecl, values_type_decl.clone()),
-            (GenerationKind::FromJson, values_type_decl),
-        ],
-    });
-
-    // Types
+    // Types - must come before Values since Values depends on Types (FloatType)
     let types_type_decl = extract_types2(
         &ctx,
         &mut temp_processed2,
@@ -1114,6 +1098,22 @@ fn generate_hs(
         markers: vec![
             (GenerationKind::TypeDecl, types_type_decl.clone()),
             (GenerationKind::FromJson, types_type_decl),
+        ],
+    });
+
+    // Values - depends on Types
+    let values_type_decl = extract_types2(
+        &ctx,
+        &mut temp_processed2,
+        &["Literal", "IntegerTy", "LiteralTy"],
+    );
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("Values.hs"),
+        target: output_dir.join("Generated_Values.hs"),
+        target_module: TargetModule::Values,
+        markers: vec![
+            (GenerationKind::TypeDecl, values_type_decl.clone()),
+            (GenerationKind::FromJson, values_type_decl),
         ],
     });
 
