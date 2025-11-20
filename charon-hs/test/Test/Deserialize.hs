@@ -15,7 +15,7 @@ import Test.Tasty.HUnit
 import Generated_Meta
 import Generated_Values
 import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
-import Generated_Crate  -- TranslatedCrate and LlbcFile are here
+import Generated_GAst hiding (Assertion)  -- TranslatedCrate and LlbcFile are here
 
 tests :: TestTree
 tests = testGroup "Deserialization Tests"

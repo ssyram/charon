@@ -9,20 +9,21 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_UllbcAst where
 
-import Data.Aeson
+import Data.Aeson hiding (Error)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta
+import Generated_Meta hiding (Error)
+import qualified Generated_Meta as M
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
 -- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping)
+import Generated_GAst hiding (Call, CopyNonOverlapping, Error)
 
 data Block = Block
-  { blockStatements :: [U.Statement]
-  , blockTerminator :: U.Terminator
+  { blockStatements :: [Statement]
+  , blockTerminator :: Terminator
   }
   deriving (Show, Eq, Ord)
 
@@ -31,11 +32,11 @@ data BlockId = BlockId
   }
   deriving (Show, Eq, Ord)
 
-type Blocks = (Vector U.BlockId U.Block)
+type Blocks = (Vector BlockId Block)
 
 data Statement = Statement
   { statementSpan :: Span
-  , statementKind :: U.StatementKind
+  , statementKind :: StatementKind
   ,   -- | Comments that precede this statement.
   statementCommentsBefore :: [String]
   }
@@ -52,23 +53,23 @@ data StatementKind = Assign Place Rvalue
   | Nop
   deriving (Show, Eq, Ord)
 
-data Switch = If U.BlockId U.BlockId
-  | SwitchInt LiteralType ([(Literal, U.BlockId)]) U.BlockId
+data Switch = If BlockId BlockId
+  | SwitchInt LiteralType ([(Literal, BlockId)]) BlockId
   deriving (Show, Eq, Ord)
 
 data Terminator = Terminator
   { terminatorSpan :: Span
-  , terminatorKind :: U.TerminatorKind
+  , terminatorKind :: TerminatorKind
   ,   -- | Comments that precede this terminator.
   terminatorCommentsBefore :: [String]
   }
   deriving (Show, Eq, Ord)
 
 -- | A raw terminator: a terminator without meta data.
-data TerminatorKind = Goto U.BlockId
-  | Switch Operand U.Switch
-  | Call G.Call U.BlockId U.BlockId
-  | Drop Place TraitRef U.BlockId U.BlockId
+data TerminatorKind = Goto BlockId
+  | Switch Operand Switch
+  | Call G.Call BlockId BlockId
+  | Drop Place TraitRef BlockId BlockId
   | Abort AbortKind
   | Return
   | UnwindResume

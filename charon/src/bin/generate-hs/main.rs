@@ -212,7 +212,7 @@ impl<'a> GenerateCtx<'a> {
 }
 
 /// Converts a type to the appropriate Haskell type name.
-fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
+fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule) -> String {
     match ty.kind() {
         TyKind::Literal(LiteralTy::Bool) => "Bool".to_string(),
         TyKind::Literal(LiteralTy::Char) => "Char".to_string(),
@@ -230,7 +230,7 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                 .generics
                 .types
                 .iter()
-                .map(|ty| type_to_haskell_name(ctx, ty))
+                .map(|ty| type_to_haskell_name(ctx, ty, target_module))
                 .collect_vec();
             match tref.id {
                 TypeId::Adt(id) => {
@@ -239,20 +239,33 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty) -> String {
                         let full_name = repr_name(ctx.crate_data, &tdecl.item_meta.name);
                         
                         // Qualify types based on their module to avoid conflicts
-                        if full_name.contains("::llbc_ast::") {
-                            // Type is from LLBC module, qualify with L.
-                            format!("L.{}", ty_name)
-                        } else if full_name.contains("::ullbc_ast::") {
-                            // Type is from ULLBC module, qualify with U.
-                            format!("U.{}", ty_name)
-                        } else if full_name.contains("::errors::") || ty_name == "Error" {
-                            // Error type from errors module needs M. qualification to avoid conflict with variant
-                            format!("M.{}", ty_name)
-                        } else if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
-                            // Qualify GAst types that conflict with Llbc/Ullbc variant constructors
-                            format!("G.{}", ty_name)
+                        // Only qualify when generating for GAst module
+                        if target_module == TargetModule::GAst {
+                            if full_name.contains("::llbc_ast::") {
+                                // Type is from LLBC module, qualify with L.
+                                format!("L.{}", ty_name)
+                            } else if full_name.contains("::ullbc_ast::") {
+                                // Type is from ULLBC module, qualify with U.
+                                format!("U.{}", ty_name)
+                            } else if full_name.contains("::errors::") || ty_name == "Error" {
+                                // Error type from errors module needs M. qualification to avoid conflict with variant
+                                format!("M.{}", ty_name)
+                            } else if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
+                                // Qualify GAst types that conflict with Llbc/Ullbc variant constructors
+                                format!("G.{}", ty_name)
+                            } else {
+                                ty_name
+                            }
                         } else {
-                            ty_name
+                            // For non-GAst modules, don't qualify llbc/ullbc types
+                            // But still qualify Error to avoid conflicts
+                            if full_name.contains("::errors::") || ty_name == "Error" {
+                                format!("M.{}", ty_name)
+                            } else if matches!(ty_name.as_str(), "Call" | "CopyNonOverlapping") {
+                                format!("G.{}", ty_name)
+                            } else {
+                                ty_name
+                            }
                         }
                     } else {
                         format!("MissingType{id}")
@@ -349,11 +362,11 @@ fn build_type(_ctx: &GenerateCtx, decl: &TypeDecl, body: &str) -> String {
 }
 
 /// Generate a Haskell type declaration that mirrors `decl`.
-fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
+fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: TargetModule) -> String {
     let body = match &decl.kind {
         _ if let Some(def) = ctx.manual_type_impls.get(&decl.def_id) => def.clone(),
         TypeDeclKind::Alias(ty) => {
-            let ty_str = type_to_haskell_name(ctx, ty);
+            let ty_str = type_to_haskell_name(ctx, ty, target_module);
             return format!(
                 "type {} = {}",
                 type_name_to_haskell_ident(&decl.item_meta),
@@ -371,7 +384,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
-                    let ty_str = type_to_haskell_name(ctx, &f.ty);
+                    let ty_str = type_to_haskell_name(ctx, &f.ty, target_module);
                     // Wrap complex types in parentheses
                     if ty_str.contains(' ') || ty_str.starts_with('(') {
                         format!("({ty_str})")
@@ -398,7 +411,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                         ty_name.to_lowercase(),
                         base_field_name
                     ));
-                    let field_ty = type_to_haskell_name(ctx, &f.ty);
+                    let field_ty = type_to_haskell_name(ctx, &f.ty, target_module);
                     let comment = extract_doc_comments(&f.attr_info);
                     let comment = build_doc_comment(comment, 1);
                     let comment_part = if comment.is_empty() {
@@ -426,7 +439,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                             .fields
                             .iter()
                             .map(|f| {
-                                let ty_str = type_to_haskell_name(ctx, &f.ty);
+                                let ty_str = type_to_haskell_name(ctx, &f.ty, target_module);
                                 // Wrap complex types in parentheses
                                 if ty_str.contains(' ') || ty_str.starts_with('(') {
                                     format!("({ty_str})")
@@ -442,7 +455,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
                             .fields
                             .iter()
                             .map(|f| {
-                                let ty_str = type_to_haskell_name(ctx, &f.ty);
+                                let ty_str = type_to_haskell_name(ctx, &f.ty, target_module);
                                 // Wrap complex types in parentheses
                                 if ty_str.contains(' ') || ty_str.starts_with('(') {
                                     format!("({ty_str})")
@@ -465,7 +478,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
 }
 
 /// Generate Aeson FromJSON instance for a type
-fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl) -> String {
+fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl, target_module: TargetModule) -> String {
     // Skip generating FromJSON instances for type aliases to avoid overlapping instances
     if matches!(&decl.kind, TypeDeclKind::Alias(_)) {
         return String::new();
@@ -708,10 +721,23 @@ enum GenerationKind {
     TypeDecl,
 }
 
+/// Module being generated
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TargetModule {
+    Meta,
+    Types,
+    Expressions,
+    GAst,
+    LlbcAst,
+    UllbcAst,
+}
+
 /// Replace markers in `template` with auto-generated code.
 struct GenerateCodeFor {
     template: PathBuf,
     target: PathBuf,
+    /// Target module being generated
+    target_module: TargetModule,
     /// Each list corresponds to a marker. We replace the ith `{- __REPLACE{i}__ -}` marker with
     /// generated code for each definition in the ith list.
     markers: Vec<(GenerationKind, HashSet<TypeDeclId>)>,
@@ -738,13 +764,13 @@ impl GenerateCodeFor {
             let generated = match kind {
                 GenerationKind::FromJson => {
                     let instances = tys
-                        .map(|ty| type_decl_to_json_deserializer(ctx, ty))
+                        .map(|ty| type_decl_to_json_deserializer(ctx, ty, self.target_module))
                         .format("\n\n");
                     format!("{instances}")
                 }
                 GenerationKind::TypeDecl => {
                     let decls = tys
-                        .map(|ty| type_decl_to_haskell_decl(ctx, ty))
+                        .map(|ty| type_decl_to_haskell_decl(ctx, ty, self.target_module))
                         .format("\n\n");
                     format!("{decls}")
                 }
@@ -1030,6 +1056,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Meta.hs"),
         target: output_dir.join("Generated_Meta.hs"),
+        target_module: TargetModule::Meta,
         markers: vec![
             (GenerationKind::TypeDecl, meta_type_decl.clone()),
             (GenerationKind::FromJson, meta_type_decl),
@@ -1045,6 +1072,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Values.hs"),
         target: output_dir.join("Generated_Values.hs"),
+        target_module: TargetModule::Meta,  // Values module
         markers: vec![
             (GenerationKind::TypeDecl, values_type_decl.clone()),
             (GenerationKind::FromJson, values_type_decl),
@@ -1073,6 +1101,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Types.hs"),
         target: output_dir.join("Generated_Types.hs"),
+        target_module: TargetModule::Types,
         markers: vec![
             (GenerationKind::TypeDecl, types_type_decl.clone()),
             (GenerationKind::FromJson, types_type_decl),
@@ -1084,6 +1113,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Expressions.hs"),
         target: output_dir.join("Generated_Expressions.hs"),
+        target_module: TargetModule::Expressions,
         markers: vec![
             (GenerationKind::TypeDecl, expressions_type_decl.clone()),
             (GenerationKind::FromJson, expressions_type_decl),
@@ -1120,6 +1150,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("LlbcAst.hs"),
         target: output_dir.join("Generated_LlbcAst.hs"),
+        target_module: TargetModule::LlbcAst,
         markers: vec![
             (GenerationKind::TypeDecl, llbc_type_decl.clone()),
             (GenerationKind::FromJson, llbc_type_decl),
@@ -1139,6 +1170,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("UllbcAst.hs"),
         target: output_dir.join("Generated_UllbcAst.hs"),
+        target_module: TargetModule::UllbcAst,
         markers: vec![
             (GenerationKind::TypeDecl, ullbc_type_decl.clone()),
             (GenerationKind::FromJson, ullbc_type_decl),
@@ -1160,6 +1192,7 @@ fn generate_hs(
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("GAst.hs"),
         target: output_dir.join("Generated_GAst.hs"),
+        target_module: TargetModule::GAst,
         markers: vec![
             (GenerationKind::TypeDecl, gast_type_decl.clone()),
             (GenerationKind::FromJson, gast_type_decl),

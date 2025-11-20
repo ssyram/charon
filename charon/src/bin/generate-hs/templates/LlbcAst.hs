@@ -12,13 +12,14 @@ module Generated_LlbcAst where
 import Data.Aeson hiding (Error)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta
+import Generated_Meta hiding (Error)
+import qualified Generated_Meta as M
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
 -- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping)
+import Generated_GAst hiding (Call, CopyNonOverlapping, Error)
 
 {- __REPLACE0__ -}
 

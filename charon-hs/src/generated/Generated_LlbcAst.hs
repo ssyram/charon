@@ -12,17 +12,18 @@ module Generated_LlbcAst where
 import Data.Aeson hiding (Error)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta
+import Generated_Meta hiding (Error)
+import qualified Generated_Meta as M
 import Generated_Values
 import Generated_Types
 import Generated_Expressions
 import qualified Generated_GAst as G
 -- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping)
+import Generated_GAst hiding (Call, CopyNonOverlapping, Error)
 
 data Block = Block
   { blockSpan :: Span
-  , blockStatements :: [L.Statement]
+  , blockStatements :: [Statement]
   }
   deriving (Show, Eq, Ord)
 
@@ -30,8 +31,8 @@ data Statement = Statement
   { statementSpan :: Span
   ,   -- | Integer uniquely identifying this statement among the statmeents in the current body. To
   -- | simplify things we generate globally-fresh ids when creating a new `Statement`.
-  statementStatementId :: L.StatementId
-  , statementKind :: L.StatementKind
+  statementStatementId :: StatementId
+  , statementKind :: StatementKind
   ,   -- | Comments that precede this statement.
   statementCommentsBefore :: [String]
   }
@@ -57,14 +58,14 @@ data StatementKind = Assign Place Rvalue
   | Break Int
   | Continue Int
   | Nop
-  | Switch L.Switch
-  | Loop L.Block
+  | Switch Switch
+  | Loop Block
   | Error String
   deriving (Show, Eq, Ord)
 
-data Switch = If Operand L.Block L.Block
-  | SwitchInt Operand LiteralType ([([Literal], L.Block)]) L.Block
-  | Match Place ([([VariantId], L.Block)]) (Maybe L.Block)
+data Switch = If Operand Block Block
+  | SwitchInt Operand LiteralType ([([Literal], Block)]) Block
+  | Match Place ([([VariantId], Block)]) (Maybe Block)
   deriving (Show, Eq, Ord)
 
 instance FromJSON Block where
