@@ -23,6 +23,7 @@ import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import {-# SOURCE #-} qualified Generated_Types as T
 import {-# SOURCE #-} qualified Generated_GAst as G
+import {-# SOURCE #-} qualified Generated_Expressions as E
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
