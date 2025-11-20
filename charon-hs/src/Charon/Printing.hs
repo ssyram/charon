@@ -30,8 +30,11 @@ import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
 import Generated_GAst
 import Generated_Types
+import qualified Generated_Types as T
 import Generated_Values
 import Generated_Expressions
+import Generated_Krate
+import qualified Generated_Meta as M
 
 -- | Tab increment for indentation (4 spaces)
 tabIncr :: Text
@@ -318,19 +321,268 @@ instance BuildWithCtx BuiltinFunId where
 
 -- Add more instances as needed...
 
--- Placeholder instances for complex types (to be fully implemented later)
+-- Region
+instance BuildWithCtx Region where
+  buildWithCtx ctx (RVar var) = buildWithCtx ctx var
+  buildWithCtx _ RStatic = "'static"
+
+-- DeBruijnVar
+instance BuildWithCtx a => BuildWithCtx (DeBruijnVar a) where
+  buildWithCtx ctx (Bound dbid varid) = 
+    "Bound(" <> buildWithCtx ctx dbid <> ", " <> buildWithCtx ctx varid <> ")"
+  buildWithCtx ctx (Free varid) = buildWithCtx ctx varid
+
+-- DeBruijnId
+instance BuildWithCtx DeBruijnId where
+  buildWithCtx _ (DeBruijnId i) = B.decimal i
+
+-- RegionId
+instance BuildWithCtx RegionId where
+  buildWithCtx _ (RegionId i) = B.decimal i
+
+-- TypeVarId
+instance BuildWithCtx TypeVarId where
+  buildWithCtx _ (TypeVarId i) = B.decimal i
+
+-- ConstGenericVarId
+instance BuildWithCtx ConstGenericVarId where
+  buildWithCtx _ (ConstGenericVarId i) = B.decimal i
+
+-- TraitClauseId
+instance BuildWithCtx TraitClauseId where
+  buildWithCtx _ (TraitClauseId i) = B.decimal i
+
+-- NullOp
+instance BuildWithCtx Nullop where
+  buildWithCtx _ SizeOf = "size_of"
+  buildWithCtx _ AlignOf = "align_of"
+  buildWithCtx _ (OffsetOf _) = "offset_of(?)"
+  buildWithCtx _ UbChecks = "ub_checks"
+
+-- ConstantExpr
+instance BuildWithCtx ConstantExpr where
+  buildWithCtx ctx (ConstantExpr kind _ty) = buildWithCtx ctx kind
+
+-- TraitItemName
+instance BuildWithCtx TraitItemName where
+  buildWithCtx _ (TraitItemName t) = fromText t
+
+-- ConstantExprKind
+instance BuildWithCtx ConstantExprKind where
+  buildWithCtx ctx (CLiteral lit) = buildWithCtx ctx lit
+  buildWithCtx ctx (CVar cg) = buildWithCtx ctx cg
+  buildWithCtx ctx (CTraitConst traitRef name) = 
+    buildWithCtx ctx traitRef <> "::" <> buildWithCtx ctx name
+  buildWithCtx ctx (CFnPtr fnPtr) = buildWithCtx ctx fnPtr
+  buildWithCtx _ (CRawMemory bytes) = "RawMemory(" <> fromString (show bytes) <> ")"
+  buildWithCtx _ (COpaque s) = "Opaque(" <> fromString s <> ")"
+
+-- Literal
+instance BuildWithCtx Literal where
+  buildWithCtx ctx (VScalar sv) = buildWithCtx ctx sv
+  buildWithCtx ctx (VFloat fv) = buildWithCtx ctx fv
+  buildWithCtx _ (VBool b) = if b then "true" else "false"
+  buildWithCtx _ (VChar c) = fromString (show c)
+  buildWithCtx _ (VStr s) = "\"" <> fromString (escapeString s) <> "\""
+    where
+      escapeString = concatMap escapeChar
+      escapeChar '\\' = "\\\\"
+      escapeChar '\n' = "\\n"
+      escapeChar '\r' = "\\r"
+      escapeChar '\t' = "\\t"
+      escapeChar c = [c]
+  buildWithCtx _ (VByteStr bs) = fromString (show bs)
+
+-- FloatValue
+instance BuildWithCtx FloatValue where
+  buildWithCtx _ (FloatValue val fty) = 
+    fromString val <> " : " <> buildWithCtx emptyCtx fty
+
+-- ScalarValue
+instance BuildWithCtx ScalarValue where
+  buildWithCtx _ (UnsignedScalar uty iv) = 
+    fromString (show iv) <> " : " <> buildWithCtx emptyCtx uty
+  buildWithCtx _ (SignedScalar ity iv) = 
+    fromString (show iv) <> " : " <> buildWithCtx emptyCtx ity
+
+-- IntegerType
+instance BuildWithCtx IntegerType where
+  buildWithCtx _ (Signed ity) = buildWithCtx emptyCtx ity
+  buildWithCtx _ (Unsigned uty) = buildWithCtx emptyCtx uty
+
+-- LiteralType  
 instance BuildWithCtx LiteralType where
-  buildWithCtx _ lt = fromString (show lt)
+  buildWithCtx _ (TInt ity) = buildWithCtx emptyCtx ity
+  buildWithCtx _ (TuInt uty) = buildWithCtx emptyCtx uty
+  buildWithCtx _ (TFloat fty) = buildWithCtx emptyCtx fty
+  buildWithCtx _ TChar = "char"
+  buildWithCtx _ TBool = "bool"
 
-instance BuildWithCtx Ty where
-  buildWithCtx _ ty = fromString (show ty)
-
-instance BuildWithCtx Operand where
-  buildWithCtx _ op = fromString (show op)
-
-instance BuildWithCtx Place where
-  buildWithCtx _ pl = fromString (show pl)
-
+-- FnOperand
 instance BuildWithCtx FnOperand where
-  buildWithCtx _ fn = fromString (show fn)
+  buildWithCtx ctx (FnOpRegular fnPtr) = buildWithCtx ctx fnPtr
+  buildWithCtx ctx (FnOpMove place) = "(move " <> buildWithCtx ctx place <> ")"
+
+-- FnPtr
+instance BuildWithCtx FnPtr where
+  buildWithCtx ctx (FnPtr kind generics) =
+    buildWithCtx ctx kind <> buildWithCtx ctx generics
+
+-- FnPtrKind
+instance BuildWithCtx FnPtrKind where
+  buildWithCtx ctx (FunId funId) = buildWithCtx ctx funId
+  buildWithCtx ctx (Generated_Types.TraitMethod traitRef methodName _) =
+    buildWithCtx ctx traitRef <> "::" <> buildWithCtx ctx methodName
+
+-- FunId
+instance BuildWithCtx FunId where
+  buildWithCtx ctx (FRegular fid) = buildWithCtx ctx fid
+  buildWithCtx _ (FBuiltin bid) = "@" <> buildWithCtx emptyCtx bid
+
+-- Operand
+instance BuildWithCtx Operand where
+  buildWithCtx ctx (Copy place) = "copy (" <> buildWithCtx ctx place <> ")"
+  buildWithCtx ctx (Move place) = "move (" <> buildWithCtx ctx place <> ")"
+  buildWithCtx ctx (Constant ce) = "const (" <> buildWithCtx ctx ce <> ")"
+
+-- Place
+instance BuildWithCtx Place where
+  buildWithCtx ctx (Place kind _ty) = buildPlaceKind ctx kind
+    where
+      buildPlaceKind ctx' (PlaceLocal lid) = buildWithCtx ctx' lid
+      buildPlaceKind ctx' (PlaceGlobal gref) = buildWithCtx ctx' gref
+      buildPlaceKind ctx' (PlaceProjection subplace proj) =
+        let base = buildPlaceKind ctx' (placeKind subplace)
+        in buildProjection ctx' base proj
+
+      buildProjection ctx' base Deref = "*(" <> base <> ")"
+      buildProjection ctx' base (Generated_Expressions.Field projKind fid) =
+        case projKind of
+          ProjAdt _tid Nothing -> "(" <> base <> ")." <> buildWithCtx ctx' fid
+          ProjAdt _tid (Just _vid) -> "(" <> base <> ")." <> buildWithCtx ctx' fid
+          ProjTuple _ -> "(" <> base <> ")." <> buildWithCtx ctx' fid
+      buildProjection _ base PtrMetadata = base <> ".metadata"
+      buildProjection ctx' base (ProjIndex offset fromEnd) = 
+        if fromEnd
+        then "(" <> base <> ")[-" <> buildWithCtx ctx' offset <> "]"
+        else "(" <> base <> ")[" <> buildWithCtx ctx' offset <> "]"
+      buildProjection ctx' base (Subslice from to fromEnd) =
+        if fromEnd
+        then "(" <> base <> ")[" <> buildWithCtx ctx' from <> "..-" <> buildWithCtx ctx' to <> "]"
+        else "(" <> base <> ")[" <> buildWithCtx ctx' from <> ".." <> buildWithCtx ctx' to <> "]"
+
+-- PlaceKind
+instance BuildWithCtx PlaceKind where
+  buildWithCtx ctx (PlaceLocal lid) = buildWithCtx ctx lid
+  buildWithCtx ctx (PlaceGlobal gref) = buildWithCtx ctx gref
+
+-- GlobalDeclRef
+instance BuildWithCtx GlobalDeclRef where
+  buildWithCtx ctx (GlobalDeclRef gid generics) =
+    buildWithCtx ctx gid <> buildWithCtx ctx generics
+
+-- GenericArgs
+instance BuildWithCtx GenericArgs where
+  buildWithCtx ctx ga@(GenericArgs (M.Vector regions) (M.Vector types) (M.Vector constGenerics) (M.Vector traitRefs)) =
+    let hasExplicits = not (null regions && null types && null constGenerics)
+        hasImplicits = not (null traitRefs)
+        explicits = if hasExplicits
+          then "<" <> mconcat (punctuate ", " (
+                 map (buildWithCtx ctx) regions ++
+                 map (buildWithCtx ctx) types ++
+                 map (buildWithCtx ctx) constGenerics
+               )) <> ">"
+          else ""
+        implicits = if hasImplicits
+          then "[" <> mconcat (punctuate ", " (map (buildWithCtx ctx) traitRefs)) <> "]"
+          else ""
+        punctuate _ [] = []
+        punctuate _ [x] = [x]
+        punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+    in explicits <> implicits
+
+-- TraitRef
+instance BuildWithCtx TraitRef where
+  buildWithCtx ctx (TraitRef kind traitDeclRef) =
+    buildWithCtx ctx kind <> buildWithCtx ctx traitDeclRef
+
+-- TraitRefKind
+instance BuildWithCtx TraitRefKind where
+  buildWithCtx ctx (Generated_Types.TraitImpl implRef) = buildWithCtx ctx implRef
+  buildWithCtx ctx (Clause var) = buildWithCtx ctx var
+  buildWithCtx ctx (ParentClause tr cid) = 
+    buildWithCtx ctx tr <> "::Parent[" <> buildWithCtx ctx cid <> "]"
+  buildWithCtx ctx (ItemClause tr name cid) =
+    buildWithCtx ctx tr <> "::" <> buildWithCtx ctx name <> "[" <> buildWithCtx ctx cid <> "]"
+  buildWithCtx _ Self = "Self"
+  buildWithCtx _ (BuiltinOrAuto _ _ _) = "BuiltinOrAuto(...)"
+
+-- RegionBinder
+instance BuildWithCtx a => BuildWithCtx (RegionBinder a) where
+  buildWithCtx ctx (RegionBinder regions value) =
+    buildWithCtx ctx value  -- Simplified - not handling region binders properly yet
+
+-- TraitImplRef
+instance BuildWithCtx TraitImplRef where
+  buildWithCtx ctx (TraitImplRef tid generics) =
+    buildWithCtx ctx tid <> buildWithCtx ctx generics
+
+-- TraitDeclRef
+instance BuildWithCtx TraitDeclRef where
+  buildWithCtx ctx (TraitDeclRef tid generics) =
+    buildWithCtx ctx tid <> buildWithCtx ctx generics
+
+-- ConstGeneric
+instance BuildWithCtx ConstGeneric where
+  buildWithCtx ctx (CgVar varid) = buildWithCtx ctx varid
+  buildWithCtx _ (CgValue lit) = buildWithCtx emptyCtx lit
+  buildWithCtx ctx (CgGlobal gid) = buildWithCtx ctx gid
+
+-- Ty (Type) - This is complex, start with basic structure
+instance BuildWithCtx Ty where
+  buildWithCtx ctx (TAdt tdeclRef) = buildWithCtx ctx tdeclRef
+  buildWithCtx ctx (TVar tvid) = buildWithCtx ctx tvid
+  buildWithCtx _ (TLiteral lt) = buildWithCtx emptyCtx lt
+  buildWithCtx _ TNever = "!"
+  buildWithCtx ctx (TRef region ty refKind) =
+    "&" <> buildWithCtx ctx region <> " " <> buildWithCtx ctx refKind <> " " <> buildWithCtx ctx ty
+  buildWithCtx ctx (TRawPtr ty refKind) =
+    "*" <> buildWithCtx ctx refKind <> " " <> buildWithCtx ctx ty
+  buildWithCtx ctx (TTraitType traitRef tyName) =
+    buildWithCtx ctx traitRef <> "::" <> buildWithCtx ctx tyName
+  buildWithCtx _ (TDynTrait _) = "dyn (?)"
+  buildWithCtx ctx (TFnPtr _) = "fn(...)"  -- Simplified for now
+  buildWithCtx ctx (TFnDef _) = "fn_def(...)"  -- Simplified for now
+  buildWithCtx ctx (TPtrMetadata ty) = "PtrMetadata(" <> buildWithCtx ctx ty <> ")"
+  buildWithCtx _ (TError msg) = "Error(" <> fromString msg <> ")"
+
+-- TypeDeclRef
+instance BuildWithCtx TypeDeclRef where
+  buildWithCtx ctx (TypeDeclRef tid generics) =
+    buildWithCtx ctx tid <> buildWithCtx ctx generics
+
+-- TypeId
+instance BuildWithCtx TypeId where
+  buildWithCtx ctx (TAdtId tdid) = buildWithCtx ctx tdid
+  buildWithCtx _ TTuple = "()"
+  buildWithCtx ctx (TBuiltin bt) = buildWithCtx ctx bt
+
+-- BuiltinTy
+instance BuildWithCtx BuiltinTy where
+  buildWithCtx _ TBox = "Box"
+  buildWithCtx _ TArray = "Array"
+  buildWithCtx _ TSlice = "Slice"
+  buildWithCtx _ TStr = "str"
+
+-- FunSig
+instance BuildWithCtx FunSig where
+  buildWithCtx ctx (FunSig isUnsafe _generics inputs output) =
+    let unsafe = if isUnsafe then "unsafe " else ""
+    in unsafe <> "fn(" <> mconcat (punctuate ", " (map (buildWithCtx ctx) inputs)) <> ")" <>
+       (if isUnitType output then "" else " -> " <> buildWithCtx ctx output)
+    where
+      isUnitType _ = False  -- We'll need better logic to detect unit type
+      punctuate _ [] = []
+      punctuate _ [x] = [x]
+      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
