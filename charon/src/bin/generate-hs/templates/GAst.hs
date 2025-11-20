@@ -17,13 +17,19 @@ import qualified Data.Vector as V
 import qualified Generated_Meta as M
 import qualified Generated_Types as T
 import qualified Generated_Expressions as E
-import {-# SOURCE #-} qualified Generated_LlbcAst as L
-import {-# SOURCE #-} qualified Generated_UllbcAst as U
+import qualified Generated_LlbcAst as L
+import qualified Generated_UllbcAst as U
+import qualified Generated_Krate as K
 
 -- Re-export commonly used types for convenience
 type Vector = M.Vector
 type Span = M.Span
 type PathBuf = M.PathBuf
+
+-- Re-export Krate types for backward compatibility
+type Body = K.Body
+type FunDecl = K.FunDecl
+type TranslatedCrate = K.TranslatedCrate
 
 {- __REPLACE0__ -}
 

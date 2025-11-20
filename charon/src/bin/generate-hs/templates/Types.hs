@@ -14,9 +14,9 @@ import Data.Text (Text)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import qualified Generated_Meta as M
-import {-# SOURCE #-} qualified Generated_Values as Val
-import {-# SOURCE #-} qualified Generated_Expressions as E
-import {-# SOURCE #-} qualified Generated_GAst as G
+import qualified Generated_Values as Val
+import qualified Generated_Expressions as E
+import qualified Generated_GAst as G
 
 -- Re-export commonly used types for convenience
 type Vector = M.Vector

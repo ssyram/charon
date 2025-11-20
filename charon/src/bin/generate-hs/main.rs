@@ -273,6 +273,7 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule)
                                 TargetModule::GAst => "G.",
                                 TargetModule::LlbcAst => "L.",
                                 TargetModule::UllbcAst => "U.",
+                                TargetModule::Krate => "K.",
                             }
                         };
                         
@@ -746,6 +747,7 @@ enum TargetModule {
     GAst,
     LlbcAst,
     UllbcAst,
+    Krate,
 }
 
 /// Replace markers in `template` with auto-generated code.
@@ -1098,9 +1100,10 @@ fn generate_hs(
         ],
     });
 
-    // GAst (part 1) - extract types that don't depend on LLBC/ULLBC
+    // GAst - extract types that don't depend on LLBC/ULLBC
     // This prevents them from being pulled into LLBC/ULLBC modules
-    let gast_base_types = extract_types2(
+    // Excludes Body, FunDecl, TranslatedCrate which go into Krate module
+    let gast_type_decl = extract_types2(
         &ctx,
         &mut temp_processed2,
         &[
@@ -1116,8 +1119,18 @@ fn generate_hs(
             "CliOpts",
             "GExprBody",
             "DeclarationGroup",
+            "TargetInfo",
         ],
     );
+    generate_code_for_with_json.push(GenerateCodeFor {
+        template: template_dir.join("GAst.hs"),
+        target: output_dir.join("Generated_GAst.hs"),
+        target_module: TargetModule::GAst,
+        markers: vec![
+            (GenerationKind::TypeDecl, gast_type_decl.clone()),
+            (GenerationKind::FromJson, gast_type_decl),
+        ],
+    });
 
     // LlbcAst - extract AFTER base GAst types so they don't get duplicated
     let llbc_type_decl = extract_types2(
@@ -1155,9 +1168,9 @@ fn generate_hs(
         ],
     });
 
-    // GAst (part 2) - extract types that depend on LLBC/ULLBC (like Body, FunDecl, TranslatedCrate)
-    // Combine with base types for a complete GAst module
-    let gast_cross_module_types = extract_types2(
+    // Krate - extract Body, FunDecl, TranslatedCrate AFTER all other modules
+    // These types depend on LLBC/ULLBC and sit at the top of the dependency tree
+    let krate_type_decl = extract_types2(
         &ctx,
         &mut temp_processed2,
         &[
@@ -1166,14 +1179,13 @@ fn generate_hs(
             "TranslatedCrate",
         ],
     );
-    let gast_type_decl: HashSet<TypeDeclId> = gast_base_types.union(&gast_cross_module_types).copied().collect();
     generate_code_for_with_json.push(GenerateCodeFor {
-        template: template_dir.join("GAst.hs"),
-        target: output_dir.join("Generated_GAst.hs"),
-        target_module: TargetModule::GAst,
+        template: template_dir.join("Krate.hs"),
+        target: output_dir.join("Generated_Krate.hs"),
+        target_module: TargetModule::Krate,
         markers: vec![
-            (GenerationKind::TypeDecl, gast_type_decl.clone()),
-            (GenerationKind::FromJson, gast_type_decl),
+            (GenerationKind::TypeDecl, krate_type_decl.clone()),
+            (GenerationKind::FromJson, krate_type_decl),
         ],
     });
 
