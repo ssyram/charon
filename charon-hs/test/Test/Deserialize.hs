@@ -12,10 +12,17 @@ import Test.Tasty.HUnit
     ( testCase, assertBool, assertEqual, assertFailure, Assertion )
 
 -- Import generated modules
-import Generated_Meta
-import Generated_Values
+import qualified Generated_Meta as M
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
 import Generated_GAst hiding (Assertion)  -- Hide Assertion to avoid conflict with HUnit's Assertion
 import Generated_Krate  -- TranslatedCrate and LlbcFile are here
+
+-- Re-export commonly used types for tests
+type FileId = M.FileId
+type IntTy = T.IntTy
+type FloatType = T.FloatType
+type UIntTy = T.UIntTy
 
 tests :: TestTree
 tests = testGroup "Deserialization Tests"
@@ -38,15 +45,15 @@ test_fileId_parse = do
   let result = eitherDecodeStrict json :: Either String FileId
   case result of
     Left err -> assertFailure $ "Failed to parse FileId: " ++ err
-    Right (FileId fileIdVal) -> assertEqual "FileId value" 0 fileIdVal
+    Right (M.FileId fileIdVal) -> assertEqual "FileId value" 0 fileIdVal
 
 test_intTy_parse :: Assertion
 test_intTy_parse = do
-  let json = BS8.pack "\"I32\""
+  let json = BS8.pack "\"T.I32\""
   let result = eitherDecodeStrict json :: Either String IntTy
   case result of
     Left err -> assertFailure $ "Failed to parse IntTy: " ++ err
-    Right intTy -> assertEqual "IntTy value" I32 intTy
+    Right intTy -> assertEqual "IntTy value" T.I32 intTy
 
 test_floatType_parse :: Assertion
 test_floatType_parse = do
