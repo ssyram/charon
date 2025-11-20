@@ -154,7 +154,7 @@ data Place = Place
   }
   deriving (Show, Eq, Ord)
 
-data PlaceKind = PlaceLocal Val.LocalId
+data PlaceKind = PlaceLocal LocalId
   | PlaceProjection Place ProjectionElem
   | PlaceGlobal G.GlobalDeclRef
   deriving (Show, Eq, Ord)

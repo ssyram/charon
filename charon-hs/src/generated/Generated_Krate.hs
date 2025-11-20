@@ -19,7 +19,7 @@ data Body = Unstructured ((G.GexprBody (M.Vector U.BlockId U.Block)))
   | TraitMethodWithoutDefault
   | Opaque
   | Missing
-  | Error M.Error
+  | Error Error
   deriving (Show, Eq, Ord)
 
 -- | Common error used during the translation.
@@ -45,7 +45,7 @@ data FunDecl = FunDecl
   ,   -- | The function body, unless the function is opaque.
   -- | Opaque functions are: external functions, or local functions tagged
   -- | as opaque.
-  fundeclBody :: G.Body
+  fundeclBody :: Body
   }
   deriving (Show, Eq, Ord)
 
@@ -71,7 +71,7 @@ data TranslatedCrate = TranslatedCrate
   ,   -- | The translated type definitions
   translatedcrateTypeDecls :: (M.Vector G.TypeDeclId T.TypeDecl)
   ,   -- | The translated function definitions
-  translatedcrateFunDecls :: (M.Vector G.FunDeclId G.FunDecl)
+  translatedcrateFunDecls :: (M.Vector G.FunDeclId FunDecl)
   ,   -- | The translated global definitions
   translatedcrateGlobalDecls :: (M.Vector G.GlobalDeclId G.GlobalDecl)
   ,   -- | The translated trait declarations

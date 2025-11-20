@@ -212,7 +212,7 @@ impl<'a> GenerateCtx<'a> {
 }
 
 /// Converts a type to the appropriate Haskell type name.
-fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule) -> String {
+fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule, local_types: &HashSet<TypeDeclId>) -> String {
     match ty.kind() {
         TyKind::Literal(LiteralTy::Bool) => "Bool".to_string(),
         TyKind::Literal(LiteralTy::Char) => "Char".to_string(),
@@ -230,7 +230,7 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule)
                 .generics
                 .types
                 .iter()
-                .map(|ty| type_to_haskell_name(ctx, ty, target_module))
+                .map(|ty| type_to_haskell_name(ctx, ty, target_module, local_types))
                 .collect_vec();
             match tref.id {
                 TypeId::Adt(id) => {
@@ -242,38 +242,45 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule)
                         // Since all imports are now qualified, we need to add module prefixes
                         // BUT: Don't qualify types that are local to the module being generated
                         
-                        let type_module = if full_name.contains("::meta::") || full_name.contains("::errors::") {
-                            TargetModule::Meta
-                        } else if full_name.contains("::types::") {
-                            TargetModule::Types
-                        } else if full_name.contains("::values::") {
-                            TargetModule::Values
-                        } else if full_name.contains("::expressions::") {
-                            TargetModule::Expressions
-                        } else if full_name.contains("::llbc_ast::") {
-                            TargetModule::LlbcAst
-                        } else if full_name.contains("::ullbc_ast::") {
-                            TargetModule::UllbcAst
-                        } else if full_name.contains("::gast::") || full_name.contains("::krate::") {
-                            TargetModule::GAst
-                        } else {
-                            // Default - can't determine, assume it's local
-                            target_module
-                        };
-                        
-                        // Only qualify if type is from a different module
-                        let module_prefix = if type_module == target_module {
+                        // First check if this type is local to the current module
+                        let module_prefix = if local_types.contains(&id) {
+                            // Type is being generated in the current module, don't qualify
                             ""
                         } else {
-                            match type_module {
-                                TargetModule::Meta => "M.",
-                                TargetModule::Values => "Val.",
-                                TargetModule::Types => "T.",
-                                TargetModule::Expressions => "E.",
-                                TargetModule::GAst => "G.",
-                                TargetModule::LlbcAst => "L.",
-                                TargetModule::UllbcAst => "U.",
-                                TargetModule::Krate => "K.",
+                            // Type is from another module, determine which one and add prefix
+                            let type_module = if full_name.contains("::meta::") || full_name.contains("::errors::") {
+                                TargetModule::Meta
+                            } else if full_name.contains("::types::") {
+                                TargetModule::Types
+                            } else if full_name.contains("::values::") {
+                                TargetModule::Values
+                            } else if full_name.contains("::expressions::") {
+                                TargetModule::Expressions
+                            } else if full_name.contains("::llbc_ast::") {
+                                TargetModule::LlbcAst
+                            } else if full_name.contains("::ullbc_ast::") {
+                                TargetModule::UllbcAst
+                            } else if full_name.contains("::gast::") || full_name.contains("::krate::") {
+                                TargetModule::GAst
+                            } else {
+                                // Default - can't determine, assume it's local
+                                target_module
+                            };
+                            
+                            // Only qualify if type is from a different module
+                            if type_module == target_module {
+                                ""
+                            } else {
+                                match type_module {
+                                    TargetModule::Meta => "M.",
+                                    TargetModule::Values => "Val.",
+                                    TargetModule::Types => "T.",
+                                    TargetModule::Expressions => "E.",
+                                    TargetModule::GAst => "G.",
+                                    TargetModule::LlbcAst => "L.",
+                                    TargetModule::UllbcAst => "U.",
+                                    TargetModule::Krate => "K.",
+                                }
                             }
                         };
                         
@@ -378,11 +385,11 @@ fn build_type(_ctx: &GenerateCtx, decl: &TypeDecl, body: &str) -> String {
 }
 
 /// Generate a Haskell type declaration that mirrors `decl`.
-fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: TargetModule) -> String {
+fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: TargetModule, local_types: &HashSet<TypeDeclId>) -> String {
     let body = match &decl.kind {
         _ if let Some(def) = ctx.manual_type_impls.get(&decl.def_id) => def.clone(),
         TypeDeclKind::Alias(ty) => {
-            let ty_str = type_to_haskell_name(ctx, ty, target_module);
+            let ty_str = type_to_haskell_name(ctx, ty, target_module, local_types);
             return format!(
                 "type {} = {}",
                 type_name_to_haskell_ident(&decl.item_meta),
@@ -400,7 +407,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: 
                 .iter()
                 .filter(|f| !f.is_opaque())
                 .map(|f| {
-                    let ty_str = type_to_haskell_name(ctx, &f.ty, target_module);
+                    let ty_str = type_to_haskell_name(ctx, &f.ty, target_module, local_types);
                     // Wrap complex types in parentheses
                     if ty_str.contains(' ') || ty_str.starts_with('(') {
                         format!("({ty_str})")
@@ -427,7 +434,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: 
                         ty_name.to_lowercase(),
                         base_field_name
                     ));
-                    let field_ty = type_to_haskell_name(ctx, &f.ty, target_module);
+                    let field_ty = type_to_haskell_name(ctx, &f.ty, target_module, local_types);
                     let comment = extract_doc_comments(&f.attr_info);
                     let comment = build_doc_comment(comment, 1);
                     let comment_part = if comment.is_empty() {
@@ -455,7 +462,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: 
                             .fields
                             .iter()
                             .map(|f| {
-                                let ty_str = type_to_haskell_name(ctx, &f.ty, target_module);
+                                let ty_str = type_to_haskell_name(ctx, &f.ty, target_module, local_types);
                                 // Wrap complex types in parentheses
                                 if ty_str.contains(' ') || ty_str.starts_with('(') {
                                     format!("({ty_str})")
@@ -471,7 +478,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: 
                             .fields
                             .iter()
                             .map(|f| {
-                                let ty_str = type_to_haskell_name(ctx, &f.ty, target_module);
+                                let ty_str = type_to_haskell_name(ctx, &f.ty, target_module, local_types);
                                 // Wrap complex types in parentheses
                                 if ty_str.contains(' ') || ty_str.starts_with('(') {
                                     format!("({ty_str})")
@@ -494,7 +501,7 @@ fn type_decl_to_haskell_decl(ctx: &GenerateCtx, decl: &TypeDecl, target_module: 
 }
 
 /// Generate Aeson FromJSON instance for a type
-fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl, target_module: TargetModule) -> String {
+fn type_decl_to_json_deserializer(ctx: &GenerateCtx, decl: &TypeDecl, _target_module: TargetModule, _local_types: &HashSet<TypeDeclId>) -> String {
     // Skip generating FromJSON instances for type aliases to avoid overlapping instances
     if matches!(&decl.kind, TypeDeclKind::Alias(_)) {
         return String::new();
@@ -782,13 +789,13 @@ impl GenerateCodeFor {
             let generated = match kind {
                 GenerationKind::FromJson => {
                     let instances = tys
-                        .map(|ty| type_decl_to_json_deserializer(ctx, ty, self.target_module))
+                        .map(|ty| type_decl_to_json_deserializer(ctx, ty, self.target_module, names))
                         .format("\n\n");
                     format!("{instances}")
                 }
                 GenerationKind::TypeDecl => {
                     let decls = tys
-                        .map(|ty| type_decl_to_haskell_decl(ctx, ty, self.target_module))
+                        .map(|ty| type_decl_to_haskell_decl(ctx, ty, self.target_module, names))
                         .format("\n\n");
                     format!("{decls}")
                 }

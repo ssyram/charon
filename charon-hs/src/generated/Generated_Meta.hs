@@ -22,6 +22,7 @@ import qualified Data.Text as Text
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
+import {-# SOURCE #-} qualified Generated_Types as T
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -103,15 +104,15 @@ data Attribute = AttrOpaque
 -- | parameters that aren't on the top-level item, e.g. `for<'a>` clauses (uses `RegionBinder` for
 -- | now), trait methods, GATs (TODO).
 data Binder a0 = Binder
-  { binderBinderParams :: T.GenericParams
+  { binderBinderParams :: GenericParams
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
   binderBinderValue :: a0
   }
   deriving (Show, Eq, Ord)
 
-data BinderKind = BkTraitType G.TraitDeclId G.TraitItemName
-  | BkTraitMethod G.TraitDeclId G.TraitItemName
+data BinderKind = BkTraitType TraitDeclId TraitItemName
+  | BkTraitMethod TraitDeclId TraitItemName
   | BkInherentImplBlock
   | BkDyn
   | BkOther
@@ -123,8 +124,8 @@ data BuiltinFunId = BoxNew
   | ArrayToSliceShared
   | ArrayToSliceMut
   | ArrayRepeat
-  | Index E.BuiltinIndexOp
-  | PtrFromParts T.RefKind
+  | Index BuiltinIndexOp
+  | PtrFromParts RefKind
   deriving (Show, Eq, Ord)
 
 -- | Describes a built-in impl. Mostly lists the implemented trait, sometimes with more details
@@ -153,7 +154,7 @@ data BuiltinIndexOp = BuiltinIndexOp
   builtinindexopIsArray :: Bool
   ,   -- | Whether we're indexing mutably or not. Determines the type ofreference of the input and
   -- | output.
-  builtinindexopMutability :: T.RefKind
+  builtinindexopMutability :: RefKind
   ,   -- | Whether we're indexing a single element or a subrange. If `true`, the function takes
   -- | two indices and the output is a slice; otherwise, the function take one index and the
   -- | output is a reference to a single element.
@@ -178,19 +179,19 @@ data BuiltinTy = TBox
   deriving (Show, Eq, Ord)
 
 -- | Const Generic Values. Either a primitive value, or a variable corresponding to a primitve value
-data ConstGeneric = CgGlobal G.GlobalDeclId
-  | CgVar ((T.DeBruijnVar T.ConstGenericVarId))
-  | CgValue Val.Literal
+data ConstGeneric = CgGlobal GlobalDeclId
+  | CgVar ((DeBruijnVar ConstGenericVarId))
+  | CgValue Literal
   deriving (Show, Eq, Ord)
 
 -- | A const generic variable in a signature or binder.
 data ConstGenericParam = ConstGenericParam
   {   -- | Index identifying the variable among other variables bound at the same level.
-  constgenericparamIndex :: T.ConstGenericVarId
+  constgenericparamIndex :: ConstGenericVarId
   ,   -- | Const generic name
   constgenericparamName :: String
   ,   -- | Type of the const generic
-  constgenericparamTy :: T.LiteralType
+  constgenericparamTy :: LiteralType
   }
   deriving (Show, Eq, Ord)
 
@@ -238,7 +239,7 @@ data DeBruijnId = DeBruijnId
 -- | ```
 -- | 
 -- | At the moment only region variables can be bound in a non-top-level binder.
-data DeBruijnVar a0 = Bound T.DeBruijnId a0
+data DeBruijnVar a0 = Bound DeBruijnId a0
   | Free a0
   deriving (Show, Eq, Ord)
 
@@ -255,7 +256,7 @@ data DynPredicate = DynPredicate
   -- | 
   -- | Only the first trait clause may have methods. We use the vtable of this trait in the `dyn
   -- | Trait` pointer metadata.
-  dynpredicateBinder :: (T.Binder T.Ty)
+  dynpredicateBinder :: (Binder T.Ty)
   }
   deriving (Show, Eq, Ord)
 
@@ -291,18 +292,18 @@ data FloatType = F16
 -- | to derive the Eq and Ord traits, which are not implemented for floats
 data FloatValue = FloatValue
   { floatvalueFloatValue :: String
-  , floatvalueFloatTy :: T.FloatType
+  , floatvalueFloatTy :: FloatType
   }
   deriving (Show, Eq, Ord)
 
 data FnPtr = FnPtr
-  { fnptrKind :: E.FnPtrKind
-  , fnptrGenerics :: T.GenericArgs
+  { fnptrKind :: FnPtrKind
+  , fnptrGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
-data FnPtrKind = FunId E.FunId
-  | TraitMethod T.TraitRef G.TraitItemName G.FunDeclId
+data FnPtrKind = FunId FunId
+  | TraitMethod TraitRef TraitItemName FunDeclId
   deriving (Show, Eq, Ord)
 
 data FunDeclId = FunDeclId
@@ -311,16 +312,16 @@ data FunDeclId = FunDeclId
   deriving (Show, Eq, Ord)
 
 -- | A function identifier. See [crate::ullbc_ast::Terminator]
-data FunId = FRegular G.FunDeclId
-  | FBuiltin E.BuiltinFunId
+data FunId = FRegular FunDeclId
+  | FBuiltin BuiltinFunId
   deriving (Show, Eq, Ord)
 
 -- | A set of generic arguments.
 data GenericArgs = GenericArgs
-  { genericargsRegions :: (Vector T.RegionId T.Region)
-  , genericargsTypes :: (Vector T.TypeVarId T.Ty)
-  , genericargsConstGenerics :: (Vector T.ConstGenericVarId T.ConstGeneric)
-  , genericargsTraitRefs :: (Vector T.TraitClauseId T.TraitRef)
+  { genericargsRegions :: (Vector RegionId Region)
+  , genericargsTypes :: (Vector TypeVarId T.Ty)
+  , genericargsConstGenerics :: (Vector ConstGenericVarId ConstGeneric)
+  , genericargsTraitRefs :: (Vector TraitClauseId TraitRef)
   }
   deriving (Show, Eq, Ord)
 
@@ -332,16 +333,16 @@ data GenericArgs = GenericArgs
 -- | trait clauses, because those enforce constraints but do not need to
 -- | be filled with witnesses/instances.
 data GenericParams = GenericParams
-  { genericparamsRegions :: (Vector T.RegionId T.RegionParam)
-  , genericparamsTypes :: (Vector T.TypeVarId T.TypeParam)
-  , genericparamsConstGenerics :: (Vector T.ConstGenericVarId T.ConstGenericParam)
-  , genericparamsTraitClauses :: (Vector T.TraitClauseId T.TraitParam)
+  { genericparamsRegions :: (Vector RegionId RegionParam)
+  , genericparamsTypes :: (Vector TypeVarId TypeParam)
+  , genericparamsConstGenerics :: (Vector ConstGenericVarId ConstGenericParam)
+  , genericparamsTraitClauses :: (Vector TraitClauseId TraitParam)
   ,   -- | The first region in the pair outlives the second region
-  genericparamsRegionsOutlive :: [(T.RegionBinder (T.OutlivesPred T.Region T.Region))]
+  genericparamsRegionsOutlive :: [(RegionBinder (OutlivesPred Region Region))]
   ,   -- | The type outlives the region
-  genericparamsTypesOutlive :: [(T.RegionBinder (T.OutlivesPred T.Ty T.Region))]
+  genericparamsTypesOutlive :: [(RegionBinder (OutlivesPred T.Ty Region))]
   ,   -- | Constraints over trait associated types
-  genericparamsTraitTypeConstraints :: (Vector T.TraitTypeConstraintId (T.RegionBinder T.TraitTypeConstraint))
+  genericparamsTraitTypeConstraints :: (Vector T.TraitTypeConstraintId (RegionBinder TraitTypeConstraint))
   }
   deriving (Show, Eq, Ord)
 
@@ -360,8 +361,8 @@ data GlobalDeclId = GlobalDeclId
 -- |   impl<T> PartialEq for List<T> { ...}
 -- |   ```
 -- | We distinguish the two.
-data ImplElem = ImplElemTy ((T.Binder T.Ty))
-  | ImplElemTrait G.TraitImplId
+data ImplElem = ImplElemTy ((Binder T.Ty))
+  | ImplElemTrait TraitImplId
   deriving (Show, Eq, Ord)
 
 -- | `#[inline]` built-in attribute.
@@ -396,8 +397,8 @@ data ItemMeta = ItemMeta
 -- | A primitive value.
 -- | 
 -- | Those are for instance used for the constant operands [crate::expressions::Operand::Const]
-data Literal = VScalar Val.ScalarValue
-  | VFloat Val.FloatValue
+data Literal = VScalar ScalarValue
+  | VFloat FloatValue
   | VBool Bool
   | VChar Char
   | VByteStr [Int]
@@ -405,9 +406,9 @@ data Literal = VScalar Val.ScalarValue
   deriving (Show, Eq, Ord)
 
 -- | Types of primitive values. Either an integer, bool, char
-data LiteralType = TInt T.IntTy
-  | TuInt T.UIntTy
-  | TFloat T.FloatType
+data LiteralType = TInt IntTy
+  | TuInt UIntTy
+  | TFloat FloatType
   | TBool
   | TChar
   deriving (Show, Eq, Ord)
@@ -467,7 +468,7 @@ data OutlivesPred a0 a1 = OutlivesPred a0 a1
 -- | See the comments for [Name]
 data PathElem = PeIdent String Disambiguator
   | PeImpl ImplElem
-  | PeInstantiated ((T.Binder T.GenericArgs))
+  | PeInstantiated ((Binder GenericArgs))
   deriving (Show, Eq, Ord)
 
 -- | A general attribute.
@@ -483,7 +484,7 @@ data RefKind = RMut
   | RShared
   deriving (Show, Eq, Ord)
 
-data Region = RVar ((T.DeBruijnVar T.RegionId))
+data Region = RVar ((DeBruijnVar RegionId))
   | RStatic
   | RErased
   deriving (Show, Eq, Ord)
@@ -492,7 +493,7 @@ data Region = RVar ((T.DeBruijnVar T.RegionId))
 -- | issues in the derived ocaml visitors.
 -- | TODO: merge with `binder`
 data RegionBinder a0 = RegionBinder
-  { regionbinderBinderRegions :: (Vector T.RegionId T.RegionParam)
+  { regionbinderBinderRegions :: (Vector RegionId RegionParam)
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
   regionbinderBinderValue :: a0
@@ -507,15 +508,15 @@ data RegionId = RegionId
 -- | A region variable in a signature or binder.
 data RegionParam = RegionParam
   {   -- | Index identifying the variable among other variables bound at the same level.
-  regionparamIndex :: T.RegionId
+  regionparamIndex :: RegionId
   ,   -- | Region name
   regionparamName :: Maybe String
   }
   deriving (Show, Eq, Ord)
 
 -- | A scalar value.
-data ScalarValue = UnsignedScalar T.UIntTy Integer
-  | SignedScalar T.IntTy Integer
+data ScalarValue = UnsignedScalar UIntTy Integer
+  | SignedScalar IntTy Integer
   deriving (Show, Eq, Ord)
 
 -- | Meta information about a piece of code (block, statement, etc.)
@@ -578,8 +579,8 @@ data TraitDeclId = TraitDeclId
 -- | 
 -- | The substitution is: `[String, bool]`.
 data TraitDeclRef = TraitDeclRef
-  { traitdeclrefId :: G.TraitDeclId
-  , traitdeclrefGenerics :: T.GenericArgs
+  { traitdeclrefId :: TraitDeclId
+  , traitdeclrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -590,8 +591,8 @@ data TraitImplId = TraitImplId
 
 -- | A reference to a tait impl, using the provided arguments.
 data TraitImplRef = TraitImplRef
-  { traitimplrefId :: G.TraitImplId
-  , traitimplrefGenerics :: T.GenericArgs
+  { traitimplrefId :: TraitImplId
+  , traitimplrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
@@ -602,18 +603,18 @@ data TraitItemName = TraitItemName Text
 -- | variable binder, to which variables of the form `TraitRefKind::Clause` can refer to.
 data TraitParam = TraitParam
   {   -- | Index identifying the clause among other clauses bound at the same level.
-  traitparamClauseId :: T.TraitClauseId
+  traitparamClauseId :: TraitClauseId
   , traitparamSpan :: Maybe Span
   ,   -- | The trait that is implemented.
-  traitparamTrait :: (T.RegionBinder T.TraitDeclRef)
+  traitparamTrait :: (RegionBinder TraitDeclRef)
   }
   deriving (Show, Eq, Ord)
 
 -- | A reference to a trait
 data TraitRef = TraitRef
-  { traitrefKind :: T.TraitRefKind
+  { traitrefKind :: TraitRefKind
   ,   -- | Not necessary, but useful
-  traitrefTraitDeclRef :: (T.RegionBinder T.TraitDeclRef)
+  traitrefTraitDeclRef :: (RegionBinder TraitDeclRef)
   }
   deriving (Show, Eq, Ord)
 
@@ -624,12 +625,12 @@ data TraitRef = TraitRef
 -- | definition. Note that every path designated by `TraitInstanceId` refers
 -- | to a *trait instance*, which is why the [`TraitRefKind::Clause`] variant may seem redundant
 -- | with some of the other variants.
-data TraitRefKind = TraitImpl T.TraitImplRef
-  | Clause ((T.DeBruijnVar T.TraitClauseId))
-  | ParentClause T.TraitRef T.TraitClauseId
-  | ItemClause T.TraitRef G.TraitItemName T.TraitClauseId
+data TraitRefKind = TraitImpl TraitImplRef
+  | Clause ((DeBruijnVar TraitClauseId))
+  | ParentClause TraitRef TraitClauseId
+  | ItemClause TraitRef TraitItemName TraitClauseId
   | Self
-  | BuiltinOrAuto T.BuiltinImplData ((Vector T.TraitClauseId T.TraitRef)) ([(G.TraitItemName, G.TraitAssocTyImpl)])
+  | BuiltinOrAuto BuiltinImplData ((Vector TraitClauseId TraitRef)) ([(TraitItemName, TraitAssocTyImpl)])
   | Dyn
   | UnknownTrait String
   deriving (Show, Eq, Ord)
@@ -642,22 +643,22 @@ data TraitRefKind = TraitImpl T.TraitImplRef
 -- |         ^^^^^^^^^^
 -- | ```
 data TraitTypeConstraint = TraitTypeConstraint
-  { traittypeconstraintTraitRef :: T.TraitRef
-  , traittypeconstraintTypeName :: G.TraitItemName
+  { traittypeconstraintTraitRef :: TraitRef
+  , traittypeconstraintTypeName :: TraitItemName
   , traittypeconstraintTy :: T.Ty
   }
   deriving (Show, Eq, Ord)
 
-data Ty = TAdt T.TypeDeclRef
-  | TVar ((T.DeBruijnVar T.TypeVarId))
-  | TLiteral T.LiteralType
+data Ty = TAdt TypeDeclRef
+  | TVar ((DeBruijnVar TypeVarId))
+  | TLiteral LiteralType
   | TNever
-  | TRef T.Region T.Ty T.RefKind
-  | TRawPtr T.Ty T.RefKind
-  | TTraitType T.TraitRef G.TraitItemName
-  | TDynTrait T.DynPredicate
-  | TFnPtr ((T.RegionBinder ([T.Ty], T.Ty)))
-  | TFnDef ((T.RegionBinder E.FnPtr))
+  | TRef Region T.Ty RefKind
+  | TRawPtr T.Ty RefKind
+  | TTraitType TraitRef TraitItemName
+  | TDynTrait DynPredicate
+  | TFnPtr ((RegionBinder ([T.Ty], T.Ty)))
+  | TFnDef ((RegionBinder FnPtr))
   | TPtrMetadata T.Ty
   | TError String
   deriving (Show, Eq, Ord)
@@ -669,23 +670,23 @@ data TypeDeclId = TypeDeclId
 
 -- | Reference to a type declaration or builtin type.
 data TypeDeclRef = TypeDeclRef
-  { typedeclrefId :: T.TypeId
-  , typedeclrefGenerics :: T.GenericArgs
+  { typedeclrefId :: TypeId
+  , typedeclrefGenerics :: GenericArgs
   }
   deriving (Show, Eq, Ord)
 
 -- | Type identifier.
 -- | 
 -- | Allows us to factorize the code for built-in types, adts and tuples
-data TypeId = TAdtId G.TypeDeclId
+data TypeId = TAdtId TypeDeclId
   | TTuple
-  | TBuiltin T.BuiltinTy
+  | TBuiltin BuiltinTy
   deriving (Show, Eq, Ord)
 
 -- | A type variable in a signature or binder.
 data TypeParam = TypeParam
   {   -- | Index identifying the variable among other variables bound at the same level.
-  typeparamIndex :: T.TypeVarId
+  typeparamIndex :: TypeVarId
   ,   -- | Variable name
   typeparamName :: String
   }
