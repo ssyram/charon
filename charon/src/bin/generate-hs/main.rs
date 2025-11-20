@@ -288,14 +288,18 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule)
                         return "Text".to_string();
                     }
                     if base_ty.ends_with("HashMap") {
-                        // HashMap<K, V> in Rust becomes [M.KVPair K V] in Haskell
+                        // HashMap<K, V> in Rust becomes [KVPair K V] or [M.KVPair K V] in Haskell
                         // This handles the case where HashMap is serialized with HashMapToArray
                         // KVPair has FromJSON that parses {key, value} objects
-                        return format!("[M.KVPair {} {}]", args[0], args[1]);
+                        // KVPair is defined in Meta module
+                        let kvpair_prefix = if target_module == TargetModule::Meta { "" } else { "M." };
+                        return format!("[{}KVPair {} {}]", kvpair_prefix, args[0], args[1]);
                     }
-                    if base_ty.ends_with("Vector") || base_ty == "M.Vector" {
-                        // Vector<K, V> in Rust becomes (M.Vector K V) in Haskell
-                        return format!("(M.Vector {} {})", args[0], args[1]);
+                    if base_ty.ends_with("Vector") || base_ty == "M.Vector" || base_ty == "Vector" {
+                        // Vector<K, V> in Rust becomes (Vector K V) or (M.Vector K V) in Haskell
+                        // Vector is defined in Meta module
+                        let vector_prefix = if target_module == TargetModule::Meta { "" } else { "M." };
+                        return format!("({}Vector {} {})", vector_prefix, args[0], args[1]);
                     }
                     if base_ty.ends_with("Option") {
                         return format!("Maybe {}", args[0]);
@@ -869,7 +873,7 @@ fn generate_hs(
         "ItemOpacity",
         "PredicateOrigin",
         "TraitTypeConstraintId",
-        "Ty",
+        "Ty",  // Ty is a newtype wrapper around HashConsed<TyKind> that serializes transparently
         "Vector",
     ];
 
@@ -1047,7 +1051,7 @@ fn generate_hs(
             "TraitClauseId",
             "DeBruijnVar",
             "ItemId",
-            "TyKind",
+            "TyKind",  // TyKind is renamed to Ty via #[charon::rename("Ty")]
             "TraitImplRef",
             "FunDeclRef",
             "GlobalDeclRef",

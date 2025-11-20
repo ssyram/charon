@@ -18,12 +18,14 @@ module Generated_Meta where
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import {-# SOURCE #-} qualified Generated_Types as T
 import {-# SOURCE #-} qualified Generated_GAst as G
 import {-# SOURCE #-} qualified Generated_Expressions as E
+import {-# SOURCE #-} qualified Generated_Values as Val
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -50,6 +52,15 @@ instance (FromJSON k, FromJSON v) => FromJSON (KVPair k v) where
     key <- o .: "key"
     value <- o .: "value"
     pure (KVPair key value)
+
+-- Helper function to parse Integer values that are serialized as strings
+parseIntegerValue :: Value -> Parser Integer
+parseIntegerValue v = case v of
+  String s -> case reads (Text.unpack s) of
+    [(n, "")] -> pure n
+    _ -> fail $ "Failed to parse integer from string: " ++ Text.unpack s
+  Number n -> pure (floor n)
+  _ -> fail "Expected String or Number for integer value"
 
 {- __REPLACE0__ -}
 

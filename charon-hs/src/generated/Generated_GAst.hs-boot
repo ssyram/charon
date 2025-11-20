@@ -11,6 +11,7 @@ data TypeDeclId
 data TraitImplId
 data ItemSource
 data ItemMeta
+data TraitAssocTyImpl
 
 instance Show TraitDeclId
 instance Eq TraitDeclId
@@ -51,3 +52,8 @@ instance Show ItemMeta
 instance Eq ItemMeta
 instance Ord ItemMeta
 instance FromJSON ItemMeta
+
+instance Show TraitAssocTyImpl
+instance Eq TraitAssocTyImpl
+instance Ord TraitAssocTyImpl
+instance FromJSON TraitAssocTyImpl

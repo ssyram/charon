@@ -18,12 +18,14 @@ module Generated_Meta where
 import Data.Aeson
 import Data.Aeson.Types (Parser)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
 import {-# SOURCE #-} qualified Generated_Types as T
 import {-# SOURCE #-} qualified Generated_GAst as G
 import {-# SOURCE #-} qualified Generated_Expressions as E
+import {-# SOURCE #-} qualified Generated_Values as Val
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -50,6 +52,15 @@ instance (FromJSON k, FromJSON v) => FromJSON (KVPair k v) where
     key <- o .: "key"
     value <- o .: "value"
     pure (KVPair key value)
+
+-- Helper function to parse Integer values that are serialized as strings
+parseIntegerValue :: Value -> Parser Integer
+parseIntegerValue v = case v of
+  String s -> case reads (Text.unpack s) of
+    [(n, "")] -> pure n
+    _ -> fail $ "Failed to parse integer from string: " ++ Text.unpack s
+  Number n -> pure (floor n)
+  _ -> fail "Expected String or Number for integer value"
 
 -- | Information about the attributes and visibility of an item, field or variant..
 data AttrInfo = AttrInfo
@@ -310,10 +321,10 @@ data FunId = FRegular G.FunDeclId
 
 -- | A set of generic arguments.
 data GenericArgs = GenericArgs
-  { genericargsRegions :: (M.Vector T.RegionId T.Region)
-  , genericargsTypes :: (M.Vector T.TypeVarId T.Ty)
-  , genericargsConstGenerics :: (M.Vector T.ConstGenericVarId T.ConstGeneric)
-  , genericargsTraitRefs :: (M.Vector T.TraitClauseId T.TraitRef)
+  { genericargsRegions :: (Vector T.RegionId T.Region)
+  , genericargsTypes :: (Vector T.TypeVarId T.Ty)
+  , genericargsConstGenerics :: (Vector T.ConstGenericVarId T.ConstGeneric)
+  , genericargsTraitRefs :: (Vector T.TraitClauseId T.TraitRef)
   }
   deriving (Show, Eq, Ord)
 
@@ -325,16 +336,16 @@ data GenericArgs = GenericArgs
 -- | trait clauses, because those enforce constraints but do not need to
 -- | be filled with witnesses/instances.
 data GenericParams = GenericParams
-  { genericparamsRegions :: (M.Vector T.RegionId T.RegionParam)
-  , genericparamsTypes :: (M.Vector T.TypeVarId T.TypeParam)
-  , genericparamsConstGenerics :: (M.Vector T.ConstGenericVarId T.ConstGenericParam)
-  , genericparamsTraitClauses :: (M.Vector T.TraitClauseId T.TraitParam)
+  { genericparamsRegions :: (Vector T.RegionId T.RegionParam)
+  , genericparamsTypes :: (Vector T.TypeVarId T.TypeParam)
+  , genericparamsConstGenerics :: (Vector T.ConstGenericVarId T.ConstGenericParam)
+  , genericparamsTraitClauses :: (Vector T.TraitClauseId T.TraitParam)
   ,   -- | The first region in the pair outlives the second region
   genericparamsRegionsOutlive :: [(T.RegionBinder (T.OutlivesPred T.Region T.Region))]
   ,   -- | The type outlives the region
   genericparamsTypesOutlive :: [(T.RegionBinder (T.OutlivesPred T.Ty T.Region))]
   ,   -- | Constraints over trait associated types
-  genericparamsTraitTypeConstraints :: (M.Vector T.TraitTypeConstraintId (T.RegionBinder T.TraitTypeConstraint))
+  genericparamsTraitTypeConstraints :: (Vector T.TraitTypeConstraintId (T.RegionBinder T.TraitTypeConstraint))
   }
   deriving (Show, Eq, Ord)
 
@@ -485,7 +496,7 @@ data Region = RVar ((T.DeBruijnVar T.RegionId))
 -- | issues in the derived ocaml visitors.
 -- | TODO: merge with `binder`
 data RegionBinder a0 = RegionBinder
-  { regionbinderBinderRegions :: (M.Vector T.RegionId T.RegionParam)
+  { regionbinderBinderRegions :: (Vector T.RegionId T.RegionParam)
   ,   -- | Named this way to highlight accesses to the inner value that might be handling parameters
   -- | incorrectly. Prefer using helper methods.
   regionbinderBinderValue :: a0
@@ -622,7 +633,7 @@ data TraitRefKind = TraitImpl T.TraitImplRef
   | ParentClause T.TraitRef T.TraitClauseId
   | ItemClause T.TraitRef G.TraitItemName T.TraitClauseId
   | Self
-  | BuiltinOrAuto T.BuiltinImplData ((M.Vector T.TraitClauseId T.TraitRef)) ([(G.TraitItemName, G.TraitAssocTyImpl)])
+  | BuiltinOrAuto T.BuiltinImplData ((Vector T.TraitClauseId T.TraitRef)) ([(G.TraitItemName, G.TraitAssocTyImpl)])
   | Dyn
   | UnknownTrait String
   deriving (Show, Eq, Ord)
