@@ -14,34 +14,27 @@ import qualified Generated_LlbcAst as L
 import qualified Generated_UllbcAst as U
 
 -- | The body of a function.
-data Body = Unstructured ((G.GexprBody (M.Vector U.BlockId U.Block)))
+data Body = Unstructured ((G.GexprBody (M.Vector T.BlockId U.Block)))
   | Structured ((G.GexprBody L.Block))
   | TraitMethodWithoutDefault
   | Opaque
   | Missing
-  | Error Error
-  deriving (Show, Eq, Ord)
-
--- | Common error used during the translation.
-data Error = Error
-  { errorSpan :: M.Span
-  , errorMsg :: String
-  }
+  | Error G.Error
   deriving (Show, Eq, Ord)
 
 -- | A function definition
 data FunDecl = FunDecl
-  { fundeclDefId :: G.FunDeclId
+  { fundeclDefId :: T.FunDeclId
   ,   -- | The meta data associated with the declaration.
-  fundeclItemMeta :: M.ItemMeta
+  fundeclItemMeta :: T.ItemMeta
   ,   -- | The signature contains the inputs/output types *with* non-erased regions.
   -- | It also contains the list of region and type parameters.
   fundeclSignature :: T.FunSig
   ,   -- | The function kind: "regular" function, trait method declaration, etc.
-  fundeclSrc :: G.ItemSource
+  fundeclSrc :: T.ItemSource
   ,   -- | Whether this function is in fact the body of a constant/static that we turned into an
   -- | initializer function.
-  fundeclIsGlobalInitializer :: Maybe G.GlobalDeclId
+  fundeclIsGlobalInitializer :: Maybe T.GlobalDeclId
   ,   -- | The function body, unless the function is opaque.
   -- | Opaque functions are: external functions, or local functions tagged
   -- | as opaque.
@@ -63,24 +56,24 @@ data TranslatedCrate = TranslatedCrate
   -- | failed to translate.
   -- | Invariant: after translation, any existing `ItemId` must have an associated name, even
   -- | if the corresponding item wasn't translated.
-  translatedcrateItemNames :: [M.KVPair G.ItemId Name]
+  translatedcrateItemNames :: [M.KVPair T.ItemId Name]
   ,   -- | Short names, for items whose last PathElem is unique.
-  translatedcrateShortNames :: [M.KVPair G.ItemId Name]
+  translatedcrateShortNames :: [M.KVPair T.ItemId Name]
   ,   -- | The translated files.
-  translatedcrateFiles :: (M.Vector M.FileId M.File)
+  translatedcrateFiles :: (M.Vector T.FileId M.File)
   ,   -- | The translated type definitions
-  translatedcrateTypeDecls :: (M.Vector G.TypeDeclId T.TypeDecl)
+  translatedcrateTypeDecls :: (M.Vector T.TypeDeclId T.TypeDecl)
   ,   -- | The translated function definitions
-  translatedcrateFunDecls :: (M.Vector G.FunDeclId FunDecl)
+  translatedcrateFunDecls :: (M.Vector T.FunDeclId FunDecl)
   ,   -- | The translated global definitions
-  translatedcrateGlobalDecls :: (M.Vector G.GlobalDeclId G.GlobalDecl)
+  translatedcrateGlobalDecls :: (M.Vector T.GlobalDeclId G.GlobalDecl)
   ,   -- | The translated trait declarations
-  translatedcrateTraitDecls :: (M.Vector G.TraitDeclId G.TraitDecl)
+  translatedcrateTraitDecls :: (M.Vector T.TraitDeclId G.TraitDecl)
   ,   -- | The translated trait declarations
-  translatedcrateTraitImpls :: (M.Vector G.TraitImplId G.TraitImpl)
+  translatedcrateTraitImpls :: (M.Vector T.TraitImplId G.TraitImpl)
   ,   -- | A `const UNIT: () = ();` used whenever we make a thin pointer/reference to avoid creating a
   -- | local `let unit = ();` variable. It is always `Some`.
-  translatedcrateUnitMetadata :: Maybe G.GlobalDeclRef
+  translatedcrateUnitMetadata :: Maybe T.GlobalDeclRef
   ,   -- | The re-ordered groups of declarations, initialized as empty.
   translatedcrateOrderedDecls :: Maybe [G.DeclarationGroup]
   }
@@ -101,13 +94,6 @@ instance FromJSON Body where
       v <- o .: "Error"
       Error <$> parseJSON v
     _ -> fail "Unknown variant"
-
-
-instance FromJSON Error where
-  parseJSON = withObject "Error" $ \o -> do
-    errorSpan <- o .: "span"
-    errorMsg <- o .: "msg"
-    pure (Error errorSpan errorMsg)
 
 
 instance FromJSON FunDecl where

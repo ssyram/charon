@@ -43,15 +43,15 @@ data Statement = Statement
 data StatementKind = Assign E.Place E.Rvalue
   | SetDiscriminant E.Place T.VariantId
   | CopyNonOverlapping G.CopyNonOverlapping
-  | StorageLive Val.LocalId
-  | StorageDead Val.LocalId
+  | StorageLive E.LocalId
+  | StorageDead E.LocalId
   | Deinit E.Place
   | Assert G.Assertion
   | Nop
   deriving (Show, Eq, Ord)
 
 data Switch = If BlockId BlockId
-  | SwitchInt T.LiteralType ([(Val.Literal, BlockId)]) BlockId
+  | SwitchInt T.LiteralType ([(T.Literal, BlockId)]) BlockId
   deriving (Show, Eq, Ord)
 
 data Terminator = Terminator
@@ -67,7 +67,7 @@ data TerminatorKind = Goto BlockId
   | Switch E.Operand Switch
   | Call G.Call BlockId BlockId
   | Drop E.Place T.TraitRef BlockId BlockId
-  | Abort G.AbortKind
+  | Abort T.AbortKind
   | Return
   | UnwindResume
   deriving (Show, Eq, Ord)

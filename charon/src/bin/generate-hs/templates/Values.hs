@@ -11,12 +11,10 @@ module Generated_Values where
 
 import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, parseJSON, (.:), (.!=))
 import Data.Aeson.Types (Parser)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
--- Note: Types is generated later but Values depends on it, so we need this import
--- This is handled by the extraction order in generate-hs
-import qualified Generated_Types as T
 
 -- Helper to parse Integer from either String or Number
 parseIntegerValue :: Value -> Parser Integer

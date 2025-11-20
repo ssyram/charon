@@ -12,6 +12,7 @@ module Generated_Expressions where
 import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
+import qualified Generated_Meta as M
 import qualified Generated_Values as Val
 import qualified Generated_Types as T
 
@@ -114,15 +115,15 @@ data ConstantExpr = ConstantExpr
 -- | Remark:
 -- | MIR seems to forbid more complex expressions like paths. For instance,
 -- | reading the constant `a.b` is translated to `{ _1 = const a; _2 = (_1.0) }`.
-data ConstantExprKind = CLiteral Val.Literal
-  | CTraitConst T.TraitRef G.TraitItemName
+data ConstantExprKind = CLiteral T.Literal
+  | CTraitConst T.TraitRef T.TraitItemName
   | CVar ((T.DeBruijnVar T.ConstGenericVarId))
-  | CFnPtr FnPtr
+  | CFnPtr T.FnPtr
   | CRawMemory [Int]
   | COpaque String
   deriving (Show, Eq, Ord)
 
-data FieldProjKind = ProjAdt G.TypeDeclId (Maybe T.VariantId)
+data FieldProjKind = ProjAdt T.TypeDeclId (Maybe T.VariantId)
   | ProjTuple Int
   deriving (Show, Eq, Ord)
 
@@ -156,7 +157,7 @@ data Place = Place
 
 data PlaceKind = PlaceLocal LocalId
   | PlaceProjection Place ProjectionElem
-  | PlaceGlobal G.GlobalDeclRef
+  | PlaceGlobal T.GlobalDeclRef
   deriving (Show, Eq, Ord)
 
 -- | Note that we don't have the equivalent of "downcasts".

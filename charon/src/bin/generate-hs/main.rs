@@ -248,10 +248,33 @@ fn type_to_haskell_name(ctx: &GenerateCtx, ty: &Ty, target_module: TargetModule,
                             ""
                         } else {
                             // Type is from another module, determine which one and add prefix
-                            let type_module = if full_name.contains("::meta::") || full_name.contains("::errors::") {
-                                TargetModule::Meta
-                            } else if full_name.contains("::types::") {
+                            // Special handling for ID types and basic types that are in Types module
+                            // even though they come from gast/meta Rust modules (following ML pattern)
+                            let type_module = if ty_name == "LocalId" {
+                                // LocalId is in Expressions module (following ML)
+                                TargetModule::Expressions
+                            } else if ty_name == "Error" {
+                                // Error is in GAst module (following ML)
+                                TargetModule::GAst
+                            } else if ty_name.ends_with("Id") || 
+                                               ty_name == "TraitItemName" ||
+                                               ty_name == "FnPtr" ||
+                                               ty_name == "FunId" ||
+                                               ty_name == "BuiltinFunId" ||
+                                               ty_name == "GlobalDeclRef" ||
+                                               ty_name == "FunDeclRef" ||
+                                               ty_name == "TypeDeclRef" ||
+                                               ty_name == "TraitDeclRef" ||
+                                               ty_name == "TraitImplRef" ||
+                                               ty_name == "TraitAssocTyImpl" ||
+                                               ty_name == "ItemMeta" ||  // ItemMeta is in Types (following ML)
+                                               ty_name == "ItemSource" ||  // ItemSource is in Types
+                                               ty_name == "AbortKind" ||  // AbortKind is in Types
+                                               ty_name == "Literal" ||  // Literal is in Types (following ML)
+                                               full_name.contains("::types::") {
                                 TargetModule::Types
+                            } else if full_name.contains("::meta::") || full_name.contains("::errors::") {
+                                TargetModule::Meta
                             } else if full_name.contains("::values::") {
                                 TargetModule::Values
                             } else if full_name.contains("::expressions::") {
@@ -1056,10 +1079,16 @@ fn generate_hs(
         &mut temp_processed2,
         &[
             "TypeVarId",
+            "TypeDeclId",  // ID types defined in Types module
+            "GlobalDeclId",
+            "FunDeclId",
+            "TraitDeclId",
+            "TraitImplId",
             "ConstGeneric",
             "TraitClauseId",
             "DeBruijnVar",
             "ItemId",
+            "ItemMeta",  // ItemMeta is in Types (following ML)
             "TyKind",  // TyKind is renamed to Ty via #[charon::rename("Ty")]
             "TraitImplRef",
             "TraitDeclRef",
@@ -1071,6 +1100,11 @@ fn generate_hs(
             "GenericParams",
             "DynPredicate",
             "TypeDecl",
+            // Types needed by Expressions (following ML)
+            "FnPtr",
+            "TraitItemName",
+            "FunId",
+            "BuiltinFunId",
         ],
     );
     generate_code_for_with_json.push(GenerateCodeFor {
@@ -1121,7 +1155,6 @@ fn generate_hs(
             "Call",
             "Assert",
             "ItemSource",
-            "ItemMeta",
             "Locals",
             "FunSig",
             "CopyNonOverlapping",
@@ -1132,6 +1165,7 @@ fn generate_hs(
             "GExprBody",
             "DeclarationGroup",
             "TargetInfo",
+            "Error",  // Error is in GAst (following ML)
         ],
     );
     generate_code_for_with_json.push(GenerateCodeFor {

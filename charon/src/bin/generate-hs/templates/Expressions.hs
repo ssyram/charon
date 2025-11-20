@@ -12,6 +12,7 @@ module Generated_Expressions where
 import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
+import qualified Generated_Meta as M
 import qualified Generated_Values as Val
 import qualified Generated_Types as T
 

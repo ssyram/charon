@@ -10,7 +10,7 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson (FromJSON(..), withObject, (.:))
+import Data.Aeson (FromJSON(..), Value(..), withObject, (.:))
 import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
@@ -35,7 +35,7 @@ data Assertion = Assertion
   ,   -- | The value that the operand should evaluate to for the assert to succeed.
   assertionExpected :: Bool
   ,   -- | What kind of abort happens on assert failure.
-  assertionOnFailure :: AbortKind
+  assertionOnFailure :: T.AbortKind
   }
   deriving (Show, Eq, Ord)
 
@@ -153,18 +153,25 @@ data CopyNonOverlapping = CopyNonOverlapping
   deriving (Show, Eq, Ord)
 
 -- | A (group of) top-level declaration(s), properly reordered.
-data DeclarationGroup = TypeGroup ((GDeclarationGroup TypeDeclId))
-  | FunGroup ((GDeclarationGroup FunDeclId))
-  | GlobalGroup ((GDeclarationGroup GlobalDeclId))
-  | TraitDeclGroup ((GDeclarationGroup TraitDeclId))
-  | TraitImplGroup ((GDeclarationGroup TraitImplId))
-  | MixedGroup ((GDeclarationGroup ItemId))
+data DeclarationGroup = TypeGroup ((GDeclarationGroup T.TypeDeclId))
+  | FunGroup ((GDeclarationGroup T.FunDeclId))
+  | GlobalGroup ((GDeclarationGroup T.GlobalDeclId))
+  | TraitDeclGroup ((GDeclarationGroup T.TraitDeclId))
+  | TraitImplGroup ((GDeclarationGroup T.TraitImplId))
+  | MixedGroup ((GDeclarationGroup T.ItemId))
+  deriving (Show, Eq, Ord)
+
+-- | Common error used during the translation.
+data Error = Error
+  { errorSpan :: M.Span
+  , errorMsg :: String
+  }
   deriving (Show, Eq, Ord)
 
 -- | A function operand is used in function calls.
 -- | It either designates a top-level function, or a place in case
 -- | we are using function pointers stored in local variables.
-data FnOperand = FnOpRegular E.FnPtr
+data FnOperand = FnOpRegular T.FnPtr
   | FnOpMove E.Place
   deriving (Show, Eq, Ord)
 
@@ -197,18 +204,18 @@ data GexprBody a0 = GexprBody
 
 -- | A global variable definition (constant or static).
 data GlobalDecl = GlobalDecl
-  { globaldeclDefId :: GlobalDeclId
+  { globaldeclDefId :: T.GlobalDeclId
   ,   -- | The meta data associated with the declaration.
-  globaldeclItemMeta :: M.ItemMeta
+  globaldeclItemMeta :: T.ItemMeta
   , globaldeclGenerics :: T.GenericParams
   , globaldeclTy :: T.Ty
   ,   -- | The context of the global: distinguishes top-level items from trait-associated items.
-  globaldeclSrc :: ItemSource
+  globaldeclSrc :: T.ItemSource
   ,   -- | The kind of global (static or const).
   globaldeclGlobalKind :: GlobalKind
   ,   -- | The initializer function used to compute the initial value for this constant/static. It
   -- | uses the same generic parameters as the global.
-  globaldeclInit :: FunDeclId
+  globaldeclInit :: T.FunDeclId
   }
   deriving (Show, Eq, Ord)
 
@@ -220,7 +227,7 @@ data GlobalKind = Static
 -- | A variable
 data Local = Local
   {   -- | Unique index identifying the variable
-  localIndex :: Val.LocalId
+  localIndex :: E.LocalId
   ,   -- | Variable name - may be `None` if the variable was introduced by Rust
   -- | through desugaring.
   localName :: Maybe String
@@ -238,7 +245,7 @@ data Locals = Locals
   -- | - the local used for the return value (index 0)
   -- | - the `arg_count` input arguments
   -- | - the remaining locals, used for the intermediate computations
-  localsLocals :: (M.Vector Val.LocalId Local)
+  localsLocals :: (M.Vector E.LocalId Local)
   }
   deriving (Show, Eq, Ord)
 
@@ -273,15 +280,15 @@ data TargetInfo = TargetInfo
 
 -- | An associated constant in a trait.
 data TraitAssocConst = TraitAssocConst
-  { traitassocconstName :: TraitItemName
+  { traitassocconstName :: T.TraitItemName
   , traitassocconstTy :: T.Ty
-  , traitassocconstDefault :: Maybe GlobalDeclRef
+  , traitassocconstDefault :: Maybe T.GlobalDeclRef
   }
   deriving (Show, Eq, Ord)
 
 -- | An associated type in a trait.
 data TraitAssocTy = TraitAssocTy
-  { traitassoctyName :: TraitItemName
+  { traitassoctyName :: T.TraitItemName
   , traitassoctyDefault :: Maybe T.Ty
   ,   -- | List of trait clauses that apply to this type.
   traitassoctyImpliedClauses :: (M.Vector T.TraitClauseId T.TraitParam)
@@ -321,8 +328,8 @@ data TraitAssocTy = TraitAssocTy
 -- | Of course, this forbids other useful use cases such as visitors implemented
 -- | by means of traits.
 data TraitDecl = TraitDecl
-  { traitdeclDefId :: TraitDeclId
-  , traitdeclItemMeta :: M.ItemMeta
+  { traitdeclDefId :: T.TraitDeclId
+  , traitdeclItemMeta :: T.ItemMeta
   , traitdeclGenerics :: T.GenericParams
   ,   -- | The "parent" clauses: the supertraits.
   -- | 
@@ -369,8 +376,8 @@ data TraitDecl = TraitDecl
 -- | }
 -- | ```
 data TraitImpl = TraitImpl
-  { traitimplDefId :: TraitImplId
-  , traitimplItemMeta :: M.ItemMeta
+  { traitimplDefId :: T.TraitImplId
+  , traitimplItemMeta :: T.ItemMeta
   ,   -- | The information about the implemented trait.
   -- | Note that this contains the instantiation of the "parent"
   -- | clauses.
@@ -379,24 +386,24 @@ data TraitImpl = TraitImpl
   ,   -- | The trait references for the parent clauses (see [TraitDecl]).
   traitimplImpliedTraitRefs :: (M.Vector T.TraitClauseId T.TraitRef)
   ,   -- | The implemented associated constants.
-  traitimplConsts :: [(TraitItemName, GlobalDeclRef)]
+  traitimplConsts :: [(T.TraitItemName, T.GlobalDeclRef)]
   ,   -- | The implemented associated types.
-  traitimplTypes :: [(TraitItemName, (T.Binder TraitAssocTyImpl))]
+  traitimplTypes :: [(T.TraitItemName, (T.Binder T.TraitAssocTyImpl))]
   ,   -- | The implemented methods
-  traitimplMethods :: [(TraitItemName, (T.Binder FunDeclRef))]
+  traitimplMethods :: [(T.TraitItemName, (T.Binder T.FunDeclRef))]
   ,   -- | The virtual table instance for this trait implementation. This is `Some` iff the trait is
   -- | dyn-compatible.
-  traitimplVtable :: Maybe GlobalDeclRef
+  traitimplVtable :: Maybe T.GlobalDeclRef
   }
   deriving (Show, Eq, Ord)
 
 -- | A trait method.
 data TraitMethod = TraitMethod
-  { traitmethodName :: TraitItemName
+  { traitmethodName :: T.TraitItemName
   ,   -- | Each method declaration is represented by a function item. That function contains the
   -- | signature of the method as well as information like attributes. It has a body iff the
   -- | method declaration has a default implementation; otherwise it has an `Opaque` body.
-  traitmethodItem :: FunDeclRef
+  traitmethodItem :: T.FunDeclRef
   }
   deriving (Show, Eq, Ord)
 
@@ -491,6 +498,13 @@ instance FromJSON DeclarationGroup where
       v <- o .: "Mixed"
       MixedGroup <$> parseJSON v
     _ -> fail "Unknown variant"
+
+
+instance FromJSON Error where
+  parseJSON = withObject "Error" $ \o -> do
+    errorSpan <- o .: "span"
+    errorMsg <- o .: "msg"
+    pure (Error errorSpan errorMsg)
 
 
 instance FromJSON FnOperand where

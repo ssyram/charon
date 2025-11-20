@@ -44,13 +44,13 @@ data StatementId = StatementId
 data StatementKind = Assign E.Place E.Rvalue
   | SetDiscriminant E.Place T.VariantId
   | CopyNonOverlapping G.CopyNonOverlapping
-  | StorageLive Val.LocalId
-  | StorageDead Val.LocalId
+  | StorageLive E.LocalId
+  | StorageDead E.LocalId
   | Deinit E.Place
   | Drop E.Place T.TraitRef
   | Assert G.Assertion
   | Call G.Call
-  | Abort G.AbortKind
+  | Abort T.AbortKind
   | Return
   | Break Int
   | Continue Int
@@ -61,7 +61,7 @@ data StatementKind = Assign E.Place E.Rvalue
   deriving (Show, Eq, Ord)
 
 data Switch = If E.Operand Block Block
-  | SwitchInt E.Operand T.LiteralType ([([Val.Literal], Block)]) Block
+  | SwitchInt E.Operand T.LiteralType ([([T.Literal], Block)]) Block
   | Match E.Place ([([T.VariantId], Block)]) (Maybe Block)
   deriving (Show, Eq, Ord)
 

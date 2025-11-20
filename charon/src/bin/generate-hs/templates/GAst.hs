@@ -10,7 +10,7 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_GAst where
 
-import Data.Aeson (FromJSON(..), withObject, (.:))
+import Data.Aeson (FromJSON(..), Value(..), withObject, (.:))
 import Data.Aeson.Types (Parser)
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
