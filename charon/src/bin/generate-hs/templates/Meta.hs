@@ -16,9 +16,12 @@ comments. These comments are replaced by auto-generated definitions by running
 module Generated_Meta where
 
 import Data.Aeson
+import Data.Aeson.Types (Parser)
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Maybe (catMaybes)
 import qualified Data.Aeson.KeyMap as H
+import qualified Data.Vector as V
 
 -- Using newtype instead of type alias to avoid duplicate instance issues
 newtype PathBuf = PathBuf Text
@@ -34,6 +37,26 @@ newtype Vector k v = Vector [v]
 
 instance FromJSON b => FromJSON (Vector a b) where
   parseJSON = fmap (Vector . catMaybes) . parseJSON
+
+-- KVPair is used to deserialize HashMap serialized with HashMapToArray
+-- which creates array of {key, value} objects instead of tuples
+data KVPair k v = KVPair { kvpairKey :: k, kvpairValue :: v }
+  deriving (Show, Eq, Ord)
+
+instance (FromJSON k, FromJSON v) => FromJSON (KVPair k v) where
+  parseJSON = withObject "KVPair" $ \o -> do
+    key <- o .: "key"
+    value <- o .: "value"
+    pure (KVPair key value)
+
+-- Helper function to parse Integer values that are serialized as strings
+parseIntegerValue :: Value -> Parser Integer
+parseIntegerValue v = case v of
+  String s -> case reads (Text.unpack s) of
+    [(n, "")] -> pure n
+    _ -> fail $ "Failed to parse integer from string: " ++ Text.unpack s
+  Number n -> pure (floor n)
+  _ -> fail "Expected String or Number for integer value"
 
 {- __REPLACE0__ -}
 

@@ -9,25 +9,23 @@ generation tool to avoid the need for hand-writing things.
 
 module Generated_LlbcAst where
 
-import Data.Aeson hiding (Error)
+import Data.Aeson (FromJSON(..), Value(..), withObject, withArray, (.:), (.!=))
 import qualified Data.Aeson.KeyMap as H
 import qualified Data.Vector as V
-import Generated_Meta
-import Generated_Values
-import Generated_Types
-import Generated_Expressions
+import qualified Generated_Meta as M
+import qualified Generated_Values as Val
+import qualified Generated_Types as T
+import qualified Generated_Expressions as E
 import qualified Generated_GAst as G
--- Import everything from GAst except the data constructors that conflict with our variant constructors
-import Generated_GAst hiding (Call, CopyNonOverlapping)
 
 data Block = Block
-  { blockSpan :: Span
+  { blockSpan :: M.Span
   , blockStatements :: [Statement]
   }
   deriving (Show, Eq, Ord)
 
 data Statement = Statement
-  { statementSpan :: Span
+  { statementSpan :: M.Span
   ,   -- | Integer uniquely identifying this statement among the statmeents in the current body. To
   -- | simplify things we generate globally-fresh ids when creating a new `Statement`.
   statementStatementId :: StatementId
@@ -43,16 +41,16 @@ data StatementId = StatementId
   deriving (Show, Eq, Ord)
 
 -- | A raw statement: a statement without meta data.
-data StatementKind = Assign Place Rvalue
-  | SetDiscriminant Place VariantId
+data StatementKind = Assign E.Place E.Rvalue
+  | SetDiscriminant E.Place T.VariantId
   | CopyNonOverlapping G.CopyNonOverlapping
-  | StorageLive LocalId
-  | StorageDead LocalId
-  | Deinit Place
-  | Drop Place TraitRef
-  | Assert Assertion
+  | StorageLive E.LocalId
+  | StorageDead E.LocalId
+  | Deinit E.Place
+  | Drop E.Place T.TraitRef
+  | Assert G.Assertion
   | Call G.Call
-  | Abort AbortKind
+  | Abort T.AbortKind
   | Return
   | Break Int
   | Continue Int
@@ -62,9 +60,9 @@ data StatementKind = Assign Place Rvalue
   | Error String
   deriving (Show, Eq, Ord)
 
-data Switch = If Operand Block Block
-  | SwitchInt Operand LiteralType ([([Literal], Block)]) Block
-  | Match Place ([([VariantId], Block)]) (Maybe Block)
+data Switch = If E.Operand Block Block
+  | SwitchInt E.Operand T.LiteralType ([([T.Literal], Block)]) Block
+  | Match E.Place ([([T.VariantId], Block)]) (Maybe Block)
   deriving (Show, Eq, Ord)
 
 instance FromJSON Block where
