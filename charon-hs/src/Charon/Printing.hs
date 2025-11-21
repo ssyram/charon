@@ -730,20 +730,25 @@ instance BuildWithCtx L.Block where
 -- FunDecl (simplified version)
 instance BuildWithCtx K.FunDecl where
   buildWithCtx ctx (K.FunDecl defId itemMeta signature _src _isGlobalInit body) =
-    "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
-    formatLangItem itemMeta <>
-    (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
-    "fn " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
-    formatGenericParams ctx signature <>
-    formatArgs ctx signature <>
-    formatReturnType ctx signature <>
-    "\n" <>
-    buildWithCtx (increaseIndent ctx) body
+    let ctxWithGenerics = pushGenerics (funsigGenerics signature) ctx
+    in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+       formatLangItem itemMeta <>
+       (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+       (if funsigIsUnsafe signature then "unsafe " else "") <>
+       "fn " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
+       formatGenericParams ctxWithGenerics signature <>
+       formatArgs ctxWithGenerics signature <>
+       formatReturnType ctxWithGenerics signature <>
+       formatPredicates ctxWithGenerics signature <>
+       "\n" <>
+       buildWithCtx (increaseIndent ctx) body
     where
       formatLangItem im = case T.itemmetaLangItem im of
         Just li -> "#[lang_item(\"" <> fromString li <> "\")]\n"
         Nothing -> ""
-      formatGenericParams c sig = ""  -- Simplified for now
+      formatGenericParams c sig = 
+        let (params, _) = formatGenericParamsWithClauses c (funsigGenerics sig)
+        in params
       formatArgs c (FunSig _ _ inputs _) =
         "(" <> mconcat (punctuate ", " (zipWith formatArg [1..] inputs)) <> ")"
         where
@@ -755,6 +760,9 @@ instance BuildWithCtx K.FunDecl where
         if isUnit output then "" else " -> " <> buildWithCtx c output
         where
           isUnit _ = False  -- Simplified
+      formatPredicates c sig =
+        let (_, clauses) = formatGenericParamsWithClauses c (funsigGenerics sig)
+        in clauses
 
 -- Body (from Krate)
 instance BuildWithCtx K.Body where
@@ -796,42 +804,43 @@ instance BuildWithCtx [T.PathElem] where
 -- TypeDecl
 instance BuildWithCtx T.TypeDecl where
   buildWithCtx ctx (T.TypeDecl defId itemMeta generics _src kind _layout _ptrMetadata _repr) =
-    let keyword = case kind of
+    let ctxWithGenerics = pushGenerics generics ctx
+        keyword = case kind of
           T.Struct _ -> "struct"
           T.Union _ -> "union"
           T.Enum _ -> "enum"
           T.Alias _ -> "type"
           T.Opaque -> "opaque type"
           T.TDeclError _ -> "opaque type"
+        (params, clauses) = formatGenericParamsWithClauses ctxWithGenerics generics
+        nlOrSpace = if hasPredicates generics then "\n" else " "
     in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
        formatLangItem itemMeta <>
        (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
        fromString keyword <> " " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
-       formatGenericParams ctx generics <>
-       formatPredicates ctx generics <>
-       formatKind ctx generics kind
+       params <> clauses <>
+       formatKind ctxWithGenerics nlOrSpace kind
     where
       formatLangItem im = case T.itemmetaLangItem im of
         Just li -> "#[lang_item(\"" <> fromString li <> "\")]\n"
         Nothing -> ""
-      formatGenericParams c gp = ""  -- Simplified for now
-      formatPredicates c gp = ""  -- Simplified for now
-      formatKind c gp (T.Struct (M.Vector fields)) =
-        let nlOrSpace = " "  -- Simplified
-        in nlOrSpace <> "{\n" <>
-           mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields) <>
-           "}"
-      formatKind c gp (T.Union (M.Vector fields)) =
-        " {\n" <>
+      hasPredicates (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
+        not (null traitClauses && null regionsOutlive && null typesOutlive && null traitTypeConstraints)
+      formatKind c nlOrSpace (T.Struct (M.Vector fields)) =
+        nlOrSpace <> "{\n" <>
         mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields) <>
         "}"
-      formatKind c gp (T.Enum (M.Vector variants)) =
-        " {\n" <>
+      formatKind c nlOrSpace (T.Union (M.Vector fields)) =
+        nlOrSpace <> "{\n" <>
+        mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields) <>
+        "}"
+      formatKind c nlOrSpace (T.Enum (M.Vector variants)) =
+        nlOrSpace <> "{\n" <>
         mconcat (map (\v -> "  " <> buildWithCtx c v <> ",\n") variants) <>
         "}"
-      formatKind c gp (T.Alias ty) = " = " <> buildWithCtx c ty
-      formatKind c gp T.Opaque = ""
-      formatKind c gp (T.TDeclError msg) = " = ERROR(" <> fromString msg <> ")"
+      formatKind c nlOrSpace (T.Alias ty) = " = " <> buildWithCtx c ty
+      formatKind c nlOrSpace T.Opaque = ""
+      formatKind c nlOrSpace (T.TDeclError msg) = " = ERROR(" <> fromString msg <> ")"
 
 -- Field
 instance BuildWithCtx T.Field where
@@ -855,37 +864,38 @@ instance BuildWithCtx T.Variant where
 -- GlobalDecl
 instance BuildWithCtx G.GlobalDecl where
   buildWithCtx ctx (G.GlobalDecl defId itemMeta generics ty _src globalKind init) =
-    let keyword = case globalKind of
+    let ctxWithGenerics = pushGenerics generics ctx
+        keyword = case globalKind of
           G.Static -> "static"
           G.NamedConst -> "const"
           G.AnonConst -> "const"
+        (params, clauses) = formatGenericParamsWithClauses ctxWithGenerics generics
     in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
        (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
        fromString keyword <> " " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
-       formatGenericParams ctx generics <>
-       ": " <> buildWithCtx ctx ty <>
-       formatPredicates ctx generics <>
-       " = " <> buildWithCtx ctx init <> "()"
+       params <> ": " <> buildWithCtx ctxWithGenerics ty <>
+       clauses <>
+       (if hasPredicates generics then "\n" else " ") <>
+       "= " <> buildWithCtx ctx init <> "()"
     where
-      formatGenericParams c gp = ""  -- Simplified for now
-      formatPredicates c gp = ""  -- Simplified for now
+      hasPredicates (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
+        not (null traitClauses && null regionsOutlive && null typesOutlive && null traitTypeConstraints)
 
 -- TraitDecl
 instance BuildWithCtx G.TraitDecl where
   buildWithCtx ctx (G.TraitDecl defId itemMeta generics impliedClauses consts types methods vtable) =
-    "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
-    formatLangItem itemMeta <>
-    (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
-    "trait " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
-    formatGenericParams ctx generics <>
-    formatPredicates ctx generics <>
-    formatBody ctx impliedClauses consts types methods vtable
+    let ctxWithGenerics = pushGenerics generics ctx
+        (params, clauses) = formatGenericParamsWithClauses ctxWithGenerics generics
+    in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+       formatLangItem itemMeta <>
+       (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+       "trait " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
+       params <> clauses <>
+       formatBody ctxWithGenerics impliedClauses consts types methods vtable
     where
       formatLangItem im = case T.itemmetaLangItem im of
         Just li -> "#[lang_item(\"" <> fromString li <> "\")]\n"
         Nothing -> ""
-      formatGenericParams c gp = ""  -- Simplified for now
-      formatPredicates c gp = ""  -- Simplified for now
       formatBody c (M.Vector implClauses) consts types methods vtable =
         let anyItem = not (null implClauses) || not (null consts) || not (null types) || not (null methods)
         in if anyItem
@@ -926,3 +936,49 @@ instance BuildWithCtx T.FunDeclRef where
 instance BuildWithCtx T.TraitParam where
   buildWithCtx ctx (T.TraitParam clauseId _span traitRef) =
     buildWithCtx ctx traitRef
+
+-- GenericParams formatting helpers
+formatGenericParamsWithClauses :: PrintingCtx -> T.GenericParams -> (Builder, Builder)
+formatGenericParamsWithClauses ctx gp =
+  let params = if hasExplicits gp
+                 then "<" <> formatParams ctx gp <> ">"
+                 else ""
+      clauses = if hasPredicates gp
+                  then "\n" <> fromText (indent ctx) <> "where" <> formatClauses ctx gp
+                  else ""
+  in (params, clauses)
+  where
+    hasExplicits (T.GenericParams (M.Vector regions) (M.Vector types) (M.Vector constGens) _ _ _ _) =
+      not (null regions && null types && null constGens)
+    hasPredicates (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
+      not (null traitClauses && null regionsOutlive && null typesOutlive && null traitTypeConstraints)
+    formatParams c (T.GenericParams (M.Vector regions) (M.Vector types) (M.Vector constGens) _ _ _ _) =
+      mconcat (punctuate ", " (map (buildWithCtx c) regions ++ map (buildWithCtx c) types ++ map (buildWithCtx c) constGens))
+    formatClauses c (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
+      mconcat (map (\tc -> "\n" <> fromText (indent c) <> "    " <> buildWithCtx c tc <> ",") traitClauses)
+    punctuate _ [] = []
+    punctuate _ [x] = [x]
+    punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+
+-- RegionParam
+instance BuildWithCtx T.RegionParam where
+  buildWithCtx ctx (T.RegionParam regionId maybeName) =
+    case maybeName of
+      Just name -> fromString name
+      Nothing -> buildWithCtx ctx regionId
+
+-- TypeParam
+instance BuildWithCtx T.TypeParam where
+  buildWithCtx ctx (T.TypeParam typeVarId name) =
+    fromString name
+
+-- ConstGenericParam
+instance BuildWithCtx T.ConstGenericParam where
+  buildWithCtx ctx (T.ConstGenericParam constVarId name ty) =
+    "const " <> fromString name <> ": " <> buildWithCtx ctx ty
+
+-- GenericParams
+instance BuildWithCtx T.GenericParams where
+  buildWithCtx ctx gp =
+    let (params, clauses) = formatGenericParamsWithClauses ctx gp
+    in params <> clauses
