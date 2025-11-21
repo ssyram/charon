@@ -94,6 +94,17 @@ fromText = B.fromText
 fromString :: String -> Builder
 fromString = B.fromString
 
+-- Helper function to punctuate a list with a separator
+punctuate :: Builder -> [Builder] -> [Builder]
+punctuate _ [] = []
+punctuate _ [x] = [x]
+punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+
+-- Helper function to check if GenericParams has predicates
+hasPredicates :: T.GenericParams -> Bool
+hasPredicates (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
+  not (null traitClauses && null regionsOutlive && null typesOutlive && null traitTypeConstraints)
+
 --------------------
 -- Basic instances
 --------------------
@@ -753,9 +764,6 @@ instance BuildWithCtx K.FunDecl where
         "(" <> mconcat (punctuate ", " (zipWith formatArg [1..] inputs)) <> ")"
         where
           formatArg i ty = "@" <> B.decimal i <> ": " <> buildWithCtx c ty
-          punctuate _ [] = []
-          punctuate _ [x] = [x]
-          punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
       formatReturnType c (FunSig _ _ _ output) =
         if isUnit output then "" else " -> " <> buildWithCtx c output
         where
@@ -950,8 +958,6 @@ formatGenericParamsWithClauses ctx gp =
   where
     hasExplicits (T.GenericParams (M.Vector regions) (M.Vector types) (M.Vector constGens) _ _ _ _) =
       not (null regions && null types && null constGens)
-    hasPredicates (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
-      not (null traitClauses && null regionsOutlive && null typesOutlive && null traitTypeConstraints)
     formatParams c (T.GenericParams (M.Vector regions) (M.Vector types) (M.Vector constGens) _ _ _ _) =
       mconcat (punctuate ", " (map (buildWithCtx c) regions ++ map (buildWithCtx c) types ++ map (buildWithCtx c) constGens))
     formatClauses c (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
