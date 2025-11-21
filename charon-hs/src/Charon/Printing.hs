@@ -952,7 +952,7 @@ instance BuildWithCtx T.GenericParams where
 
 -- TraitImpl
 instance BuildWithCtx G.TraitImpl where
-  buildWithCtx ctx (G.TraitImpl defId itemMeta implTrait generics impliedTraitRefs consts types methods) =
+  buildWithCtx ctx (G.TraitImpl defId itemMeta implTrait generics impliedTraitRefs consts types methods vtable) =
     let ctxWithGenerics = pushGenerics generics ctx
         (params, clauses) = formatGenericParamsWithClauses ctxWithGenerics generics
     in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
@@ -960,14 +960,15 @@ instance BuildWithCtx G.TraitImpl where
        "impl" <> params <> " " <> buildWithCtx ctxWithGenerics implTrait <>
        clauses <>
        (if hasPredicates generics then "\n" else " ") <>
-       formatBody ctxWithGenerics impliedTraitRefs consts types methods
+       formatBody ctxWithGenerics impliedTraitRefs consts types methods vtable
     where
-      formatBody c (M.Vector impliedRefs) constsList typesList methodsList =
+      formatBody c (M.Vector impliedRefs) constsList typesList methodsList mvtable =
         "{\n" <>
         formatImpliedRefs c impliedRefs <>
         formatConsts c constsList <>
         formatTypes c typesList <>
         formatMethods c methodsList <>
+        formatVtable c mvtable <>
         "}"
       formatImpliedRefs c [] = ""
       formatImpliedRefs c refs =
@@ -981,6 +982,8 @@ instance BuildWithCtx G.TraitImpl where
       formatMethods c [] = ""
       formatMethods c methodsList =
         mconcat (map (\(T.TraitItemName name, binder) -> "    fn " <> fromText name <> " = " <> buildWithCtx c binder <> "\n") methodsList)
+      formatVtable c Nothing = ""
+      formatVtable c (Just ref) = "    vtable = " <> buildWithCtx c ref <> "\n"
 
 -- Binder for TraitAssocTyImpl
 instance BuildWithCtx (T.Binder T.TraitAssocTyImpl) where

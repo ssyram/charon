@@ -15,7 +15,7 @@ import Control.Monad (filterM, forM_)
 
 -- Import our modules
 import Charon.Printing
-import Generated_Krate (LlbcFile(..), TranslatedCrate(..))
+import Generated_Krate (LlbcFile(..), TranslatedCrate(..), FunDecl)
 import qualified Generated_GAst as G
 import qualified Generated_Types as T
 import qualified Generated_Meta as M
@@ -47,7 +47,7 @@ testPrintCompare testName = do
   result <- eitherDecodeFileStrict llbcPath
   case result of
     Left err -> assertFailure $ "Failed to decode LLBC file: " ++ err
-    Right (LlbcFile crate) -> do
+    Right (LlbcFile _version crate) -> do
       -- Load expected output
       expectedContent <- readFile outPath
       let expectedLines = lines expectedContent
@@ -80,21 +80,25 @@ printCrate ctx crate = unlines
   , printDecls ctx crate
   ]
 
+-- Helper to extract values from Vector
+vectorToList :: M.Vector k v -> [v]
+vectorToList (M.Vector xs) = xs
+
 -- Print all declarations in a crate
 printDecls :: PrintingCtx -> TranslatedCrate -> String
 printDecls ctx crate = unlines $ concat
-  [ map (printTypeDecl ctx) (M.vectorValues $ translatedc_type_decls crate)
-  , map (printFunDecl ctx) (M.vectorValues $ translatedc_fun_decls crate)
-  , map (printGlobalDecl ctx) (M.vectorValues $ translatedc_global_decls crate)
-  , map (printTraitDecl ctx) (M.vectorValues $ translatedc_trait_decls crate)
-  , map (printTraitImpl ctx) (M.vectorValues $ translatedc_trait_impls crate)
+  [ map (printTypeDecl ctx) (vectorToList $ translatedcrateTypeDecls crate)
+  , map (printFunDecl ctx) (vectorToList $ translatedcrateFunDecls crate)
+  , map (printGlobalDecl ctx) (vectorToList $ translatedcrateGlobalDecls crate)
+  , map (printTraitDecl ctx) (vectorToList $ translatedcrateTraitDecls crate)
+  , map (printTraitImpl ctx) (vectorToList $ translatedcrateTraitImpls crate)
   ]
 
 -- Helper functions to print specific declaration types
 printTypeDecl :: PrintingCtx -> T.TypeDecl -> String
 printTypeDecl ctx decl = printWithCtx ctx decl ++ "\n"
 
-printFunDecl :: PrintingCtx -> G.FunDecl -> String
+printFunDecl :: PrintingCtx -> FunDecl -> String
 printFunDecl ctx decl = printWithCtx ctx decl ++ "\n"
 
 printGlobalDecl :: PrintingCtx -> G.GlobalDecl -> String
