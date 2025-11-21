@@ -533,7 +533,7 @@ instance BuildWithCtx (RegionBinder ([Ty], Ty)) where
     where
       isUnitType (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
       isUnitType _ = False
-      pushBoundRegions c _ = c  -- Simplified - we would push bound regions to context
+      pushBoundRegions c _ = c  -- Note: In Rust, this pushes bound regions to context; we don't track them
 
 -- RegionBinder - generic instance for other types
 instance BuildWithCtx a => BuildWithCtx (RegionBinder a) where
@@ -748,7 +748,7 @@ instance BuildWithCtx L.Block where
   buildWithCtx ctx (L.Block _span statements) =
     mconcat (map (\stmt -> buildWithCtx ctx stmt <> "\n") statements)
 
--- FunDecl (simplified version)
+-- FunDecl
 instance BuildWithCtx K.FunDecl where
   buildWithCtx ctx (K.FunDecl defId itemMeta signature _src _isGlobalInit body) =
     let ctxWithGenerics = pushGenerics (funsigGenerics signature) ctx
@@ -876,7 +876,37 @@ instance BuildWithCtx U.Block where
 
 -- Unstructured Terminator  
 instance BuildWithCtx U.Terminator where
-  buildWithCtx ctx term = "terminator(...)"  -- TODO: Add all terminator variants
+  buildWithCtx ctx (U.Terminator _span kind commentsBefore) =
+    mconcat (map (\c -> fromText (indent ctx) <> "// " <> fromString c <> "\n") commentsBefore) <>
+    fromText (indent ctx) <> buildWithCtx ctx kind
+
+-- Unstructured TerminatorKind
+instance BuildWithCtx U.TerminatorKind where
+  buildWithCtx _ (U.Goto target) =
+    "goto bb" <> B.decimal (U.blockidRaw target)
+  buildWithCtx ctx (U.Switch discr targets) =
+    "switch " <> buildWithCtx ctx discr <> " -> " <> buildWithCtx ctx targets
+  buildWithCtx ctx (U.Call call target onUnwind) =
+    buildWithCtx ctx call <> " -> bb" <> B.decimal (U.blockidRaw target) <> 
+    " (unwind: bb" <> B.decimal (U.blockidRaw onUnwind) <> ")"
+  buildWithCtx ctx (U.Drop place tref target onUnwind) =
+    "drop[" <> buildWithCtx ctx tref <> "] " <> buildWithCtx ctx place <> 
+    " -> bb" <> B.decimal (U.blockidRaw target) <> " (unwind: bb" <> B.decimal (U.blockidRaw onUnwind) <> ")"
+  buildWithCtx ctx (U.Abort kind) =
+    buildWithCtx ctx kind
+  buildWithCtx _ U.Return =
+    "return"
+  buildWithCtx _ U.UnwindResume =
+    "unwind_continue"
+
+-- Switch formatting for unstructured terminators
+instance BuildWithCtx U.Switch where
+  buildWithCtx _ (U.If trueBlock falseBlock) =
+    "bb" <> B.decimal (U.blockidRaw trueBlock) <> " else -> bb" <> B.decimal (U.blockidRaw falseBlock)
+  buildWithCtx ctx (U.SwitchInt _ty maps otherwise) =
+    let formatMap (lit, bid) = buildWithCtx ctx lit <> ": bb" <> B.decimal (U.blockidRaw bid)
+        allMaps = map formatMap maps ++ ["otherwise: bb" <> B.decimal (U.blockidRaw otherwise)]
+    in mconcat (punctuate ", " allMaps)
 
 -- TypeDecl
 instance BuildWithCtx T.TypeDecl where
