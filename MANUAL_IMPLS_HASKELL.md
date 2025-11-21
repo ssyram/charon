@@ -34,6 +34,8 @@ These types:
 - **ItemOpacity** and **PredicateOrigin**: Come from external crates and aren't part of the charon AST
 - **Ty**: A newtype wrapper around `HashConsed<TyKind>` that serializes transparently. The inner `TyKind` is auto-generated, but `Ty` itself requires special handling due to hash-consing
 
+Note: "Opaque" is not a separate type - it's a variant of `TypeDeclKind` and `Body`, which are auto-generated.
+
 **In generate-ml**: Same types are manually implemented
 
 ### Haskell-Specific Types
@@ -114,10 +116,12 @@ These GAst struct types conflicted with:
   - Both have Vector (filters None values)
   - ScalarValue in generate-hs requires dual String/Number parsing
 
-- **manually_implemented**: generate-hs has 5 (down from 16!), generate-ml has 7
+- **manually_implemented**: generate-hs has 5 (down from 16!), generate-ml has 6
   - 3 are shared (ItemOpacity, PredicateOrigin, Ty)
   - 2 are Haskell-specific (TraitTypeConstraintId - marker trait, Vector - phantom type parameter)
   - 3 types (Body, FunDecl, TranslatedCrate) are now auto-generated in Haskell but still manual in ML
+  
+Note: Vector is auto-generated in both but has manual FromJSON/of_json for filtering None values.
 
 ### Why Haskell previously needed more manual implementations
 
