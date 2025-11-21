@@ -39,6 +39,7 @@ import Generated_Krate
 import qualified Generated_Krate as K
 import qualified Generated_Meta as M
 import qualified Generated_LlbcAst as L
+import qualified Generated_UllbcAst as U
 import Data.List (intercalate)
 
 -- | Tab increment for indentation (4 spaces)
@@ -523,7 +524,9 @@ instance BuildWithCtx TraitRefKind where
 -- RegionBinder
 instance BuildWithCtx a => BuildWithCtx (RegionBinder a) where
   buildWithCtx ctx (RegionBinder regions value) =
-    buildWithCtx ctx value  -- Simplified - not handling region binders properly yet
+    if null regions
+    then buildWithCtx ctx value
+    else "for<" <> mconcat (punctuate ", " (map (buildWithCtx ctx) regions)) <> "> " <> buildWithCtx ctx value
 
 -- TraitImplRef
 instance BuildWithCtx TraitImplRef where
@@ -553,10 +556,13 @@ instance BuildWithCtx Ty where
     "*" <> buildWithCtx ctx refKind <> " " <> buildWithCtx ctx ty
   buildWithCtx ctx (TTraitType traitRef tyName) =
     buildWithCtx ctx traitRef <> "::" <> buildWithCtx ctx tyName
-  buildWithCtx _ (TDynTrait _) = "dyn (?)"
-  buildWithCtx ctx (TFnPtr _) = "fn(...)"  -- Simplified for now
-  buildWithCtx ctx (TFnDef _) = "fn_def(...)"  -- Simplified for now
-  buildWithCtx ctx (TPtrMetadata ty) = "PtrMetadata(" <> buildWithCtx ctx ty <> ")"
+  buildWithCtx ctx (TDynTrait predicate) =
+    "(dyn " <> buildWithCtx ctx predicate <> ")"
+  buildWithCtx ctx (TFnPtr fnSig) = buildWithCtx ctx fnSig
+  buildWithCtx ctx (TFnDef binder) =
+    let ctx' = ctx { generics = [] }  -- Reset generics for function types
+    in buildWithCtx ctx' binder
+  buildWithCtx ctx (TPtrMetadata ty) = "PtrMetadata<" <> buildWithCtx ctx ty <> ">"
   buildWithCtx _ (TError msg) = "Error(" <> fromString msg <> ")"
 
 -- TypeDeclRef
@@ -584,7 +590,21 @@ instance BuildWithCtx FunSig where
     in unsafe <> "fn(" <> mconcat (punctuate ", " (map (buildWithCtx ctx) inputs)) <> ")" <>
        (if isUnitType output then "" else " -> " <> buildWithCtx ctx output)
     where
-      isUnitType _ = False  -- We'll need better logic to detect unit type
+      isUnitType (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
+      isUnitType _ = False
+
+-- RegionBinder for function pointer types (Vec<Ty>, Ty)
+instance BuildWithCtx (RegionBinder ([Ty], Ty)) where
+  buildWithCtx ctx (RegionBinder regions (inputs, output)) =
+    let ctx' = pushBoundRegions ctx regions
+    in "fn" <>
+       (if null regions then "" else "<" <> mconcat (punctuate ", " (map (buildWithCtx ctx') regions)) <> ">") <>
+       "(" <> mconcat (punctuate ", " (map (buildWithCtx ctx') inputs)) <> ")" <>
+       (if isUnitType output then "" else " -> " <> buildWithCtx ctx' output)
+    where
+      isUnitType (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
+      isUnitType _ = False
+      pushBoundRegions c _ = c  -- Simplified - we would push bound regions to context
 
 
 -- Rvalue
@@ -600,7 +620,8 @@ instance BuildWithCtx E.Rvalue where
     in borrow <> buildWithCtx ctx place <>
        (if isUnitOperand metadata then "" else " with_metadata(" <> buildWithCtx ctx metadata <> ")")
     where
-      isUnitOperand _ = True  -- Simplified - assume unit metadata for now
+      isUnitOperand (Constant (ConstantExpr (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) _)) = True
+      isUnitOperand _ = False
   buildWithCtx ctx (E.RawPtr place refKind metadata) =
     let ptrKind = case refKind of
           RShared -> "&raw const "
@@ -608,7 +629,8 @@ instance BuildWithCtx E.Rvalue where
     in ptrKind <> buildWithCtx ctx place <>
        (if isUnitOperand metadata then "" else " with_metadata(" <> buildWithCtx ctx metadata <> ")")
     where
-      isUnitOperand _ = True  -- Simplified
+      isUnitOperand (Constant (ConstantExpr (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) _)) = True
+      isUnitOperand _ = False
   buildWithCtx ctx (E.BinaryOp binop op1 op2) =
     buildWithCtx ctx op1 <> " " <> buildWithCtx ctx binop <> " " <> buildWithCtx ctx op2
   buildWithCtx ctx (E.UnaryOp unop op) =
@@ -650,8 +672,9 @@ instance BuildWithCtx L.StatementKind where
     fromText (indent ctx) <> buildWithCtx ctx place <> " := " <> buildWithCtx ctx rvalue
   buildWithCtx ctx (L.SetDiscriminant place variantId) =
     fromText (indent ctx) <> "@discriminant(" <> buildWithCtx ctx place <> ") := " <> buildWithCtx ctx variantId
-  buildWithCtx ctx (L.CopyNonOverlapping cpyNonOv) =
-    fromText (indent ctx) <> "copy_nonoverlapping(...)"  -- Simplified
+  buildWithCtx ctx (L.CopyNonOverlapping (G.CopyNonOverlapping src dst count)) =
+    fromText (indent ctx) <> "copy_nonoverlapping(" <> 
+    buildWithCtx ctx src <> ", " <> buildWithCtx ctx dst <> ", " <> buildWithCtx ctx count <> ")"
   buildWithCtx ctx (L.StorageLive lid) =
     fromText (indent ctx) <> "storage_live(" <> buildWithCtx ctx lid <> ")"
   buildWithCtx ctx (L.StorageDead lid) =
@@ -739,7 +762,8 @@ instance BuildWithCtx K.FunDecl where
       formatReturnType c (FunSig _ _ _ output) =
         if isUnit output then "" else " -> " <> buildWithCtx c output
         where
-          isUnit _ = False  -- Simplified
+          isUnit (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
+          isUnit _ = False
       formatPredicates c sig =
         let (_, clauses) = formatGenericParamsWithClauses c (funsigGenerics sig)
         in clauses
@@ -748,12 +772,12 @@ instance BuildWithCtx K.FunDecl where
 instance BuildWithCtx K.Body where
   buildWithCtx ctx (K.Structured gexprBody) =
     buildWithCtx ctx gexprBody
-  buildWithCtx ctx (K.Unstructured _gexprBody) =
-    "{ /* unstructured */ }"  -- Simplified
-  buildWithCtx _ K.TraitMethodWithoutDefault = "{ /* trait method without default */ }"
-  buildWithCtx _ K.Opaque = "{ /* opaque */ }"
-  buildWithCtx _ K.Missing = "{ /* missing */ }"
-  buildWithCtx ctx (K.Error err) = "{ /* error: " <> fromString (show err) <> " */ }"
+  buildWithCtx ctx (K.Unstructured gexprBody) =
+    buildWithCtx ctx gexprBody
+  buildWithCtx _ K.TraitMethodWithoutDefault = "= <method_without_default_body>"
+  buildWithCtx _ K.Opaque = "= <opaque>"
+  buildWithCtx _ K.Missing = "= <missing>"
+  buildWithCtx ctx (K.Error err) = "= <error: " <> fromString (show err) <> ">"
 
 -- GexprBody for Block
 instance BuildWithCtx (G.GexprBody L.Block) where
@@ -772,10 +796,44 @@ instance BuildWithCtx (G.GexprBody L.Block) where
       formatLocalName Nothing idx = "@" <> B.decimal (E.localidRaw idx)
       formatComment idx = if E.localidRaw idx == 0 then "return" else "local"
 
+-- GexprBody for unstructured (Vector of BlockId Block)
+instance BuildWithCtx (G.GexprBody (M.Vector U.BlockId U.Block)) where
+  buildWithCtx ctx (G.GexprBody _span locals (M.Vector blocks)) =
+    let tab = indent ctx
+        ctx' = increaseIndent ctx
+    in "\n" <> fromText tab <>
+       "{\n" <>
+       formatLocals ctx' locals <>
+       mconcat (zipWith (formatBlock ctx') [0..] blocks) <>
+       fromText tab <> "}"
+    where
+      formatLocals c (G.Locals _argCount (M.Vector localsList)) =
+        mconcat (map (formatLocal c) localsList)
+      formatLocal c (G.Local idx name ty) =
+        fromText (indent c) <> "let " <> formatLocalName name idx <> ": " <>
+        buildWithCtx c ty <> "; // " <> formatComment idx <> "\n"
+      formatLocalName (Just n) idx = fromString n <> "@" <> B.decimal (E.localidRaw idx)
+      formatLocalName Nothing idx = "@" <> B.decimal (E.localidRaw idx)
+      formatComment idx = if E.localidRaw idx == 0 then "return" else "local"
+      formatBlock c idx (U.BlockId bid, block) =
+        "\n" <> fromText (indent c) <> "bb" <> B.decimal bid <> ": {\n" <>
+        buildWithCtx (increaseIndent c) block <>
+        "\n" <> fromText (indent c) <> "}\n"
+
 -- ItemMeta name formatting
 instance BuildWithCtx [T.PathElem] where
   buildWithCtx ctx elems =
     mconcat (punctuate "::" (map (buildWithCtx ctx) elems))
+
+-- Unstructured Block
+instance BuildWithCtx U.Block where
+  buildWithCtx ctx (U.Block stmts terminator) =
+    mconcat (map (buildWithCtx ctx) stmts) <>
+    fromText (indent ctx) <> buildWithCtx ctx terminator
+
+-- Unstructured Terminator  
+instance BuildWithCtx U.Terminator where
+  buildWithCtx ctx term = "terminator(...)"  -- TODO: Add all terminator variants
 
 -- TypeDecl
 instance BuildWithCtx T.TypeDecl where
@@ -884,9 +942,10 @@ instance BuildWithCtx G.TraitDecl where
       formatConst (G.TraitAssocConst name ty _default) =
         let T.TraitItemName n = name
         in "    const " <> fromText n <> " : " <> buildWithCtx ctx ty <> "\n"
-      formatType (T.Binder _regions assocTy) =
+      formatType (T.Binder regions assocTy) =
         let T.TraitItemName name = G.traitassoctyName assocTy
-        in "    type " <> fromText name <> "\n"  -- Simplified
+            params = if null regions then "" else "<" <> mconcat (punctuate ", " (map (buildWithCtx ctx) regions)) <> ">"
+        in "    type " <> fromText name <> params <> "\n"
       formatMethod (T.Binder _regions method) =
         let T.TraitItemName name = G.traitmethodName method
         in "    fn " <> fromText name <> " = " <>
