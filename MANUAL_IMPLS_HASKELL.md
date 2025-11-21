@@ -75,7 +75,7 @@ These types were moved from manual implementation to the auto-generated `Generat
 - Body variants use qualified types: G.GexprBody (M.Vector U.BlockId U.Block) and G.GexprBody L.Block
 - FromJSON instances handle all complex structures including HashMap fields serialized as arrays
 
-**In generate-ml**: Same types are auto-generated
+**In generate-ml**: Still manually implemented (GAst.ml defines gfun_decl and gcrate manually)
 
 ### TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping
 **Former reason**: Name conflicts between GAst structs and Types/Expressions module variants
@@ -115,9 +115,9 @@ These GAst struct types conflicted with:
   - ScalarValue in generate-hs requires dual String/Number parsing
 
 - **manually_implemented**: generate-hs has 5 (down from 16!), generate-ml has 7
-  - 4 are shared (ItemOpacity, PredicateOrigin, Ty, Vector)
-  - Body, FunDecl, TranslatedCrate are now auto-generated in Haskell (still manual in ML)
-  - 1 is Haskell-specific (TraitTypeConstraintId - marker trait)
+  - 3 are shared (ItemOpacity, PredicateOrigin, Ty)
+  - 2 are Haskell-specific (TraitTypeConstraintId - marker trait, Vector - phantom type parameter)
+  - 3 types (Body, FunDecl, TranslatedCrate) are now auto-generated in Haskell but still manual in ML
 
 ### Why Haskell previously needed more manual implementations
 
