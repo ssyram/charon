@@ -30,14 +30,20 @@ These types are excluded from automatic type and FromJSON instance generation:
 #### ItemOpacity, PredicateOrigin, Ty
 **Reason**: External/non-local types or special handling required
 
-These are types that either:
-- Come from external crates and aren't part of the charon AST  
-- Require special deserialization logic not covered by the standard patterns
-- Have complex dependencies that make automatic generation difficult
+These types:
+- **ItemOpacity** and **PredicateOrigin**: Come from external crates and aren't part of the charon AST
+- **Ty**: A newtype wrapper around `HashConsed<TyKind>` that serializes transparently. The inner `TyKind` is auto-generated, but `Ty` itself requires special handling due to hash-consing
 
 **In generate-ml**: Same types are manually implemented
 
 ### Haskell-Specific Types
+
+#### TraitTypeConstraintId
+**Reason**: Marker trait that doesn't need Haskell representation
+
+This is a marker type used in the Rust codebase that doesn't require a Haskell implementation as it's not used in the serialized output.
+
+**In generate-ml**: Not applicable
 
 #### Vector
 **Reason**: Phantom type parameter causes conflicts
@@ -70,8 +76,6 @@ These types were moved from manual implementation to the auto-generated `Generat
 - FromJSON instances handle all complex structures including HashMap fields serialized as arrays
 
 **In generate-ml**: Same types are auto-generated
-
-These types were previously manually implemented but are now automatically generated using module qualification to resolve naming conflicts:
 
 ### TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping
 **Former reason**: Name conflicts between GAst structs and Types/Expressions module variants
