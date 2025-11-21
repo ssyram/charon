@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverlappingInstances #-}
 {-|
 Module: Charon.Printing
 Description: Printing mechanism for the generated Haskell AST
@@ -521,9 +522,22 @@ instance BuildWithCtx TraitRefKind where
   buildWithCtx _ Self = "Self"
   buildWithCtx _ (BuiltinOrAuto _ _ _) = "BuiltinOrAuto(...)"
 
--- RegionBinder
+-- RegionBinder for function pointer types (Vec<Ty>, Ty) - MUST come before generic instance
+instance BuildWithCtx (RegionBinder ([Ty], Ty)) where
+  buildWithCtx ctx (RegionBinder (M.Vector regions) (inputs, output)) =
+    let ctx' = pushBoundRegions ctx regions
+    in "fn" <>
+       (if null regions then "" else "<" <> mconcat (punctuate ", " (map (buildWithCtx ctx') regions)) <> ">") <>
+       "(" <> mconcat (punctuate ", " (map (buildWithCtx ctx') inputs)) <> ")" <>
+       (if isUnitType output then "" else " -> " <> buildWithCtx ctx' output)
+    where
+      isUnitType (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
+      isUnitType _ = False
+      pushBoundRegions c _ = c  -- Simplified - we would push bound regions to context
+
+-- RegionBinder - generic instance for other types
 instance BuildWithCtx a => BuildWithCtx (RegionBinder a) where
-  buildWithCtx ctx (RegionBinder regions value) =
+  buildWithCtx ctx (RegionBinder (M.Vector regions) value) =
     if null regions
     then buildWithCtx ctx value
     else "for<" <> mconcat (punctuate ", " (map (buildWithCtx ctx) regions)) <> "> " <> buildWithCtx ctx value
@@ -544,6 +558,21 @@ instance BuildWithCtx ConstGeneric where
   buildWithCtx _ (CgValue lit) = buildWithCtx emptyCtx lit
   buildWithCtx ctx (CgGlobal gid) = buildWithCtx ctx gid
 
+-- DynPredicate
+instance BuildWithCtx DynPredicate where
+  buildWithCtx ctx (DynPredicate binder) = buildWithCtx ctx binder
+
+-- Binder Ty (for dyn traits)
+instance BuildWithCtx (Binder Ty) where
+  buildWithCtx ctx (Binder binderParams ty) =
+    let T.GenericParams _ (M.Vector typeParams) _ (M.Vector traitClauses) _ _ _ = binderParams
+        predicates = if null traitClauses
+          then ""
+          else mconcat (punctuate " + " (map (buildWithCtx ctx) traitClauses))
+    in if null traitClauses
+      then buildWithCtx ctx ty
+      else predicates
+
 -- Ty (Type) - This is complex, start with basic structure
 instance BuildWithCtx Ty where
   buildWithCtx ctx (TAdt tdeclRef) = buildWithCtx ctx tdeclRef
@@ -558,7 +587,7 @@ instance BuildWithCtx Ty where
     buildWithCtx ctx traitRef <> "::" <> buildWithCtx ctx tyName
   buildWithCtx ctx (TDynTrait predicate) =
     "(dyn " <> buildWithCtx ctx predicate <> ")"
-  buildWithCtx ctx (TFnPtr fnSig) = buildWithCtx ctx fnSig
+  buildWithCtx ctx (TFnPtr regionBinder) = buildWithCtx ctx regionBinder
   buildWithCtx ctx (TFnDef binder) =
     let ctx' = ctx { generics = [] }  -- Reset generics for function types
     in buildWithCtx ctx' binder
@@ -593,20 +622,6 @@ instance BuildWithCtx FunSig where
       isUnitType (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
       isUnitType _ = False
 
--- RegionBinder for function pointer types (Vec<Ty>, Ty)
-instance BuildWithCtx (RegionBinder ([Ty], Ty)) where
-  buildWithCtx ctx (RegionBinder regions (inputs, output)) =
-    let ctx' = pushBoundRegions ctx regions
-    in "fn" <>
-       (if null regions then "" else "<" <> mconcat (punctuate ", " (map (buildWithCtx ctx') regions)) <> ">") <>
-       "(" <> mconcat (punctuate ", " (map (buildWithCtx ctx') inputs)) <> ")" <>
-       (if isUnitType output then "" else " -> " <> buildWithCtx ctx' output)
-    where
-      isUnitType (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) = True
-      isUnitType _ = False
-      pushBoundRegions c _ = c  -- Simplified - we would push bound regions to context
-
-
 -- Rvalue
 instance BuildWithCtx E.Rvalue where
   buildWithCtx ctx (E.Use op) = buildWithCtx ctx op
@@ -620,7 +635,7 @@ instance BuildWithCtx E.Rvalue where
     in borrow <> buildWithCtx ctx place <>
        (if isUnitOperand metadata then "" else " with_metadata(" <> buildWithCtx ctx metadata <> ")")
     where
-      isUnitOperand (Constant (ConstantExpr (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) _)) = True
+      isUnitOperand (Constant (ConstantExpr _ (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))))) = True
       isUnitOperand _ = False
   buildWithCtx ctx (E.RawPtr place refKind metadata) =
     let ptrKind = case refKind of
@@ -629,7 +644,7 @@ instance BuildWithCtx E.Rvalue where
     in ptrKind <> buildWithCtx ctx place <>
        (if isUnitOperand metadata then "" else " with_metadata(" <> buildWithCtx ctx metadata <> ")")
     where
-      isUnitOperand (Constant (ConstantExpr (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))) _)) = True
+      isUnitOperand (Constant (ConstantExpr _ (TAdt (TypeDeclRef TTuple (GenericArgs (M.Vector []) (M.Vector []) (M.Vector []) (M.Vector [])))))) = True
       isUnitOperand _ = False
   buildWithCtx ctx (E.BinaryOp binop op1 op2) =
     buildWithCtx ctx op1 <> " " <> buildWithCtx ctx binop <> " " <> buildWithCtx ctx op2
@@ -798,13 +813,13 @@ instance BuildWithCtx (G.GexprBody L.Block) where
 
 -- GexprBody for unstructured (Vector of BlockId Block)
 instance BuildWithCtx (G.GexprBody (M.Vector U.BlockId U.Block)) where
-  buildWithCtx ctx (G.GexprBody _span locals (M.Vector blocks)) =
+  buildWithCtx ctx (G.GexprBody _span locals blocks) =
     let tab = indent ctx
         ctx' = increaseIndent ctx
     in "\n" <> fromText tab <>
        "{\n" <>
        formatLocals ctx' locals <>
-       mconcat (zipWith (formatBlock ctx') [0..] blocks) <>
+       formatBlocks ctx' blocks <>
        fromText tab <> "}"
     where
       formatLocals c (G.Locals _argCount (M.Vector localsList)) =
@@ -815,7 +830,9 @@ instance BuildWithCtx (G.GexprBody (M.Vector U.BlockId U.Block)) where
       formatLocalName (Just n) idx = fromString n <> "@" <> B.decimal (E.localidRaw idx)
       formatLocalName Nothing idx = "@" <> B.decimal (E.localidRaw idx)
       formatComment idx = if E.localidRaw idx == 0 then "return" else "local"
-      formatBlock c idx (U.BlockId bid, block) =
+      formatBlocks c (M.Vector blockList) =
+        mconcat (zipWith (formatBlock c) [0..] blockList)
+      formatBlock c bid block =
         "\n" <> fromText (indent c) <> "bb" <> B.decimal bid <> ": {\n" <>
         buildWithCtx (increaseIndent c) block <>
         "\n" <> fromText (indent c) <> "}\n"
@@ -824,6 +841,32 @@ instance BuildWithCtx (G.GexprBody (M.Vector U.BlockId U.Block)) where
 instance BuildWithCtx [T.PathElem] where
   buildWithCtx ctx elems =
     mconcat (punctuate "::" (map (buildWithCtx ctx) elems))
+
+-- Unstructured Statement
+instance BuildWithCtx U.Statement where
+  buildWithCtx ctx (U.Statement _span kind commentsBefore) =
+    mconcat (map (\c -> fromText (indent ctx) <> "// " <> fromString c <> "\n") commentsBefore) <>
+    buildWithCtx ctx kind
+
+-- Unstructured StatementKind
+instance BuildWithCtx U.StatementKind where
+  buildWithCtx ctx (U.Assign place rvalue) =
+    fromText (indent ctx) <> buildWithCtx ctx place <> " := " <> buildWithCtx ctx rvalue
+  buildWithCtx ctx (U.SetDiscriminant place variantId) =
+    fromText (indent ctx) <> "@discriminant(" <> buildWithCtx ctx place <> ") := " <> buildWithCtx ctx variantId
+  buildWithCtx ctx (U.CopyNonOverlapping (G.CopyNonOverlapping src dst count)) =
+    fromText (indent ctx) <> "copy_nonoverlapping(" <> 
+    buildWithCtx ctx src <> ", " <> buildWithCtx ctx dst <> ", " <> buildWithCtx ctx count <> ")"
+  buildWithCtx ctx (U.StorageLive lid) =
+    fromText (indent ctx) <> "storage_live(" <> buildWithCtx ctx lid <> ")"
+  buildWithCtx ctx (U.StorageDead lid) =
+    fromText (indent ctx) <> "storage_dead(" <> buildWithCtx ctx lid <> ")"
+  buildWithCtx ctx (U.Deinit place) =
+    fromText (indent ctx) <> "deinit(" <> buildWithCtx ctx place <> ")"
+  buildWithCtx ctx (U.Assert assertion) =
+    fromText (indent ctx) <> buildWithCtx ctx assertion
+  buildWithCtx ctx U.Nop =
+    fromText (indent ctx) <> "nop"
 
 -- Unstructured Block
 instance BuildWithCtx U.Block where
@@ -942,8 +985,9 @@ instance BuildWithCtx G.TraitDecl where
       formatConst (G.TraitAssocConst name ty _default) =
         let T.TraitItemName n = name
         in "    const " <> fromText n <> " : " <> buildWithCtx ctx ty <> "\n"
-      formatType (T.Binder regions assocTy) =
+      formatType (T.Binder binderParams assocTy) =
         let T.TraitItemName name = G.traitassoctyName assocTy
+            T.GenericParams (M.Vector regions) _ _ _ _ _ _ = binderParams
             params = if null regions then "" else "<" <> mconcat (punctuate ", " (map (buildWithCtx ctx) regions)) <> ">"
         in "    type " <> fromText name <> params <> "\n"
       formatMethod (T.Binder _regions method) =
