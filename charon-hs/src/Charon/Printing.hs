@@ -133,11 +133,6 @@ instance BuildWithCtx a => BuildWithCtx (Maybe a) where
 -- List instance - renders comma-separated
 instance BuildWithCtx a => BuildWithCtx [a] where
   buildWithCtx ctx xs = mconcat $ punctuate (fromText ", ") (map (buildWithCtx ctx) xs)
-    where
-      punctuate :: Builder -> [Builder] -> [Builder]
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs') = (x <> sep) : punctuate sep xs'
 
 --------------------
 -- AST instances
@@ -156,11 +151,6 @@ instance BuildWithCtx AbortKind where
 instance BuildWithCtx Name where
   buildWithCtx ctx (Name items) = 
     mconcat $ punctuate (fromText "::") (map (buildWithCtx ctx) items)
-    where
-      punctuate :: Builder -> [Builder] -> [Builder]
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs') = (x <> sep) : punctuate sep xs'
 
 -- PathElem
 instance BuildWithCtx PathElem where
@@ -512,9 +502,6 @@ instance BuildWithCtx GenericArgs where
         implicits = if hasImplicits
           then "[" <> mconcat (punctuate ", " (map (buildWithCtx ctx) traitRefs)) <> "]"
           else ""
-        punctuate _ [] = []
-        punctuate _ [x] = [x]
-        punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
     in explicits <> implicits
 
 -- TraitRef
@@ -598,9 +585,6 @@ instance BuildWithCtx FunSig where
        (if isUnitType output then "" else " -> " <> buildWithCtx ctx output)
     where
       isUnitType _ = False  -- We'll need better logic to detect unit type
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
 
 -- Rvalue
@@ -635,10 +619,6 @@ instance BuildWithCtx E.Rvalue where
     "@discriminant(" <> buildWithCtx ctx place <> ")"
   buildWithCtx ctx (E.Aggregate aggKind ops) =
     buildWithCtx ctx aggKind <> " { " <> mconcat (punctuate ", " (map (buildWithCtx ctx) ops)) <> " }"
-    where
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
   buildWithCtx ctx (E.Len place ty _maybeConst) =
     "len(" <> buildWithCtx ctx place <> ")"
   buildWithCtx ctx (E.Repeat op ty cg) =
@@ -717,10 +697,6 @@ instance BuildWithCtx L.Switch where
       buildWithCtx ctx blk) branches) <>
     fromText (indent ctx) <> "  _ => " <> buildWithCtx ctx defaultBlock <>
     fromText (indent ctx) <> "}"
-    where
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
   buildWithCtx ctx (L.Match place branches _maybeDefaultBlock) =
     fromText (indent ctx) <> "match " <> buildWithCtx ctx place <> " {\n" <>
     mconcat (map (\(variantIds, blk) ->
@@ -728,10 +704,6 @@ instance BuildWithCtx L.Switch where
       mconcat (punctuate " | " (map (buildWithCtx ctx) variantIds)) <> " => " <>
       buildWithCtx ctx blk) branches) <>
     fromText (indent ctx) <> "}"
-    where
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
 -- Block
 instance BuildWithCtx L.Block where
@@ -804,10 +776,6 @@ instance BuildWithCtx (G.GexprBody L.Block) where
 instance BuildWithCtx [T.PathElem] where
   buildWithCtx ctx elems =
     mconcat (punctuate "::" (map (buildWithCtx ctx) elems))
-    where
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
 -- TypeDecl
 instance BuildWithCtx T.TypeDecl where
@@ -864,10 +832,6 @@ instance BuildWithCtx T.Variant where
     (case fields of
        [] -> ""
        _ -> "(" <> mconcat (punctuate ", " (map (buildWithCtx ctx) fields)) <> ")")
-    where
-      punctuate _ [] = []
-      punctuate _ [x] = [x]
-      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
 -- GlobalDecl
 instance BuildWithCtx G.GlobalDecl where
@@ -962,9 +926,6 @@ formatGenericParamsWithClauses ctx gp =
       mconcat (punctuate ", " (map (buildWithCtx c) regions ++ map (buildWithCtx c) types ++ map (buildWithCtx c) constGens))
     formatClauses c (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
       mconcat (map (\tc -> "\n" <> fromText (indent c) <> "    " <> buildWithCtx c tc <> ",") traitClauses)
-    punctuate _ [] = []
-    punctuate _ [x] = [x]
-    punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
 -- RegionParam
 instance BuildWithCtx T.RegionParam where
