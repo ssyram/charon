@@ -884,6 +884,9 @@ instance BuildWithCtx U.Terminator where
 instance BuildWithCtx U.TerminatorKind where
   buildWithCtx _ (U.Goto target) =
     "goto bb" <> B.decimal (U.blockidRaw target)
+  buildWithCtx ctx (U.Switch discr (U.If trueBlock falseBlock)) =
+    "if " <> buildWithCtx ctx discr <> " -> bb" <> B.decimal (U.blockidRaw trueBlock) <>
+    " else -> bb" <> B.decimal (U.blockidRaw falseBlock)
   buildWithCtx ctx (U.Switch discr targets) =
     "switch " <> buildWithCtx ctx discr <> " -> " <> buildWithCtx ctx targets
   buildWithCtx ctx (U.Call call target onUnwind) =
@@ -899,9 +902,10 @@ instance BuildWithCtx U.TerminatorKind where
   buildWithCtx _ U.UnwindResume =
     "unwind_continue"
 
--- Switch formatting for unstructured terminators
+-- Switch formatting for unstructured terminators (only SwitchInt now, If is handled above)
 instance BuildWithCtx U.Switch where
   buildWithCtx _ (U.If trueBlock falseBlock) =
+    -- This shouldn't be reached since If is handled specially in TerminatorKind
     "bb" <> B.decimal (U.blockidRaw trueBlock) <> " else -> bb" <> B.decimal (U.blockidRaw falseBlock)
   buildWithCtx ctx (U.SwitchInt _ty maps otherwise) =
     let formatMap (lit, bid) = buildWithCtx ctx lit <> ": bb" <> B.decimal (U.blockidRaw bid)
