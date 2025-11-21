@@ -27,24 +27,25 @@ These types are excluded from automatic type and FromJSON instance generation:
 
 ### Core Types (shared with generate-ml)
 
-#### ItemOpacity, PredicateOrigin, Ty, Opaque
+#### ItemOpacity, PredicateOrigin, Ty
 **Reason**: External/non-local types or special handling required
 
-These are types that either:
-- Come from external crates and aren't part of the charon AST
-- Require special deserialization logic not covered by the standard patterns
-- Have complex dependencies that make automatic generation difficult
+These types:
+- **ItemOpacity** and **PredicateOrigin**: Come from external crates and aren't part of the charon AST
+- **Ty**: A newtype wrapper around `HashConsed<TyKind>` that serializes transparently. The inner `TyKind` is auto-generated, but `Ty` itself requires special handling due to hash-consing
 
-**In generate-ml**: Same types are manually implemented
-
-#### Body, FunDecl, TranslatedCrate
-**Reason**: Complex types with LLBC/ULLBC variant dependencies
-
-These types have variant-specific fields (LLBC vs ULLBC) and complex nested structures that would require sophisticated code generation logic. They are manually implemented in the templates to handle their complexity correctly.
+Note: "Opaque" is not a separate type - it's a variant of `TypeDeclKind` and `Body`, which are auto-generated.
 
 **In generate-ml**: Same types are manually implemented
 
 ### Haskell-Specific Types
+
+#### TraitTypeConstraintId
+**Reason**: Marker trait that doesn't need Haskell representation
+
+This is a marker type used in the Rust codebase that doesn't require a Haskell implementation as it's not used in the serialized output.
+
+**In generate-ml**: Not applicable
 
 #### Vector
 **Reason**: Phantom type parameter causes conflicts
@@ -55,11 +56,28 @@ These types have variant-specific fields (LLBC vs ULLBC) and complex nested stru
 
 **Manual definition in template**: Type alias `type Vector k v = [v]` with manual FromJSON that ignores the phantom type parameter `k`
 
-**Total manually_implemented**: 8 (down from 16 originally)
+**Total manually_implemented**: 5 (down from 16 originally)
 
 ## Previously Manual, Now Automated
 
 These types were previously manually implemented but are now automatically generated using module qualification to resolve naming conflicts:
+
+### Body, FunDecl, TranslatedCrate (NOW AUTO-GENERATED!)
+**Former reason**: Complex types with LLBC/ULLBC variant dependencies
+
+These types were moved from manual implementation to the auto-generated `Generated_Krate` module. The circular dependency issue was resolved by:
+1. Creating a dedicated `Krate` module that sits at the top of the dependency hierarchy
+2. Auto-generating Body, FunDecl, and TranslatedCrate with full FromJSON instances
+3. Using qualified imports (G., L., U.) to handle LLBC/ULLBC type references
+4. **TranslatedCrate now properly handles fun_decls** with full deserialization!
+
+**Solution**: Automatic generation with module separation
+- Types auto-generated in Generated_Krate module (depends on all other modules)
+- No circular dependencies: Meta → Values → Types → Expressions → GAst → LlbcAst/UllbcAst → Krate
+- Body variants use qualified types: G.GexprBody (M.Vector U.BlockId U.Block) and G.GexprBody L.Block
+- FromJSON instances handle all complex structures including HashMap fields serialized as arrays
+
+**In generate-ml**: Still manually implemented (GAst.ml defines gfun_decl and gcrate manually)
 
 ### TraitImpl, TraitMethod, Local, Call, Assertion, CopyNonOverlapping
 **Former reason**: Name conflicts between GAst structs and Types/Expressions module variants
@@ -98,9 +116,12 @@ These GAst struct types conflicted with:
   - Both have Vector (filters None values)
   - ScalarValue in generate-hs requires dual String/Number parsing
 
-- **manually_implemented**: generate-hs has 8 (down from 16), generate-ml has 7
-  - 7 are shared (core types with complex dependencies)  
-  - 1 is Haskell-specific (Vector - phantom type parameter)
+- **manually_implemented**: generate-hs has 5 (down from 16!), generate-ml has 6
+  - 3 are shared (ItemOpacity, PredicateOrigin, Ty)
+  - 2 are Haskell-specific (TraitTypeConstraintId - marker trait, Vector - phantom type parameter)
+  - 3 types (Body, FunDecl, TranslatedCrate) are now auto-generated in Haskell but still manual in OCaml
+  
+Note: Vector is auto-generated in both but has manual FromJSON/of_json for filtering None values.
 
 ### Why Haskell previously needed more manual implementations
 
@@ -124,16 +145,21 @@ By using **module qualification with prefixes** (G., T., E., M.), we can now:
 
 ## Improvements Made
 
-This PR reduced:
+This implementation reduced:
 - **manual_json_impls** from 7 to 1 (86% reduction)
-- **manually_implemented** from 16 to 8 (50% reduction)
+- **manually_implemented** from 16 to 5 (69% reduction!)
 
 Changes made:
 1. Added serde(transparent) support (first PR phase)
 2. Added struct variant support (first PR phase)
-3. **Added module qualification for naming conflicts** (this update):
+3. **Added module qualification for naming conflicts** (auto-generation phase):
    - Automatically qualifies GAst types with `G.` prefix when they conflict with Types variants
    - Automatically qualifies Types types with `T.` prefix when they conflict with Expressions variants
    - Removed 7 types from manually_implemented list: TraitImpl, TraitMethod, Local, Field, Call, Assertion, CopyNonOverlapping
+4. **Created Krate module with full auto-generation** (final phase):
+   - Extracted Body, FunDecl, TranslatedCrate to dedicated Krate module
+   - Resolved circular dependency issues with proper module hierarchy
+   - **TranslatedCrate now fully handles fun_decls with automatic deserialization!**
+   - Removed 3 more types from manual list: Body, FunDecl, TranslatedCrate
 
-These improvements bring the Haskell code generation much closer to the OCaml version's level of automation, while safely handling Haskell's namespace constraints through module qualification.
+These improvements bring the Haskell code generation to match or exceed the OCaml version's level of automation (5 manual types vs 6 in OCaml), while safely handling Haskell's namespace constraints through module qualification and strategic module organization.
