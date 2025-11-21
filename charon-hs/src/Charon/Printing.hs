@@ -29,12 +29,17 @@ import Data.Text.Lazy.Builder (Builder)
 import qualified Data.Text.Lazy.Builder as B
 import qualified Data.Text.Lazy.Builder.Int as B
 import Generated_GAst
+import qualified Generated_GAst as G
 import Generated_Types
 import qualified Generated_Types as T
 import Generated_Values
 import Generated_Expressions
+import qualified Generated_Expressions as E
 import Generated_Krate
+import qualified Generated_Krate as K
 import qualified Generated_Meta as M
+import qualified Generated_LlbcAst as L
+import Data.List (intercalate)
 
 -- | Tab increment for indentation (4 spaces)
 tabIncr :: Text
@@ -586,3 +591,204 @@ instance BuildWithCtx FunSig where
       punctuate _ [x] = [x]
       punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
 
+
+-- Rvalue
+instance BuildWithCtx E.Rvalue where
+  buildWithCtx ctx (E.Use op) = buildWithCtx ctx op
+  buildWithCtx ctx (E.RvRef place bkind metadata) =
+    let borrow = case bkind of
+          BShared -> "&"
+          BMut -> "&mut "
+          BTwoPhaseMut -> "&two-phase-mut "
+          BUniqueImmutable -> "&uniq "
+          BShallow -> "&shallow "
+    in borrow <> buildWithCtx ctx place <>
+       (if isUnitOperand metadata then "" else " with_metadata(" <> buildWithCtx ctx metadata <> ")")
+    where
+      isUnitOperand _ = True  -- Simplified - assume unit metadata for now
+  buildWithCtx ctx (E.RawPtr place refKind metadata) =
+    let ptrKind = case refKind of
+          RShared -> "&raw const "
+          RMut -> "&raw mut "
+    in ptrKind <> buildWithCtx ctx place <>
+       (if isUnitOperand metadata then "" else " with_metadata(" <> buildWithCtx ctx metadata <> ")")
+    where
+      isUnitOperand _ = True  -- Simplified
+  buildWithCtx ctx (E.BinaryOp binop op1 op2) =
+    buildWithCtx ctx op1 <> " " <> buildWithCtx ctx binop <> " " <> buildWithCtx ctx op2
+  buildWithCtx ctx (E.UnaryOp unop op) =
+    buildWithCtx ctx unop <> " " <> buildWithCtx ctx op
+  buildWithCtx ctx (E.NullaryOp nullop ty) =
+    buildWithCtx ctx nullop <> "<" <> buildWithCtx ctx ty <> ">"
+  buildWithCtx ctx (E.Discriminant place) =
+    "@discriminant(" <> buildWithCtx ctx place <> ")"
+  buildWithCtx ctx (E.Aggregate aggKind ops) =
+    buildWithCtx ctx aggKind <> " { " <> mconcat (punctuate ", " (map (buildWithCtx ctx) ops)) <> " }"
+    where
+      punctuate _ [] = []
+      punctuate _ [x] = [x]
+      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+  buildWithCtx ctx (E.Len place ty _maybeConst) =
+    "len(" <> buildWithCtx ctx place <> ")"
+  buildWithCtx ctx (E.Repeat op ty cg) =
+    "[" <> buildWithCtx ctx op <> "; " <> buildWithCtx ctx cg <> "]"
+  buildWithCtx ctx (E.ShallowInitBox op ty) =
+    "shallow_init_box(" <> buildWithCtx ctx op <> ")"
+
+-- AggregateKind
+instance BuildWithCtx E.AggregateKind where
+  buildWithCtx ctx (E.AggregatedAdt tdeclRef variantId _maybeFieldId) =
+    buildWithCtx ctx tdeclRef <>
+    (case variantId of
+       Nothing -> ""
+       Just vid -> "::" <> buildWithCtx ctx vid)
+  buildWithCtx ctx (E.AggregatedArray ty cg) =
+    "Array"
+  buildWithCtx ctx (E.AggregatedRawPtr ty refKind) =
+    "RawPtr"
+
+-- Statement
+instance BuildWithCtx L.Statement where
+  buildWithCtx ctx (L.Statement _span _id kind commentsBefore) =
+    mconcat (map (\c -> fromText (indent ctx) <> "// " <> fromString c <> "\n") commentsBefore) <>
+    buildWithCtx ctx kind
+
+-- StatementKind  
+instance BuildWithCtx L.StatementKind where
+  buildWithCtx ctx (L.Assign place rvalue) =
+    fromText (indent ctx) <> buildWithCtx ctx place <> " := " <> buildWithCtx ctx rvalue
+  buildWithCtx ctx (L.SetDiscriminant place variantId) =
+    fromText (indent ctx) <> "@discriminant(" <> buildWithCtx ctx place <> ") := " <> buildWithCtx ctx variantId
+  buildWithCtx ctx (L.CopyNonOverlapping cpyNonOv) =
+    fromText (indent ctx) <> "copy_nonoverlapping(...)"  -- Simplified
+  buildWithCtx ctx (L.StorageLive lid) =
+    fromText (indent ctx) <> "storage_live(" <> buildWithCtx ctx lid <> ")"
+  buildWithCtx ctx (L.StorageDead lid) =
+    fromText (indent ctx) <> "storage_dead(" <> buildWithCtx ctx lid <> ")"
+  buildWithCtx ctx (L.Deinit place) =
+    fromText (indent ctx) <> "deinit(" <> buildWithCtx ctx place <> ")"
+  buildWithCtx ctx (L.Drop place traitRef) =
+    fromText (indent ctx) <> "drop[" <> buildWithCtx ctx traitRef <> "] " <> buildWithCtx ctx place
+  buildWithCtx ctx (L.Assert assertion) =
+    fromText (indent ctx) <> buildWithCtx ctx assertion
+  buildWithCtx ctx (L.Call call) =
+    fromText (indent ctx) <> buildWithCtx ctx call
+  buildWithCtx ctx (L.Abort abortKind) =
+    fromText (indent ctx) <> "abort(" <> buildWithCtx ctx abortKind <> ")"
+  buildWithCtx ctx L.Return =
+    fromText (indent ctx) <> "return"
+  buildWithCtx ctx (L.Break n) =
+    fromText (indent ctx) <> "break " <> B.decimal n
+  buildWithCtx ctx (L.Continue n) =
+    fromText (indent ctx) <> "continue " <> B.decimal n
+  buildWithCtx ctx L.Nop =
+    fromText (indent ctx) <> "nop"
+  buildWithCtx ctx (L.Switch switch) =
+    buildWithCtx ctx switch
+  buildWithCtx ctx (L.Loop block) =
+    fromText (indent ctx) <> "loop " <> buildWithCtx ctx block
+  buildWithCtx ctx (L.Error msg) =
+    fromText (indent ctx) <> "@Error(" <> fromString msg <> ")"
+
+-- Switch
+instance BuildWithCtx L.Switch where
+  buildWithCtx ctx (L.If cond thenBlock elseBlock) =
+    fromText (indent ctx) <> "if " <> buildWithCtx ctx cond <> " {\n" <>
+    buildWithCtx ctx thenBlock <>
+    fromText (indent ctx) <> "} else {\n" <>
+    buildWithCtx ctx elseBlock <>
+    fromText (indent ctx) <> "}"
+  buildWithCtx ctx (L.SwitchInt op _litTy branches defaultBlock) =
+    fromText (indent ctx) <> "match " <> buildWithCtx ctx op <> " {\n" <>
+    mconcat (map (\(lits, blk) ->
+      fromText (indent ctx) <> "  " <>
+      mconcat (punctuate " | " (map (buildWithCtx ctx) lits)) <> " => " <>
+      buildWithCtx ctx blk) branches) <>
+    fromText (indent ctx) <> "  _ => " <> buildWithCtx ctx defaultBlock <>
+    fromText (indent ctx) <> "}"
+    where
+      punctuate _ [] = []
+      punctuate _ [x] = [x]
+      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+  buildWithCtx ctx (L.Match place branches _maybeDefaultBlock) =
+    fromText (indent ctx) <> "match " <> buildWithCtx ctx place <> " {\n" <>
+    mconcat (map (\(variantIds, blk) ->
+      fromText (indent ctx) <> "  variant " <>
+      mconcat (punctuate " | " (map (buildWithCtx ctx) variantIds)) <> " => " <>
+      buildWithCtx ctx blk) branches) <>
+    fromText (indent ctx) <> "}"
+    where
+      punctuate _ [] = []
+      punctuate _ [x] = [x]
+      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+
+-- Block
+instance BuildWithCtx L.Block where
+  buildWithCtx ctx (L.Block _span statements) =
+    mconcat (map (\stmt -> buildWithCtx ctx stmt <> "\n") statements)
+
+-- FunDecl (simplified version)
+instance BuildWithCtx K.FunDecl where
+  buildWithCtx ctx (K.FunDecl defId itemMeta signature _src _isGlobalInit body) =
+    "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+    formatLangItem itemMeta <>
+    (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+    "fn " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
+    formatGenericParams ctx signature <>
+    formatArgs ctx signature <>
+    formatReturnType ctx signature <>
+    "\n" <>
+    buildWithCtx (increaseIndent ctx) body
+    where
+      formatLangItem im = case T.itemmetaLangItem im of
+        Just li -> "#[lang_item(\"" <> fromString li <> "\")]\n"
+        Nothing -> ""
+      formatGenericParams c sig = ""  -- Simplified for now
+      formatArgs c (FunSig _ _ inputs _) =
+        "(" <> mconcat (punctuate ", " (zipWith formatArg [1..] inputs)) <> ")"
+        where
+          formatArg i ty = "@" <> B.decimal i <> ": " <> buildWithCtx c ty
+          punctuate _ [] = []
+          punctuate _ [x] = [x]
+          punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+      formatReturnType c (FunSig _ _ _ output) =
+        if isUnit output then "" else " -> " <> buildWithCtx c output
+        where
+          isUnit _ = False  -- Simplified
+
+-- Body (from Krate)
+instance BuildWithCtx K.Body where
+  buildWithCtx ctx (K.Structured gexprBody) =
+    buildWithCtx ctx gexprBody
+  buildWithCtx ctx (K.Unstructured _gexprBody) =
+    "{ /* unstructured */ }"  -- Simplified
+  buildWithCtx _ K.TraitMethodWithoutDefault = "{ /* trait method without default */ }"
+  buildWithCtx _ K.Opaque = "{ /* opaque */ }"
+  buildWithCtx _ K.Missing = "{ /* missing */ }"
+  buildWithCtx ctx (K.Error err) = "{ /* error: " <> fromString (show err) <> " */ }"
+
+-- GexprBody for Block
+instance BuildWithCtx (G.GexprBody L.Block) where
+  buildWithCtx ctx (G.GexprBody _span locals body) =
+    "{\n" <>
+    formatLocals (increaseIndent ctx) locals <>
+    buildWithCtx (increaseIndent ctx) body <>
+    fromText (indent ctx) <> "}"
+    where
+      formatLocals c (G.Locals _argCount (M.Vector localsList)) =
+        mconcat (map (formatLocal c) localsList)
+      formatLocal c (G.Local idx name ty) =
+        fromText (indent c) <> "let " <> formatLocalName name idx <> ": " <>
+        buildWithCtx c ty <> "; // " <> formatComment idx <> "\n"
+      formatLocalName (Just n) idx = fromString n <> "@" <> B.decimal (E.localidRaw idx)
+      formatLocalName Nothing idx = "@" <> B.decimal (E.localidRaw idx)
+      formatComment idx = if E.localidRaw idx == 0 then "return" else "local"
+
+-- ItemMeta name formatting
+instance BuildWithCtx [T.PathElem] where
+  buildWithCtx ctx elems =
+    mconcat (punctuate "::" (map (buildWithCtx ctx) elems))
+    where
+      punctuate _ [] = []
+      punctuate _ [x] = [x]
+      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
