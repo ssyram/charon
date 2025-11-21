@@ -47,6 +47,7 @@ tests:
       - Test.Deserialize
       - Test.Printing
       - Test.Print
+      - Test.PrintComparison
     dependencies:
       - base >= 4.14 && < 5
       - charon-hs

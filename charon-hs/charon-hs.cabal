@@ -46,6 +46,7 @@ test-suite charon-hs-test
       Test.Deserialize
       Test.Printing
       Test.Print
+      Test.PrintComparison
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints

@@ -949,3 +949,52 @@ instance BuildWithCtx T.GenericParams where
   buildWithCtx ctx gp =
     let (params, clauses) = formatGenericParamsWithClauses ctx gp
     in params <> clauses
+
+-- TraitImpl
+instance BuildWithCtx G.TraitImpl where
+  buildWithCtx ctx (G.TraitImpl defId itemMeta implTrait generics impliedTraitRefs consts types methods) =
+    let ctxWithGenerics = pushGenerics generics ctx
+        (params, clauses) = formatGenericParamsWithClauses ctxWithGenerics generics
+    in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+       (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+       "impl" <> params <> " " <> buildWithCtx ctxWithGenerics implTrait <>
+       clauses <>
+       (if hasPredicates generics then "\n" else " ") <>
+       formatBody ctxWithGenerics impliedTraitRefs consts types methods
+    where
+      formatBody c (M.Vector impliedRefs) constsList typesList methodsList =
+        "{\n" <>
+        formatImpliedRefs c impliedRefs <>
+        formatConsts c constsList <>
+        formatTypes c typesList <>
+        formatMethods c methodsList <>
+        "}"
+      formatImpliedRefs c [] = ""
+      formatImpliedRefs c refs =
+        mconcat (zipWith (\i r -> "    parent_clause" <> B.decimal i <> " = " <> buildWithCtx c r <> "\n") [0::Int ..] refs)
+      formatConsts c [] = ""
+      formatConsts c constsList =
+        mconcat (map (\(T.TraitItemName name, ref) -> "    const " <> fromText name <> " = " <> buildWithCtx c ref <> "\n") constsList)
+      formatTypes c [] = ""
+      formatTypes c typesList =
+        mconcat (map (\(T.TraitItemName name, binder) -> "    type " <> fromText name <> " = " <> buildWithCtx c binder <> "\n") typesList)
+      formatMethods c [] = ""
+      formatMethods c methodsList =
+        mconcat (map (\(T.TraitItemName name, binder) -> "    fn " <> fromText name <> " = " <> buildWithCtx c binder <> "\n") methodsList)
+
+-- Binder for TraitAssocTyImpl
+instance BuildWithCtx (T.Binder T.TraitAssocTyImpl) where
+  buildWithCtx ctx (T.Binder params value) =
+    -- Push the binder's generic params onto the context
+    let ctxWithParams = pushGenerics params ctx
+    in buildWithCtx ctxWithParams value
+
+-- TraitAssocTyImpl
+instance BuildWithCtx T.TraitAssocTyImpl where
+  buildWithCtx ctx (T.TraitAssocTyImpl ty) = buildWithCtx ctx ty
+
+-- Binder for FunDeclRef
+instance BuildWithCtx (T.Binder T.FunDeclRef) where
+  buildWithCtx ctx (T.Binder params value) =
+    -- For FunDeclRef, we don't push params since it's just a reference
+    buildWithCtx ctx value

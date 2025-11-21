@@ -4,6 +4,7 @@ import Test.Tasty ( defaultMain, testGroup )
 import qualified Test.Deserialize
 import qualified Test.Printing
 import qualified Test.Print
+import qualified Test.PrintComparison
 
 main :: IO ()
 main = do
@@ -16,4 +17,5 @@ main = do
     , llbcTests
     , Test.Printing.tests
     , Test.Print.tests
+    , Test.PrintComparison.tests
     ]
