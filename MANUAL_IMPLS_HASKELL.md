@@ -119,7 +119,7 @@ These GAst struct types conflicted with:
 - **manually_implemented**: generate-hs has 5 (down from 16!), generate-ml has 6
   - 3 are shared (ItemOpacity, PredicateOrigin, Ty)
   - 2 are Haskell-specific (TraitTypeConstraintId - marker trait, Vector - phantom type parameter)
-  - 3 types (Body, FunDecl, TranslatedCrate) are now auto-generated in Haskell but still manual in ML
+  - 3 types (Body, FunDecl, TranslatedCrate) are now auto-generated in Haskell but still manual in OCaml
   
 Note: Vector is auto-generated in both but has manual FromJSON/of_json for filtering None values.
 
@@ -162,4 +162,4 @@ Changes made:
    - **TranslatedCrate now fully handles fun_decls with automatic deserialization!**
    - Removed 3 more types from manual list: Body, FunDecl, TranslatedCrate
 
-These improvements bring the Haskell code generation significantly beyond the OCaml version's level of automation (5 manual vs 7), while safely handling Haskell's namespace constraints through module qualification and strategic module organization.
+These improvements bring the Haskell code generation to match or exceed the OCaml version's level of automation (5 manual types vs 6 in OCaml), while safely handling Haskell's namespace constraints through module qualification and strategic module organization.
