@@ -792,3 +792,137 @@ instance BuildWithCtx [T.PathElem] where
       punctuate _ [] = []
       punctuate _ [x] = [x]
       punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+
+-- TypeDecl
+instance BuildWithCtx T.TypeDecl where
+  buildWithCtx ctx (T.TypeDecl defId itemMeta generics _src kind _layout _ptrMetadata _repr) =
+    let keyword = case kind of
+          T.Struct _ -> "struct"
+          T.Union _ -> "union"
+          T.Enum _ -> "enum"
+          T.Alias _ -> "type"
+          T.Opaque -> "opaque type"
+          T.TDeclError _ -> "opaque type"
+    in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+       formatLangItem itemMeta <>
+       (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+       fromString keyword <> " " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
+       formatGenericParams ctx generics <>
+       formatPredicates ctx generics <>
+       formatKind ctx generics kind
+    where
+      formatLangItem im = case T.itemmetaLangItem im of
+        Just li -> "#[lang_item(\"" <> fromString li <> "\")]\n"
+        Nothing -> ""
+      formatGenericParams c gp = ""  -- Simplified for now
+      formatPredicates c gp = ""  -- Simplified for now
+      formatKind c gp (T.Struct (M.Vector fields)) =
+        let nlOrSpace = " "  -- Simplified
+        in nlOrSpace <> "{\n" <>
+           mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields) <>
+           "}"
+      formatKind c gp (T.Union (M.Vector fields)) =
+        " {\n" <>
+        mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields) <>
+        "}"
+      formatKind c gp (T.Enum (M.Vector variants)) =
+        " {\n" <>
+        mconcat (map (\v -> "  " <> buildWithCtx c v <> ",\n") variants) <>
+        "}"
+      formatKind c gp (T.Alias ty) = " = " <> buildWithCtx c ty
+      formatKind c gp T.Opaque = ""
+      formatKind c gp (T.TDeclError msg) = " = ERROR(" <> fromString msg <> ")"
+
+-- Field
+instance BuildWithCtx T.Field where
+  buildWithCtx ctx (T.Field _span _attrInfo name ty) =
+    case name of
+      Just n -> fromString n <> ": " <> buildWithCtx ctx ty
+      Nothing -> buildWithCtx ctx ty
+
+-- Variant
+instance BuildWithCtx T.Variant where
+  buildWithCtx ctx (T.Variant _span _attrInfo name (M.Vector fields) _discr) =
+    fromString name <>
+    (case fields of
+       [] -> ""
+       _ -> "(" <> mconcat (punctuate ", " (map (buildWithCtx ctx) fields)) <> ")")
+    where
+      punctuate _ [] = []
+      punctuate _ [x] = [x]
+      punctuate sep (x:xs) = (x <> sep) : punctuate sep xs
+
+-- GlobalDecl
+instance BuildWithCtx G.GlobalDecl where
+  buildWithCtx ctx (G.GlobalDecl defId itemMeta generics ty _src globalKind init) =
+    let keyword = case globalKind of
+          G.Static -> "static"
+          G.NamedConst -> "const"
+          G.AnonConst -> "const"
+    in "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+       (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+       fromString keyword <> " " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
+       formatGenericParams ctx generics <>
+       ": " <> buildWithCtx ctx ty <>
+       formatPredicates ctx generics <>
+       " = " <> buildWithCtx ctx init <> "()"
+    where
+      formatGenericParams c gp = ""  -- Simplified for now
+      formatPredicates c gp = ""  -- Simplified for now
+
+-- TraitDecl
+instance BuildWithCtx G.TraitDecl where
+  buildWithCtx ctx (G.TraitDecl defId itemMeta generics impliedClauses consts types methods vtable) =
+    "// Full name: " <> buildWithCtx ctx (T.itemmetaName itemMeta) <> "\n" <>
+    formatLangItem itemMeta <>
+    (if M.attrinfoPublic (T.itemmetaAttrInfo itemMeta) then "pub " else "") <>
+    "trait " <> buildWithCtx ctx (T.itemmetaName itemMeta) <>
+    formatGenericParams ctx generics <>
+    formatPredicates ctx generics <>
+    formatBody ctx impliedClauses consts types methods vtable
+    where
+      formatLangItem im = case T.itemmetaLangItem im of
+        Just li -> "#[lang_item(\"" <> fromString li <> "\")]\n"
+        Nothing -> ""
+      formatGenericParams c gp = ""  -- Simplified for now
+      formatPredicates c gp = ""  -- Simplified for now
+      formatBody c (M.Vector implClauses) consts types methods vtable =
+        let anyItem = not (null implClauses) || not (null consts) || not (null types) || not (null methods)
+        in if anyItem
+           then "\n{\n" <>
+                mconcat (zipWith formatImpliedClause [0..] implClauses) <>
+                mconcat (map formatConst consts) <>
+                mconcat (map formatType types) <>
+                mconcat (map formatMethod methods) <>
+                formatVtable vtable <>
+                "}"
+           else ""
+      formatImpliedClause idx clause =
+        "    parent_clause" <> B.decimal idx <> " : " <> buildWithCtx ctx clause <> "\n"
+      formatConst (G.TraitAssocConst name ty _default) =
+        let T.TraitItemName n = name
+        in "    const " <> fromText n <> " : " <> buildWithCtx ctx ty <> "\n"
+      formatType (T.Binder _regions assocTy) =
+        let T.TraitItemName name = G.traitassoctyName assocTy
+        in "    type " <> fromText name <> "\n"  -- Simplified
+      formatMethod (T.Binder _regions method) =
+        let T.TraitItemName name = G.traitmethodName method
+        in "    fn " <> fromText name <> " = " <>
+           buildWithCtx ctx (G.traitmethodItem method) <> "\n"
+      formatVtable Nothing = "    non-dyn-compatible\n"
+      formatVtable (Just ref) = "    vtable: " <> buildWithCtx ctx ref <> "\n"
+
+-- TraitMethod
+instance BuildWithCtx G.TraitMethod where
+  buildWithCtx ctx (G.TraitMethod (T.TraitItemName name) item) =
+    fromText name
+
+-- FunDeclRef  
+instance BuildWithCtx T.FunDeclRef where
+  buildWithCtx ctx (T.FunDeclRef funId generics) =
+    buildWithCtx ctx funId <> buildWithCtx ctx generics
+
+-- TraitParam
+instance BuildWithCtx T.TraitParam where
+  buildWithCtx ctx (T.TraitParam clauseId _span traitRef) =
+    buildWithCtx ctx traitRef
