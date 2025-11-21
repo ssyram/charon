@@ -46,6 +46,7 @@ tests:
     other-modules:
       - Test.Deserialize
       - Test.Printing
+      - Test.Print
     dependencies:
       - base >= 4.14 && < 5
       - charon-hs

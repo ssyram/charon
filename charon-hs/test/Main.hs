@@ -3,6 +3,7 @@ module Main (main) where
 import Test.Tasty ( defaultMain, testGroup )
 import qualified Test.Deserialize
 import qualified Test.Printing
+import qualified Test.Print
 
 main :: IO ()
 main = do
@@ -14,4 +15,5 @@ main = do
     [ Test.Deserialize.tests
     , llbcTests
     , Test.Printing.tests
+    , Test.Print.tests
     ]
