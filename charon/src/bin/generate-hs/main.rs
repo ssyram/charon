@@ -1237,16 +1237,6 @@ fn generate_hs(
             "TranslatedCrate",
         ],
     );
-    
-    // Debug: print what's being extracted to Krate module
-    eprintln!("=== Krate module types ===");
-    for &id in &krate_type_decl {
-        if let Some(decl) = ctx.crate_data.type_decls.get(id) {
-            eprintln!("  - {}", repr_name(ctx.crate_data, &decl.item_meta.name));
-        }
-    }
-    eprintln!("=== End Krate module types ===\n");
-    
     generate_code_for_with_json.push(GenerateCodeFor {
         template: template_dir.join("Krate.hs"),
         target: output_dir.join("Generated_Krate.hs"),
