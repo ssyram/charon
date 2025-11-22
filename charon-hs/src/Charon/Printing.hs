@@ -512,7 +512,12 @@ instance BuildWithCtx GenericArgs where
 -- TraitRef
 instance BuildWithCtx TraitRef where
   buildWithCtx ctx (TraitRef kind traitDeclRef) =
-    buildWithCtx ctx kind <> buildWithCtx ctx traitDeclRef
+    case kind of
+      BuiltinOrAuto kindId types -> 
+        -- Format as {built_in impl TraitName<...> for Type<...>}
+        let traitImpl = "{built_in impl " <> buildWithCtx ctx traitDeclRef <> "}"
+        in traitImpl
+      _ -> buildWithCtx ctx kind <> buildWithCtx ctx traitDeclRef
 
 -- TraitRefKind
 instance BuildWithCtx TraitRefKind where
@@ -523,7 +528,7 @@ instance BuildWithCtx TraitRefKind where
   buildWithCtx ctx (ItemClause tr name cid) =
     buildWithCtx ctx tr <> "::" <> buildWithCtx ctx name <> "[" <> buildWithCtx ctx cid <> "]"
   buildWithCtx _ Self = "Self"
-  buildWithCtx _ (BuiltinOrAuto _ _ _) = "BuiltinOrAuto(...)"
+  buildWithCtx _ (BuiltinOrAuto _ _ _) = ""  -- Handled in TraitRef instance
 
 -- RegionBinder for function pointer types (Vec<Ty>, Ty) - MUST come before generic instance
 instance BuildWithCtx (RegionBinder ([Ty], Ty)) where
