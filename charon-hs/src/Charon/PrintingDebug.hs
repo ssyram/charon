@@ -64,7 +64,7 @@ compareFile testName = do
             let ctx = emptyCtx { translated = Just crate }
             
             -- Print the crate
-            let actualOutput = printCrateDebug ctx crate
+            let actualOutput = printCrate crate
             let actualLines = lines actualOutput
             
             -- Show comparison
@@ -104,7 +104,7 @@ printFile testName = do
         Left err -> putStrLn $ "ERROR: Failed to decode LLBC file: " ++ err
         Right (LlbcFile _version crate) -> do
           let ctx = emptyCtx { translated = Just crate }
-          putStrLn $ printCrateDebug ctx crate
+          putStrLn $ printCrate crate
 
 -- | Show line-by-line diff between expected and actual
 --
@@ -133,7 +133,7 @@ showDiff testName = do
             let llbcOutput = dropWhile (\l -> l == "" || isPrefixOf "#" l) expectedLines
             
             let ctx = emptyCtx { translated = Just crate }
-            let actualOutput = printCrateDebug ctx crate
+            let actualOutput = printCrate crate
             let actualLines = lines actualOutput
             
             -- Show line-by-line diff
@@ -191,41 +191,3 @@ loadAndPrint testName = do
         Right (LlbcFile _version crate) -> do
           putStrLn $ "Successfully loaded: " ++ testName
           return $ Just crate
-
--- Import the print functions from Test.PrintComparison
-printCrateDebug :: PrintingCtx -> TranslatedCrate -> String
-printCrateDebug ctx crate = unlines
-  [ "# Final LLBC before serialization:"
-  , ""
-  , printDeclsDebug ctx crate
-  ]
-
--- Helper to extract values from Vector
-vectorToList :: M.Vector k v -> [v]
-vectorToList (M.Vector xs) = xs
-
--- Print all declarations in a crate
-printDeclsDebug :: PrintingCtx -> TranslatedCrate -> String
-printDeclsDebug ctx crate = unlines $ concat
-  [ map (printTypeDeclDebug ctx) (vectorToList $ translatedcrateTypeDecls crate)
-  , map (printFunDeclDebug ctx) (vectorToList $ translatedcrateFunDecls crate)
-  , map (printGlobalDeclDebug ctx) (vectorToList $ translatedcrateGlobalDecls crate)
-  , map (printTraitDeclDebug ctx) (vectorToList $ translatedcrateTraitDecls crate)
-  , map (printTraitImplDebug ctx) (vectorToList $ translatedcrateTraitImpls crate)
-  ]
-
--- Helper functions to print specific declaration types
-printTypeDeclDebug :: PrintingCtx -> T.TypeDecl -> String
-printTypeDeclDebug ctx decl = printWithCtx ctx decl ++ "\n"
-
-printFunDeclDebug :: PrintingCtx -> FunDecl -> String
-printFunDeclDebug ctx decl = printWithCtx ctx decl ++ "\n"
-
-printGlobalDeclDebug :: PrintingCtx -> G.GlobalDecl -> String
-printGlobalDeclDebug ctx decl = printWithCtx ctx decl ++ "\n"
-
-printTraitDeclDebug :: PrintingCtx -> G.TraitDecl -> String
-printTraitDeclDebug ctx decl = printWithCtx ctx decl ++ "\n"
-
-printTraitImplDebug :: PrintingCtx -> G.TraitImpl -> String
-printTraitImplDebug ctx impl = printWithCtx ctx impl ++ "\n"

@@ -21,6 +21,9 @@ module Charon.Printing
     -- * Typeclass
   , BuildWithCtx(..)
   , printWithCtx
+    -- * Crate printing
+  , printCrate
+  , printDecls
   ) where
 
 import Data.Text (Text)
@@ -1144,3 +1147,21 @@ instance BuildWithCtx (T.Binder T.FunDeclRef) where
   buildWithCtx ctx (T.Binder params value) =
     -- For FunDeclRef, we don't push params since it's just a reference
     buildWithCtx ctx value
+
+-- | Print an entire TranslatedCrate to String with header
+printCrate :: TranslatedCrate -> String
+printCrate crate =
+  let ctx = emptyCtx { translated = Just crate }
+      header = "# Final LLBC before serialization:\n\n"
+      decls = printDecls ctx crate
+  in header ++ decls
+
+-- | Print all declarations in a crate
+printDecls :: PrintingCtx -> TranslatedCrate -> String
+printDecls ctx crate =
+  let types = map (\decl -> printWithCtx ctx decl ++ "\n") (M.vectorToList $ translatedcrateTypeDecls crate)
+      funs = map (\decl -> printWithCtx ctx decl ++ "\n") (M.vectorToList $ translatedcrateFunDecls crate)
+      globals = map (\decl -> printWithCtx ctx decl ++ "\n") (M.vectorToList $ translatedcrateGlobalDecls crate)
+      traitDecls = map (\decl -> printWithCtx ctx decl ++ "\n") (M.vectorToList $ translatedcrateTraitDecls crate)
+      traitImpls = map (\decl -> printWithCtx ctx decl ++ "\n") (M.vectorToList $ translatedcrateTraitImpls crate)
+  in concat (types ++ funs ++ globals ++ traitDecls ++ traitImpls)
