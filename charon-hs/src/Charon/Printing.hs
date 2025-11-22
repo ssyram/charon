@@ -802,14 +802,17 @@ instance BuildWithCtx (G.GexprBody L.Block) where
     buildWithCtx (increaseIndent ctx) body <>
     fromText (indent ctx) <> "}"
     where
-      formatLocals c (G.Locals _argCount (M.Vector localsList)) =
-        mconcat (map (formatLocal c) localsList)
-      formatLocal c (G.Local idx name ty) =
+      formatLocals c (G.Locals argCount (M.Vector localsList)) =
+        mconcat (map (formatLocal c argCount) localsList)
+      formatLocal c argCount (G.Local idx name ty) =
         fromText (indent c) <> "let " <> formatLocalName name idx <> ": " <>
-        buildWithCtx c ty <> "; // " <> formatComment idx <> "\n"
+        buildWithCtx c ty <> "; // " <> formatComment argCount idx <> "\n"
       formatLocalName (Just n) idx = fromString n <> "@" <> B.decimal (E.localidRaw idx)
       formatLocalName Nothing idx = "@" <> B.decimal (E.localidRaw idx)
-      formatComment idx = if E.localidRaw idx == 0 then "return" else "local"
+      formatComment argCount idx
+        | E.localidRaw idx == 0 = "return"
+        | E.localidRaw idx < argCount = "arg #" <> B.decimal (E.localidRaw idx)
+        | otherwise = "local"
 
 -- GexprBody for unstructured (Vector of BlockId Block)
 instance BuildWithCtx (G.GexprBody (M.Vector U.BlockId U.Block)) where
@@ -822,14 +825,17 @@ instance BuildWithCtx (G.GexprBody (M.Vector U.BlockId U.Block)) where
        formatBlocks ctx' blocks <>
        fromText tab <> "}"
     where
-      formatLocals c (G.Locals _argCount (M.Vector localsList)) =
-        mconcat (map (formatLocal c) localsList)
-      formatLocal c (G.Local idx name ty) =
+      formatLocals c (G.Locals argCount (M.Vector localsList)) =
+        mconcat (map (formatLocal c argCount) localsList)
+      formatLocal c argCount (G.Local idx name ty) =
         fromText (indent c) <> "let " <> formatLocalName name idx <> ": " <>
-        buildWithCtx c ty <> "; // " <> formatComment idx <> "\n"
+        buildWithCtx c ty <> "; // " <> formatComment argCount idx <> "\n"
       formatLocalName (Just n) idx = fromString n <> "@" <> B.decimal (E.localidRaw idx)
       formatLocalName Nothing idx = "@" <> B.decimal (E.localidRaw idx)
-      formatComment idx = if E.localidRaw idx == 0 then "return" else "local"
+      formatComment argCount idx
+        | E.localidRaw idx == 0 = "return"
+        | E.localidRaw idx < argCount = "arg #" <> B.decimal (E.localidRaw idx)
+        | otherwise = "local"
       formatBlocks c (M.Vector blockList) =
         mconcat (zipWith (formatBlock c) [0..] blockList)
       formatBlock c bid block =
