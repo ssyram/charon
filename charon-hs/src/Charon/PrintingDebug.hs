@@ -23,7 +23,10 @@ import Data.List (isPrefixOf)
 
 -- Import our modules
 import Charon.Printing
-import Generated_Krate (LlbcFile(..), TranslatedCrate(..))
+import Generated_Krate (LlbcFile(..), TranslatedCrate(..), FunDecl)
+import qualified Generated_Meta as M
+import qualified Generated_GAst as G
+import qualified Generated_Types as T
 
 -- | Load and print a single LLBC file, comparing with expected output
 -- 
@@ -200,11 +203,6 @@ printCrateDebug ctx crate = unlines
 -- Helper to extract values from Vector
 vectorToList :: M.Vector k v -> [v]
 vectorToList (M.Vector xs) = xs
-
-import qualified Generated_Meta as M
-import qualified Generated_GAst as G
-import qualified Generated_Types as T
-import Generated_Krate (FunDecl)
 
 -- Print all declarations in a crate
 printDeclsDebug :: PrintingCtx -> TranslatedCrate -> String
