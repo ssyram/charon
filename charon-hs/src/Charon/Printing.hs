@@ -287,19 +287,29 @@ instance BuildWithCtx TypeDeclId where
 
 -- FunDeclId
 instance BuildWithCtx FunDeclId where
-  buildWithCtx _ (FunDeclId i) = "FunDeclId(" <> B.decimal i <> ")"
+  buildWithCtx _ (FunDeclId i) = "@Fun" <> B.decimal i
 
 -- GlobalDeclId
 instance BuildWithCtx GlobalDeclId where
-  buildWithCtx _ (GlobalDeclId i) = "GlobalDeclId(" <> B.decimal i <> ")"
+  buildWithCtx _ (GlobalDeclId i) = "@Global" <> B.decimal i
 
 -- TraitDeclId
 instance BuildWithCtx TraitDeclId where
-  buildWithCtx _ (TraitDeclId i) = "TraitDeclId(" <> B.decimal i <> ")"
+  buildWithCtx ctx (TraitDeclId i) =
+    case translated ctx of
+      Just crate -> 
+        -- Try to look up the trait name
+        let traits = M.vectorToList $ translatedcrateTraitDecls crate
+        in if i < length traits
+           then let traitDecl = traits !! i
+                    itemMeta = G.traitdeclItemMeta traitDecl
+                in buildWithCtx ctx (T.itemmetaName itemMeta)
+           else "@Trait" <> B.decimal i
+      Nothing -> "@Trait" <> B.decimal i
 
 -- TraitImplId
 instance BuildWithCtx TraitImplId where
-  buildWithCtx _ (TraitImplId i) = "TraitImplId(" <> B.decimal i <> ")"
+  buildWithCtx _ (TraitImplId i) = "@TraitImpl" <> B.decimal i
 
 -- Assertion
 instance BuildWithCtx Assertion where
@@ -361,7 +371,7 @@ instance BuildWithCtx ConstGenericVarId where
 
 -- TraitClauseId
 instance BuildWithCtx TraitClauseId where
-  buildWithCtx _ (TraitClauseId i) = B.decimal i
+  buildWithCtx _ (TraitClauseId i) = "@TraitClause" <> B.decimal i
 
 -- NullOp
 instance BuildWithCtx Nullop where
