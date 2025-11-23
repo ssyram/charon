@@ -979,8 +979,8 @@ instance BuildWithCtx T.TypeDecl where
       hasPredicates (T.GenericParams _ _ _ (M.Vector traitClauses) regionsOutlive typesOutlive (M.Vector traitTypeConstraints)) =
         not (null traitClauses && null regionsOutlive && null typesOutlive && null traitTypeConstraints)
       formatKind c nlOrSpace (T.Struct (M.Vector fields)) =
-        nlOrSpace <> "{\n" <>
-        mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields) <>
+        nlOrSpace <> "{" <>
+        (if null fields then "" else "\n" <> mconcat (map (\f -> "  " <> buildWithCtx c f <> ",\n") fields)) <>
         "}"
       formatKind c nlOrSpace (T.Union (M.Vector fields)) =
         nlOrSpace <> "{\n" <>
