@@ -155,7 +155,9 @@ instance BuildWithCtx AbortKind where
 -- Name
 instance BuildWithCtx Name where
   buildWithCtx ctx (Name items) = 
-    mconcat $ punctuate (fromText "::") (map (buildWithCtx ctx) items)
+    -- Reset generics to avoid names being displayed differently depending on the current binding level
+    let ctx' = ctx { generics = [] }
+    in mconcat $ punctuate (fromText "::") (map (buildWithCtx ctx') items)
 
 -- PathElem
 instance BuildWithCtx PathElem where
@@ -275,41 +277,55 @@ instance BuildWithCtx FieldId where
 instance BuildWithCtx VariantId where
   buildWithCtx _ (VariantId i) = B.decimal i
 
+-- Helper to look up item name from crate context
+lookupItemName :: PrintingCtx -> ItemId -> Maybe Name
+lookupItemName ctx itemId =
+  case translated ctx of
+    Just crate -> 
+      -- Look up in short names first
+      case lookup itemId (translatedcrateShortNames crate) of
+        Just name -> Just name
+        Nothing -> lookup itemId (translatedcrateItemNames crate)
+    Nothing -> Nothing
+  where
+    lookup key items = case filter (\kv -> kvpairKey kv == key) items of
+      (kv:_) -> Just (kvpairValue kv)
+      [] -> Nothing
+
 -- TypeDeclId
 instance BuildWithCtx TypeDeclId where
-  buildWithCtx ctx (TypeDeclId i) =
-    case translated ctx of
-      Just _crate -> 
-        -- Try to look up the type name in the crate
-        -- For now, show as TypeDeclId
-        "TypeDeclId(" <> B.decimal i <> ")"
-      Nothing -> "TypeDeclId(" <> B.decimal i <> ")"
+  buildWithCtx ctx tid =
+    case lookupItemName ctx (IdType tid) of
+      Just name -> buildWithCtx ctx name
+      Nothing -> "@Type" <> B.decimal (typedeclidRaw tid)
 
 -- FunDeclId
 instance BuildWithCtx FunDeclId where
-  buildWithCtx _ (FunDeclId i) = "@Fun" <> B.decimal i
+  buildWithCtx ctx fid =
+    case lookupItemName ctx (IdFun fid) of
+      Just name -> buildWithCtx ctx name
+      Nothing -> "@Fun" <> B.decimal (fundeclidRaw fid)
 
 -- GlobalDeclId
 instance BuildWithCtx GlobalDeclId where
-  buildWithCtx _ (GlobalDeclId i) = "@Global" <> B.decimal i
+  buildWithCtx ctx gid =
+    case lookupItemName ctx (IdGlobal gid) of
+      Just name -> buildWithCtx ctx name
+      Nothing -> "@Global" <> B.decimal (globaldeclidRaw gid)
 
 -- TraitDeclId
 instance BuildWithCtx TraitDeclId where
-  buildWithCtx ctx (TraitDeclId i) =
-    case translated ctx of
-      Just crate -> 
-        -- Try to look up the trait name
-        let traits = M.vectorToList $ translatedcrateTraitDecls crate
-        in if i < length traits
-           then let traitDecl = traits !! i
-                    itemMeta = G.traitdeclItemMeta traitDecl
-                in buildWithCtx ctx (T.itemmetaName itemMeta)
-           else "@Trait" <> B.decimal i
-      Nothing -> "@Trait" <> B.decimal i
+  buildWithCtx ctx tid =
+    case lookupItemName ctx (IdTraitDecl tid) of
+      Just name -> buildWithCtx ctx name
+      Nothing -> "@Trait" <> B.decimal (traitdeclidRaw tid)
 
 -- TraitImplId
 instance BuildWithCtx TraitImplId where
-  buildWithCtx _ (TraitImplId i) = "@TraitImpl" <> B.decimal i
+  buildWithCtx ctx tid =
+    case lookupItemName ctx (IdTraitImpl tid) of
+      Just name -> buildWithCtx ctx name
+      Nothing -> "@TraitImpl" <> B.decimal (traitimplidRaw tid)
 
 -- Assertion
 instance BuildWithCtx Assertion where
