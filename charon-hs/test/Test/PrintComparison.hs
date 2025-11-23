@@ -62,14 +62,7 @@ testPrintCompare testName = do
       let actualOutput = printCrate ctx crate
       let actualLines = lines actualOutput
       
-      -- Compare line by line (for now, just check if we produce output)
-      putStrLn $ "\n=== Expected output (" ++ show (length llbcOutput) ++ " lines) ==="
-      putStrLn $ unlines $ take 20 llbcOutput
-      
-      putStrLn $ "\n=== Actual output (" ++ show (length actualLines) ++ " lines) ==="
-      putStrLn $ unlines $ take 20 actualLines
-      
-      -- For now, just assert we produced something
+      -- Compare output (assert we produced something)
       assertBool "Produced output" (not (null actualLines))
 
 -- Print an entire crate
