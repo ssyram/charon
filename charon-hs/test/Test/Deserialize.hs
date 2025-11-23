@@ -4,6 +4,7 @@ module Test.Deserialize (tests, getAllLlbcTests) where
 
 import Data.Aeson (eitherDecodeFileStrict, eitherDecodeStrict)
 import qualified Data.ByteString.Char8 as BS8
+import Data.List (isSuffixOf)
 import System.Directory (doesFileExist, listDirectory, doesDirectoryExist)
 import System.FilePath ((</>), takeExtension)
 import Control.Monad (filterM, when)
@@ -107,34 +108,62 @@ createLlbcTest filepath = testCase filepath $ do
       let crate = llbcfileTranslated llbcFile
       -- Successfully deserialized the entire crate!
       -- We can validate that it has the expected structure
-      let typeDeclCount = length (translatedcrateTypeDecls crate)
+      let funDeclCount = length (translatedcrateFunDecls crate)
+          typeDeclCount = length (translatedcrateTypeDecls crate)
           globalDeclCount = length (translatedcrateGlobalDecls crate)
           traitDeclCount = length (translatedcrateTraitDecls crate)
           traitImplCount = length (translatedcrateTraitImpls crate)
       
-      -- The test passes if we successfully deserialized the TranslatedCrate
-      assertBool (concat
-        [ "Successfully deserialized LLBC file with charon version "
-        , llbcfileCharonVersion llbcFile
-        , ": crate '"
-        , translatedcrateCrateName crate
-        , "' with "
-        , show typeDeclCount, " type decls, "
-        , show globalDeclCount, " global decls, "
-        , show traitDeclCount, " trait decls, "
-        , show traitImplCount, " trait impls"
-        ]) True
+      -- For test_crate.llbc, validate exact counts
+      if "test_crate.llbc" `isSuffixOf` filepath
+        then do
+          -- Expected counts for test_crate.llbc
+          let expectedFunDecls = 2
+              expectedGlobalDecls = 1
+              expectedTypeDecls = 0
+              expectedTraitDecls = 0
+              expectedTraitImpls = 0
+          
+          -- Assert each count matches the expected value
+          assertEqual "Number of FunDecls" expectedFunDecls funDeclCount
+          assertEqual "Number of GlobalDecls" expectedGlobalDecls globalDeclCount
+          assertEqual "Number of TypeDecls" expectedTypeDecls typeDeclCount
+          assertEqual "Number of TraitDecls" expectedTraitDecls traitDeclCount
+          assertEqual "Number of TraitImpls" expectedTraitImpls traitImplCount
+        else
+          -- For other files, just confirm successful deserialization with counts
+          assertBool (concat
+            [ "Successfully deserialized LLBC file with charon version "
+            , llbcfileCharonVersion llbcFile
+            , ": crate '"
+            , translatedcrateCrateName crate
+            , "' with "
+            , show funDeclCount, " fun decls, "
+            , show typeDeclCount, " type decls, "
+            , show globalDeclCount, " global decls, "
+            , show traitDeclCount, " trait decls, "
+            , show traitImplCount, " trait impls"
+            ]) True
 
 -- Export function to get all LLBC test cases
 getAllLlbcTests :: IO TestTree
 getAllLlbcTests = do
+  -- Check for LLBC files in the test data directory
+  let testDataDir = "test/data"
+  testDataExists <- doesDirectoryExist testDataDir
+  testDataFiles <- if testDataExists
+    then findLlbcFiles testDataDir
+    else return []
+  
+  -- Check for LLBC files in the UI test directory
   let testDir = "../charon/tests/ui"
   dirExists <- doesDirectoryExist testDir
-  if not dirExists
-    then return $ testGroup "LLBC Files" []
-    else do
-      llbcFiles <- findLlbcFiles testDir
-      let testCases = map createLlbcTest llbcFiles
-      return $ testGroup "All LLBC Files" testCases
+  uiTestFiles <- if dirExists
+    then findLlbcFiles testDir
+    else return []
+  
+  let allFiles = testDataFiles ++ uiTestFiles
+  let testCases = map createLlbcTest allFiles
+  return $ testGroup "All LLBC Files" testCases
 
 
