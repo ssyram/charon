@@ -546,13 +546,14 @@ instance BuildWithCtx TraitRef where
       _ -> buildWithCtx ctx kind <> buildWithCtx ctx traitDeclRef
 
 -- TraitRefKind
+-- TraitRefKind
 instance BuildWithCtx TraitRefKind where
   buildWithCtx ctx (Generated_Types.TraitImpl implRef) = buildWithCtx ctx implRef
   buildWithCtx ctx (Clause var) = buildWithCtx ctx var
   buildWithCtx ctx (ParentClause tr cid) = 
-    buildWithCtx ctx tr <> "::Parent[" <> buildWithCtx ctx cid <> "]"
+    buildWithCtx ctx tr <> "::parent_clause" <> B.decimal (traitclauseidRaw cid)
   buildWithCtx ctx (ItemClause tr name cid) =
-    buildWithCtx ctx tr <> "::" <> buildWithCtx ctx name <> "[" <> buildWithCtx ctx cid <> "]"
+    "(" <> buildWithCtx ctx tr <> "::" <> fromText (traitItemNameText name) <> "::[@TraitClause" <> B.decimal (traitclauseidRaw cid) <> "])"
   buildWithCtx _ Self = "Self"
   buildWithCtx _ (BuiltinOrAuto _ _ _) = ""  -- Handled in TraitRef instance
 
