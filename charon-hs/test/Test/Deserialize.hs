@@ -34,6 +34,7 @@ tests = testGroup "Deserialization Tests"
       ]
   , testGroup "LLBC File Deserialization" 
       [ testCase "Find test LLBC files" test_find_llbc_files
+      , testCase "Parse and validate test_crate.llbc" test_test_crate_llbc
       -- Note: The comprehensive LLBC tests will be added dynamically below
       ]
   ]
@@ -83,6 +84,42 @@ test_find_llbc_files = do
     -- So this test passes even if no files are found
     assertBool ("Checked for LLBC files in " ++ testDir ++ ", found " ++ show fileCount) True
 
+-- Test the checked-in test_crate.llbc file with rigorous AST checks
+test_test_crate_llbc :: Assertion
+test_test_crate_llbc = do
+  let filepath = "test/data/test_crate.llbc"
+  fileExists <- doesFileExist filepath
+  if not fileExists
+    then assertFailure $ "Test file not found: " ++ filepath
+    else do
+      result <- eitherDecodeFileStrict filepath :: IO (Either String LlbcFile)
+      case result of
+        Left err -> assertFailure $ "Failed to deserialize LLBC file: " ++ err
+        Right llbcFile -> do
+          let crate = llbcfileTranslated llbcFile
+          
+          -- Extract counts from the AST
+          let funDeclCount = length (translatedcrateFunDecls crate)
+              globalDeclCount = length (translatedcrateGlobalDecls crate)
+              typeDeclCount = length (translatedcrateTypeDecls crate)
+              traitDeclCount = length (translatedcrateTraitDecls crate)
+              traitImplCount = length (translatedcrateTraitImpls crate)
+          
+          -- Expected counts for test_crate.llbc
+          let expectedFunDecls = 2
+              expectedGlobalDecls = 1
+              expectedTypeDecls = 0
+              expectedTraitDecls = 0
+              expectedTraitImpls = 0
+          
+          -- Assert each count matches the expected value
+          assertEqual "Number of FunDecls" expectedFunDecls funDeclCount
+          assertEqual "Number of GlobalDecls" expectedGlobalDecls globalDeclCount
+          assertEqual "Number of TypeDecls" expectedTypeDecls typeDeclCount
+          assertEqual "Number of TraitDecls" expectedTraitDecls traitDeclCount
+          assertEqual "Number of TraitImpls" expectedTraitImpls traitImplCount
+
+
 -- Helper function to find all .llbc files in a directory recursively
 findLlbcFiles :: FilePath -> IO [FilePath]
 findLlbcFiles dir = do
@@ -107,7 +144,8 @@ createLlbcTest filepath = testCase filepath $ do
       let crate = llbcfileTranslated llbcFile
       -- Successfully deserialized the entire crate!
       -- We can validate that it has the expected structure
-      let typeDeclCount = length (translatedcrateTypeDecls crate)
+      let funDeclCount = length (translatedcrateFunDecls crate)
+          typeDeclCount = length (translatedcrateTypeDecls crate)
           globalDeclCount = length (translatedcrateGlobalDecls crate)
           traitDeclCount = length (translatedcrateTraitDecls crate)
           traitImplCount = length (translatedcrateTraitImpls crate)
@@ -119,6 +157,7 @@ createLlbcTest filepath = testCase filepath $ do
         , ": crate '"
         , translatedcrateCrateName crate
         , "' with "
+        , show funDeclCount, " fun decls, "
         , show typeDeclCount, " type decls, "
         , show globalDeclCount, " global decls, "
         , show traitDeclCount, " trait decls, "
