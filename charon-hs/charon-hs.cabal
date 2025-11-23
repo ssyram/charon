@@ -23,10 +23,13 @@ library
       Generated_GAst
       Generated_LlbcAst
       Generated_UllbcAst
+      Charon.Printing
+      Charon.PrintingDebug
       Generated_Krate
   other-modules:
       Paths_charon_hs
   hs-source-dirs:
+      src
       src/generated
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
@@ -42,6 +45,9 @@ test-suite charon-hs-test
   main-is: Main.hs
   other-modules:
       Test.Deserialize
+      Test.Printing
+      Test.Print
+      Test.PrintComparison
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
