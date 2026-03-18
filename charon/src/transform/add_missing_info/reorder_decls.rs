@@ -307,6 +307,16 @@ fn compute_declarations_graph<'tcx>(ctx: &'tcx TransformCtx) -> DiGraphMap<ItemI
         .map(|item| item.id())
         .collect();
 
+    if deps.unprocessed.is_empty() {
+        // `--start-from` can target items from a foreign crate. Those items still get translated,
+        // but after normalization their pretty-printed names may no longer match the original
+        // starting pattern exactly, which would incorrectly make them appear unreachable here.
+        // Fall back to all translated items so that `--print-{u,}llbc` still shows the extracted
+        // foreign declarations instead of an empty crate.
+        deps.unprocessed = ctx.translated.all_items().map(|item| item.id()).collect();
+    }
+
+
     // Explore reachable items.
     while let Some(id) = deps.unprocessed.pop() {
         if !deps.visited.insert(id) {

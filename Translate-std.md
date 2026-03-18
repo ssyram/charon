@@ -38,14 +38,5 @@ cargo build
 6. translate the std function by specifying `--start-from`. For example, the following command translates `std::cmp::min`.
 
 ```
-RUST_LOG=trace ./target/debug/charon rustc --start-from=std::cmp::min --include=std --no-serialize -- --sysroot="$SYSROOT" file.rs 2>trace.txt
+./target/debug/charon rustc --start-from=std::cmp::min --include=std --print-llbc --no-serialize -- --sysroot="$SYSROOT" file.rs
 ```
-
-7. check the LLBC after translation by opening `trace.txt` and searching `LLBC`.
-
-
-## TODO
-
-1. Support output `.llbc` files with the `print-llbc` compilation option.
-
-2. Support recursively translate all the items in a std module.
