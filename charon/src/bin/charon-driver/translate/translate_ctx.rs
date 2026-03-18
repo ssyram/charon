@@ -66,6 +66,10 @@ pub struct TranslateCtx<'tcx> {
     pub cached_item_metas: HashMap<TransItemSource, ItemMeta>,
     /// Compute which lifetimes are used in a `&'a mut T`. This is a global fixpoint analysis.
     pub lt_mutability_computer: LifetimeMutabilityComputer,
+    /// Items explicitly selected by `--start-from`, `--start-from-attribute`, or
+    /// `--start-from-pub`. We force these items themselves to be transparent even if they come
+    /// from a foreign crate, so that starting from e.g. `std::cmp::min` translates its body.
+    pub explicit_start_items: HashSet<hax::DefId>,
 }
 
 /// Tracks whether a method is used (i.e. called or (non-opaquely) implemented).

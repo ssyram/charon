@@ -64,7 +64,12 @@ impl<'tcx, 'ctx> TranslateCtx<'tcx> {
         if let Some(trans_id) = trans_id {
             self.translated.item_names.insert(trans_id, name.clone());
         }
-        let opacity = self.opacity_for_name(&name);
+        // let opacity = self.opacity_for_name(&name);
+        let opacity = if self.explicit_start_items.contains(item_src.def_id()) {
+            ItemOpacity::Transparent
+        } else {
+            self.opacity_for_name(&name)
+        };
         if opacity.is_invisible() {
             // Don't even start translating the item. In particular don't call `hax_def` on it.
             return Ok(());

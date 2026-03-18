@@ -26,6 +26,9 @@ result
 nohup.out
 *~
 
+# dummy file with main to test translation of std
+charon/file.rs
+
 # Other
 .vscode
 *#
