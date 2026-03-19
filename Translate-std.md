@@ -1,44 +1,47 @@
-# Translate Rust Standard Library
+# Translating the Rust Standard Library Incrementally
 
-This document introduces how to translate parts of the Rust standard library incrementally.
-It origins from the [issue](https://github.com/AeneasVerif/charon/issues/863) in the authority of Charon in Github and the discussion on the [zulip](https://aeneas-verif.zulipchat.com/#narrow/channel/423740-dev/topic/Extracting.20the.20standard.20library/with/546486336).
+This document explains how to incrementally translate parts of the Rust standard library using Charon. It originates from [this github issue](https://github.com/AeneasVerif/charon/issues/863) and the subsequent discussion on [zulip](https://aeneas-verif.zulipchat.com/#narrow/channel/423740-dev/topic/Extracting.20the.20standard.20library/with/546486336).
 
 ## Instructions
 
-1. cd to the `charon` subdirectory.
+1. Navigate to the the `charon` subdirectory:
 
 ```
 cd charon
 ```
 
-2. setup miri by (miri offers the prebuilt of the standard library that will be used by rustc).
+2. Set up Miri, which provides a prebuilt version of the standard library that `rustc` will use:
 
 ```
 rustup component add miri
 ```
 
-3. setup `SYSROOT` env, which tells rustc the location of the `std` to look for.
+3. Set the `SYSROOT` nvironment variable to tell `rustc` where to look for the standard library:
 
 ```
 SYSROOT=$(cargo miri setup -v --print-sysroot)
 ```
 
-4. create a dummy rust file with the `main` function.
+4. Create a dummy Rust file with a `main` function (required for the translation process):
 
 ```
 echo "fn main() {}" > file.rs
 ```
 
-5. build `charon`.
+5. Build Charon:
 
 ```
 cargo build
 ```
 
-6. translate the std by modules.
+6. Translate the standard library module by module using the provided Python script:
 
 ```
 python3 translate_std.py --sysroot "$(rustc --print sysroot)"
 ```
 
-7. A directory `translate_std` and a file `failed_modules` will be generated. For each std module, if Charon translated it successfully, a file `std_xxx_yyy.txt` will be generated in `translate_std`; otherwise a file `std_xxx_yyy_error.txt` will be generated. All the failed modules are recorded in `failed_modules`.
+7. After execution, a directory named `translate_std` and a file named `failed_modules` will be created. For each standard library module:
+
+  - If Charon translates it successfully, a file named `std_xxx_yyy.txt` is generated inside `translate_std`.
+  - If translation fails, a file named `std_xxx_yyy_error.txt` is generated instead.
+  - All modules that failed are listed in `failed_modules.txt`
