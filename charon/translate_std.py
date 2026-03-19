@@ -11,6 +11,19 @@ def clean_output_dir(dir_path):
         shutil.rmtree(dir_path)
     os.makedirs(dir_path)
 
+def run_command(cmd):
+    """Run a command and return the CompletedProcess object"""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=None)
+    except Exception as e:
+        # Wrap exception as a fake result with non-zero returncode and error message
+        class FailedResult:
+            def __init__(self, exc):
+                self.returncode = -1
+                self.stdout = ""
+                self.stderr = f"Exception: {exc}"
+        return FailedResult(e)
+
 def main():
     parser = argparse.ArgumentParser(description="Run charon to process std modules")
     parser.add_argument("--sysroot", help="Rust sysroot path; if not provided, read from environment variable SYSROOT")
@@ -50,7 +63,7 @@ def main():
         if not arg:
             continue
 
-        print(f"Processing     : {arg}")
+        print(f"Processing: {arg}")
 
         # Generate safe filename: remove trailing "::*", then replace "::" with "_"
         if arg.endswith("::*"):
@@ -59,10 +72,12 @@ def main():
             base_arg = arg       # If not, keep as is (but all lines in file should have it)
         safe_arg = base_arg.replace("::", "_")
 
+        # First attempt with original arg
         cmd = [
             "./target/debug/charon",
             "rustc",
-            f"--start-from={arg}",   # Note: command still uses original arg, only filename removes ::*
+            "--monomorphize",
+            f"--start-from={arg}",
             "--include=std",
             "--print-llbc",
             "--no-serialize",
@@ -71,25 +86,51 @@ def main():
             test_file
         ]
 
-        try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=None)
-        except Exception as e:
-            print(f"Command execution failed ({arg}): {e}", file=sys.stderr)
-            failed_modules.append(arg)  # Record failed module
-            continue
+        result = run_command(cmd)
 
+        # Check if we should retry without trailing "::*"
+        retried = False
+        if result.returncode != 0 and arg.endswith("::*"):
+            # Transform the pattern: replace trailing "*" with "_" in the argument
+            transformed = arg[:-1] + "_"   # change last character from * to _
+            # Construct the expected warning line (first line)
+            first_line = result.stderr.split('\n')[0] if result.stderr else ""
+            expected_warning = f"warning: when processing starting pattern `{transformed}`: path `{transformed}` does not correspond to any item"
+            # Check if first line matches exactly (ignoring possible trailing spaces)
+            if first_line.strip() == expected_warning:
+                print(f"  Warning detected, retrying without trailing '::*' (using {base_arg})")
+                # Second attempt with base_arg
+                retry_cmd = [
+                    "./target/debug/charon",
+                    "rustc",
+                    "--monomorphize",
+                    f"--start-from={base_arg}",
+                    "--include=std",
+                    "--print-llbc",
+                    "--no-serialize",
+                    "--",
+                    f"--sysroot={sysroot}",
+                    test_file
+                ]
+                result = run_command(retry_cmd)
+                retried = True
+
+        # Determine output file and content based on final result
         if result.returncode == 0:
             filename = os.path.join(out_dir, f"{safe_arg}.txt")
             content = result.stdout
+            print(f"  Success, output saved to: {filename}")
         else:
             filename = os.path.join(out_dir, f"{safe_arg}_error.txt")
             content = result.stderr
-            failed_modules.append(arg)  # Record failed module
+            failed_modules.append(arg)  # Record original arg in failed list
+            print(f"  Failed, error saved to: {filename}")
+            if retried:
+                print(f"  (Failed after retry)")
 
+        # Write the output file
         with open(filename, "w") as f:
             f.write(content)
-
-        print(f"Result saved to: {filename}")
 
     # Write failed modules list to file in current directory
     if failed_modules:
@@ -99,7 +140,6 @@ def main():
         print(f"Failed modules list saved to: {args.failed_list}")
     else:
         # If no failed modules, create an empty file or skip
-        # Here choose to create an empty file to indicate completion with no failures
         with open(args.failed_list, "w") as f:
             pass
         print("All modules processed successfully, failed list is empty.")
