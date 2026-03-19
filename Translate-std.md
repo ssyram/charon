@@ -35,8 +35,10 @@ echo "fn main() {}" > file.rs
 cargo build
 ```
 
-6. translate the std function by specifying `--start-from`. For example, the following command translates `std::cmp::min`.
+6. translate the std by modules.
 
 ```
-./target/debug/charon rustc --start-from=std::cmp::min --include=std --print-llbc --no-serialize -- --sysroot="$SYSROOT" file.rs
+python3 translate_std.py --sysroot "$(rustc --print sysroot)"
 ```
+
+7. A directory `translate_std` and a file `failed_modules` will be generated. For each std module, if Charon translated it successfully, a file `std_xxx_yyy.txt` will be generated in `translate_std`; otherwise a file `std_xxx_yyy_error.txt` will be generated. All the failed modules are recorded in `failed_modules`.

@@ -14,6 +14,8 @@ def clean_output_dir(dir_path):
 def main():
     parser = argparse.ArgumentParser(description="运行 charon 处理 std 模块")
     parser.add_argument("--sysroot", help="Rust sysroot 路径，如果不提供则从环境变量 SYSROOT 读取")
+    parser.add_argument("--failed-list", default="failed_modules.txt",
+                        help="记录失败模块列表的文件名，默认为 failed_modules.txt")
     args = parser.parse_args()
 
     # 获取 sysroot：优先命令行参数，否则环境变量
@@ -40,6 +42,8 @@ def main():
 
     with open(list_file, "r") as f:
         lines = f.readlines()
+
+    failed_modules = []  # 用于记录失败的模块原始字符串
 
     for line in lines:
         arg = line.strip()
@@ -71,6 +75,7 @@ def main():
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=None)
         except Exception as e:
             print(f"执行命令失败 ({arg}): {e}", file=sys.stderr)
+            failed_modules.append(arg)  # 记录失败模块
             continue
 
         if result.returncode == 0:
@@ -79,11 +84,25 @@ def main():
         else:
             filename = os.path.join(out_dir, f"{safe_arg}_error.txt")
             content = result.stderr
+            failed_modules.append(arg)  # 记录失败模块
 
         with open(filename, "w") as f:
             f.write(content)
 
         print(f"结果已保存至: {filename}")
+
+    # 将失败的模块列表写入当前目录下的文件
+    if failed_modules:
+        with open(args.failed_list, "w") as f:
+            for mod in failed_modules:
+                f.write(mod + "\n")
+        print(f"失败模块列表已保存至: {args.failed_list}")
+    else:
+        # 没有失败模块时，也可以创建一个空文件或跳过
+        # 这里选择创建空文件以表明运行完成但无失败
+        with open(args.failed_list, "w") as f:
+            pass
+        print("所有模块处理成功，失败列表为空。")
 
 if __name__ == "__main__":
     main()
